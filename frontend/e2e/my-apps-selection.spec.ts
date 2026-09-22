@@ -9,46 +9,46 @@ async function openApps(page: Page) {
   await stabilizePage(page);
 }
 
-for (const mode of ['Basic', 'Advanced']) {
-  test(`Grid/List preserves ${mode} disclosure, navigation, and app selection`, async ({ page }) => {
-    await openApps(page);
-    const settingsWrites: string[] = [];
-    page.on('request', request => {
-      if (request.url().endsWith('/api/system/settings') && request.method() === 'PUT') settingsWrites.push(request.url());
-    });
-    await page.getByRole('button', { name: mode, exact: true }).click();
-    const storage = page.getByRole('link', { name: 'Storage', exact: true });
-    const expectedLinks = mode === 'Advanced' ? 1 : 0;
-    await expect(storage).toHaveCount(expectedLinks);
-    for (const layout of ['Grid', 'List']) {
-      const toggle = page.getByRole('radio', { name: `${layout} view` });
-      await toggle.focus();
-      await page.keyboard.press('Space');
-      await expect(toggle).toBeChecked();
-      await expect(storage).toHaveCount(expectedLinks);
-      await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
-      const dialog = page.getByRole('dialog', { name: /Vaultwarden/ });
-      await expect(dialog).toBeVisible();
-      await expect(page).toHaveURL(/focus=managed%3Avaultwarden&panel=manage/);
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-      await expect(dialog).toHaveCount(0);
-    }
-    expect(await page.evaluate(() => localStorage.getItem('autark-os.viewMode'))).toBe(mode.toLowerCase());
-    await page.getByRole('link', { name: 'Access', exact: true }).click();
-    await expect(page.getByRole('tab', { name: 'Devices', exact: true })).toHaveCount(expectedLinks);
-    await page.goto('/activity');
-    await expect(page.getByRole('heading', { name: 'Activity Log', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'System metrics', exact: true })).toHaveCount(expectedLinks);
-    await page.getByRole('link', { name: 'My Apps', exact: true }).click();
-    await expect(page.getByRole('radio', { name: 'List view' })).toBeChecked();
-    await page.reload();
-    await expect(page.getByRole('radio', { name: 'List view' })).toBeChecked();
-    await expect(storage).toHaveCount(expectedLinks);
-    await page.getByRole('button', { name: mode === 'Basic' ? 'Advanced' : 'Basic', exact: true }).click();
-    await expect(page.getByRole('radio', { name: 'List view' })).toBeChecked();
-    expect(settingsWrites).toEqual([]);
+test('Grid/List preserves stable navigation and local disclosures across pages and reload', async ({ page }) => {
+  await openApps(page);
+  const settingsWrites: string[] = [];
+  page.on('request', request => {
+    if (request.url().endsWith('/api/system/settings') && request.method() === 'PUT') settingsWrites.push(request.url());
   });
-}
+  const storage = page.getByRole('link', { name: 'Storage', exact: true });
+  await expect(storage).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(Basic|Advanced)$/ })).toHaveCount(0);
+  for (const layout of ['Grid', 'List']) {
+    const toggle = page.getByRole('radio', { name: `${layout} view` });
+    await toggle.focus();
+    await page.keyboard.press('Space');
+    await expect(toggle).toBeChecked();
+    await expect(storage).toBeVisible();
+    await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
+    const dialog = page.getByRole('dialog', { name: /Vaultwarden/ });
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/focus=managed%3Avaultwarden&panel=manage/);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+  await page.getByRole('link', { name: 'Access', exact: true }).click();
+  await page.getByRole('tab', { name: 'Devices', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Devices', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.goto('/access?tab=advanced');
+  await expect(page.getByRole('tab', { name: 'Diagnostics', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.goto('/storage?tab=advanced');
+  await expect(page.getByRole('tab', { name: 'Technical details', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.goto('/activity');
+  await expect(page.getByRole('tab', { name: 'History', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'System metrics', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'System metrics', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'My Apps', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'List view' })).toBeChecked();
+  await page.reload();
+  await expect(page.getByRole('radio', { name: 'List view' })).toBeChecked();
+  await expect(storage).toBeVisible();
+  expect(settingsWrites).toEqual([]);
+});
 
 test('saving appliance settings leaves the app layout unchanged', async ({ page }) => {
   await openApps(page);

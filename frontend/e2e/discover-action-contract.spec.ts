@@ -10,6 +10,57 @@ async function discoverFixture(page: Page) {
   return apps;
 }
 
+test('local catalog and category filters keep an empty result usable without unrelated app actions', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const apps = await discoverFixture(page);
+  apps.find(view => view.application.id === 'immich')!.app.supportLevel = 'Experimental';
+  await page.goto('/discover');
+  const catalog = page.getByRole('combobox', { name: 'Catalog', exact: true });
+  const rail = page.getByLabel('Selected Discover app', { exact: true });
+  await expect(catalog).toContainText('Starter apps');
+  await expect(page.getByText('No apps match this view.', { exact: true })).toBeVisible();
+  await expect(rail).toHaveCount(0);
+  await expect(page.getByText('Loading Discover', { exact: true })).toHaveCount(0);
+  await catalog.click();
+  await page.getByRole('option', { name: 'Ready apps', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Select Vaultwarden/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select Immich', exact: true })).toHaveCount(0);
+  await catalog.click();
+  await page.getByRole('option', { name: 'All apps', exact: true }).click();
+  await page.getByRole('button', { name: 'Select Immich', exact: true }).click();
+  await expect(rail).toContainText('Experimental');
+  const category = page.getByRole('combobox', { name: 'Category', exact: true });
+  await category.click();
+  await page.getByRole('option', { name: 'Security', exact: true }).click();
+  await expect(rail).toContainText('Vaultwarden');
+  await catalog.click();
+  await page.getByRole('option', { name: 'Starter apps', exact: true }).click();
+  await expect(category).toContainText('Security');
+  await expect(rail).toHaveCount(0);
+  await catalog.click();
+  await page.getByRole('option', { name: 'All apps', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search Discover apps' }).fill('no-matching-app');
+  await expect(rail).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Search Discover apps' }).clear();
+  await expect(rail).toContainText('Vaultwarden');
+  // A deliberate deep link is independent of the default catalog filter.
+  await page.goto('/discover?detail=immich');
+  await expect(catalog).toContainText('Starter apps');
+  await expect(rail).toContainText('Immich');
+  await page.getByRole('link', { name: 'Storage', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Technical details', exact: true })).toBeVisible();
+});
+
+test('an empty server catalog keeps filters and refresh available', async ({ page }) => {
+  await discoverFixture(page);
+  await page.route('**/api/discover/apps', route => route.fulfill({ json: [] }));
+  await page.goto('/discover');
+  await expect(page.getByText('No apps match this view.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Catalog', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await expect(page.getByText('Loading Discover', { exact: true })).toHaveCount(0);
+});
+
 test('mobile Discover management links use the app ID, not its installation identity', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const apps = await discoverFixture(page);
@@ -67,6 +118,8 @@ for (const missingFromList of [false, true]) {
     // Refresh the catalog without replacing the selected job or remounting the page.
     await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Catalog', exact: true }).click();
+    await page.getByRole('option', { name: 'All apps', exact: true }).click();
     await page.getByRole('button', { name: `Select ${app.name}`, exact: true }).click();
     await expect(page.getByLabel('Selected Discover app', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeEnabled();

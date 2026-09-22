@@ -131,5 +131,9 @@ test('failed plan retries in place without enabling destructive confirmation', a
   state.planFails = false;
   await dialog.getByRole('button', { name: 'Retry plan', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Restore now', exact: true })).toBeEnabled();
+  await expect(dialog.getByText('Archive verification', { exact: true })).toBeHidden();
+  await dialog.locator('summary', { hasText: 'Technical restore details' }).click();
+  await expect(dialog.getByText('Archive verification', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('What will change', { exact: true })).toBeVisible();
   expect(state.restoreRequests).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -52,7 +53,6 @@ type StorageCapacityRibbonWorkspaceProps = {
   refreshing: boolean;
   refreshError?: string | null;
   report: StorageReport;
-  showAdvancedMetrics: boolean;
   updatedAt: Date | null;
 };
 
@@ -65,7 +65,6 @@ export function StorageCapacityRibbonWorkspace({
   refreshing,
   refreshError,
   report,
-  showAdvancedMetrics,
   updatedAt,
 }: StorageCapacityRibbonWorkspaceProps) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,16 +72,11 @@ export function StorageCapacityRibbonWorkspace({
   const appsWithBackupsOn = report.apps.filter((app) => app.backupEnabled).length;
   const largestApps = report.apps.slice(0, 3);
   const route = useMemo(
-    () => parseStorageWorkspaceRoute(searchParams, report.apps, showAdvancedMetrics),
-    [report.apps, searchParams, showAdvancedMetrics],
+    () => parseStorageWorkspaceRoute(searchParams, report.apps),
+    [report.apps, searchParams],
   );
   const workspaceTab = route.tab;
   const selectedApp = report.apps.find((app) => app.appId === route.appId) ?? report.apps[0] ?? null;
-
-  function reviewOrphan(orphan: OrphanedStorage) {
-    onReviewOrphan(orphan);
-  }
-
   function selectApp(appId: string) {
     updateRoute({ appId, tab: 'apps' });
   }
@@ -116,7 +110,7 @@ export function StorageCapacityRibbonWorkspace({
               <StorageWorkspaceTabTrigger icon={PackageOpen} label="App data" value="apps" />
               <StorageWorkspaceTabTrigger icon={Archive} label="Backups" value="backups" />
               <StorageWorkspaceTabTrigger icon={Trash2} label="Cleanup" value="cleanup" />
-              {showAdvancedMetrics && <StorageWorkspaceTabTrigger icon={Database} label="Advanced" value="advanced" />}
+              <StorageWorkspaceTabTrigger icon={Database} label="Technical details" value="advanced" />
             </TabsList>
           </div>
 
@@ -137,7 +131,6 @@ export function StorageCapacityRibbonWorkspace({
               onSelectApp={selectApp}
               selectedApp={selectedApp}
               selectedAppId={route.appId ?? selectedApp?.appId ?? null}
-              showAdvancedMetrics={showAdvancedMetrics}
             />
           </TabsContent>
 
@@ -146,14 +139,12 @@ export function StorageCapacityRibbonWorkspace({
           </TabsContent>
 
           <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="cleanup">
-            <CleanupWorkspace onReviewOrphan={reviewOrphan} orphans={report.orphanedData} showAdvancedMetrics={showAdvancedMetrics} />
+            <CleanupWorkspace onReviewOrphan={onReviewOrphan} orphans={report.orphanedData} />
           </TabsContent>
 
-          {showAdvancedMetrics && (
-            <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="advanced">
-              <AdvancedStorageWorkspace report={report} />
-            </TabsContent>
-          )}
+          <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="advanced">
+            <AdvancedStorageWorkspace report={report} />
+          </TabsContent>
         </Surface>
       </Tabs>
     </section>
@@ -173,33 +164,12 @@ function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, refreshError,
   usedPercent: number;
 }) {
   return (
-    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
-            <HardDrive aria-hidden="true" className="size-5" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Storage</h1>
-            <p className="m-0 text-sm text-sky-100/70">Room for apps, backups, and a little breathing space.</p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <HeaderMetric label="Used" value={storagePercentLabel(usedPercent)} />
-          <HeaderMetric label="Free" value={formatStorageBytes(freeBytes)} />
-          <RefreshStatus error={refreshError} className="pl-1" intervalLabel="Updates every 30s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
-        </div>
-      </div>
-    </Surface>
-  );
-}
-
-function HeaderMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-20 rounded-xl border border-sky-300/15 bg-slate-950/25 px-3 py-2 text-right">
-      <p className="text-sm font-semibold leading-none text-white">{value}</p>
-      <p className="mt-1 text-[0.68rem] text-slate-400">{label}</p>
-    </div>
+    <PageHeader icon={HardDrive} title="Storage" description="Room for apps, backups, and a little breathing space." metrics={[
+      { label: 'Used', value: storagePercentLabel(usedPercent) },
+      { label: 'Free', value: formatStorageBytes(freeBytes) },
+    ]}>
+      <RefreshStatus error={refreshError} intervalLabel="Updates every 30s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
+    </PageHeader>
   );
 }
 
@@ -270,7 +240,6 @@ function GrowthPanel({ apps, status, weeklyGrowthBytes }: { apps: AppStorageUsag
   const trend = useMemo(() => aggregateAppStorageTrend(apps), [apps]);
   const largestChange = apps.reduce<AppStorageUsage | null>((largest, app) => !largest || app.sevenDayGrowthBytes > largest.sevenDayGrowthBytes ? app : largest, null);
   const watching = status === 'warning' || status === 'critical' || weeklyGrowthBytes > 0;
-
   return (
     <Surface className="flex min-h-0 flex-col border-sky-300/20 bg-slate-900 p-4" tone="panel">
       <div className="flex items-start justify-between gap-3">
@@ -385,7 +354,6 @@ function AppDataWorkspace({
   onSelectApp,
   selectedApp,
   selectedAppId,
-  showAdvancedMetrics,
 }: {
   appIconUrlById: Record<string, string | null>;
   apps: AppStorageUsage[];
@@ -394,7 +362,7 @@ function AppDataWorkspace({
   onSelectApp: (appId: string) => void;
   selectedApp: AppStorageUsage | null;
   selectedAppId: string | null;
-  showAdvancedMetrics: boolean;
+
 }) {
   return (
     <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(15rem,0.55fr)_minmax(0,1.45fr)]">
@@ -432,7 +400,7 @@ function AppDataWorkspace({
               <DetailFact label="Restore protection" value={selectedApp.backupState === 'protected_by_restore_point' ? 'Verified restore point' : selectedApp.backupState === 'backup_disabled' ? 'Backups off — review retained points in Backups' : 'No compatible verified restore point'} />
               <DetailFact label="Storage status" value={selectedApp.status} />
             </div>
-            {showAdvancedMetrics && <div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={selectedApp.path}>{selectedApp.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(selectedApp.path, selectedApp.appId)} size="sm" type="button">{copiedPathId === selectedApp.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === selectedApp.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div>}
+            <details className="mt-3"><summary className="cursor-pointer text-sm text-muted-foreground">Technical details</summary><div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={selectedApp.path}>{selectedApp.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(selectedApp.path, selectedApp.appId)} size="sm" type="button">{copiedPathId === selectedApp.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === selectedApp.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div></details>
           </div>
         )}
       </Surface>
@@ -466,12 +434,12 @@ function BackupWorkspace({ appsWithBackupsOn, report }: { appsWithBackupsOn: num
   );
 }
 
-function CleanupWorkspace({ onReviewOrphan, orphans, showAdvancedMetrics }: { onReviewOrphan: (orphan: OrphanedStorage) => void; orphans: OrphanedStorage[]; showAdvancedMetrics: boolean }) {
+function CleanupWorkspace({ onReviewOrphan, orphans }: { onReviewOrphan: (orphan: OrphanedStorage) => void; orphans: OrphanedStorage[] }) {
   return (
     <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
       <Surface className="p-4" tone="inset">
         <WorkspaceHeading description="Review unused folders before archiving their declared app data and removing them." icon={FolderSearch} title="Unused data" />
-        <div className="mt-4 grid gap-2">{orphans.length ? orphans.map((orphan) => <DetailedOrphanRow key={orphan.path} onReview={() => onReviewOrphan(orphan)} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : <ProjectInset className="border-emerald-300/20 bg-emerald-400/5 text-sm text-emerald-100/75">Autark-OS did not find unused app data.</ProjectInset>}</div>
+        <div className="mt-4 grid gap-2">{orphans.length ? orphans.map((orphan) => <DetailedOrphanRow key={orphan.path} onReview={() => onReviewOrphan(orphan)} orphan={orphan} />) : <ProjectInset className="border-emerald-300/20 bg-emerald-400/5 text-sm text-emerald-100/75">Autark-OS did not find unused app data.</ProjectInset>}</div>
       </Surface>
       <Surface className="p-4" tone="panel"><WorkspaceHeading description="Archives require manual recovery; they are not Backups restore points." icon={ShieldCheck} title="Cleanup steps" /><div className="mt-4 grid gap-2"><DetailFact label="1" value="Review and confirm" /><DetailFact label="2" value="Archive declared app data" /><DetailFact label="3" value="Remove unused folder" /></div></Surface>
     </section>
@@ -499,10 +467,10 @@ function RecommendationRow({ recommendation }: { recommendation: StorageReport['
   return <div className={cn('rounded-lg p-3', semanticStatusVariants({ tone }))}><p className="text-sm font-semibold text-white">{recommendation.title}</p><p className="mt-1 text-xs leading-5 text-current/80">{recommendation.message}</p></div>;
 }
 
-function DetailedOrphanRow({ onReview, orphan, showAdvancedMetrics }: { onReview: () => void; orphan: OrphanedStorage; showAdvancedMetrics: boolean }) {
+function DetailedOrphanRow({ onReview, orphan }: { onReview: () => void; orphan: OrphanedStorage }) {
   return (
     <div className="rounded-xl border border-amber-300/25 bg-amber-400/5 p-3 text-amber-100">
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-white">{orphan.name}</p><p className="mt-1 text-xs text-amber-100/75">Not tied to an installed app · {formatStorageBytes(orphan.usedBytes)}</p>{!orphan.cleanupAllowed && <p className="mt-2 text-xs leading-5 text-amber-100">Cleanup blocked: {orphan.cleanupBlockedReason}</p>}{showAdvancedMetrics && <p className="mt-2 select-text break-all font-mono text-xs text-amber-100/85">{orphan.path}</p>}</div><DisabledAction disabled={!orphan.cleanupAllowed} reason={orphan.cleanupBlockedReason || 'Autark-OS cannot prove this folder is safe to clean up.'}><ProjectWarningButton className="shrink-0" disabled={!orphan.cleanupAllowed} onClick={onReview} size="sm" type="button">Review</ProjectWarningButton></DisabledAction></div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-white">{orphan.name}</p><p className="mt-1 text-xs text-amber-100/75">Not tied to an installed app · {formatStorageBytes(orphan.usedBytes)}</p>{!orphan.cleanupAllowed && <p className="mt-2 text-xs leading-5 text-amber-100">Cleanup blocked: {orphan.cleanupBlockedReason}</p>}<details className="mt-2"><summary className="cursor-pointer text-sm text-muted-foreground">Technical details</summary><p className="mt-2 select-text break-all font-mono text-xs text-amber-100/85">{orphan.path}</p></details></div><DisabledAction disabled={!orphan.cleanupAllowed} reason={orphan.cleanupBlockedReason || 'Autark-OS cannot prove this folder is safe to clean up.'}><ProjectWarningButton className="shrink-0" disabled={!orphan.cleanupAllowed} onClick={onReview} size="sm" type="button">Review</ProjectWarningButton></DisabledAction></div>
     </div>
   );
 }

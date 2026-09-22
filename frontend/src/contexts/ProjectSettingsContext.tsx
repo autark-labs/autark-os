@@ -3,17 +3,10 @@ import type { ReactNode } from 'react';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import type { ProjectSettings } from '@/types/system';
 
-export type ViewMode = 'basic' | 'advanced';
-
-const viewModeStorageKey = 'autark-os.viewMode';
-
 type ProjectSettingsContextValue = {
   loading: boolean;
   settings: ProjectSettings | null;
-  showAdvancedMetrics: boolean;
-  viewMode: ViewMode;
   refreshSettings: () => Promise<void>;
-  setViewMode: (mode: ViewMode) => void;
   setProjectSettings: (settings: ProjectSettings) => void;
 };
 
@@ -21,22 +14,13 @@ const ProjectSettingsContext = createContext<ProjectSettingsContextValue | null>
 
 export function ProjectSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
-  const [viewMode, setViewModeState] = useState<ViewMode>(() => storedViewMode() ?? 'basic');
   const [loading, setLoading] = useState(true);
-
-  const setViewMode = useCallback((mode: ViewMode) => {
-    setViewModeState(mode);
-    window.localStorage.setItem(viewModeStorageKey, mode);
-  }, []);
 
   const refreshSettings = useCallback(async () => {
     setLoading(true);
     try {
       const nextSettings = await SystemAPIClient.settings();
       setSettings(nextSettings);
-      if (!storedViewMode()) {
-        setViewModeState(nextSettings.showAdvancedMetrics ? 'advanced' : 'basic');
-      }
     } catch (error) {
       console.warn('Unable to load Autark-OS settings.', error);
     } finally {
@@ -48,20 +32,12 @@ export function ProjectSettingsProvider({ children }: { children: ReactNode }) {
     void refreshSettings();
   }, [refreshSettings]);
 
-  const setProjectSettings = useCallback((nextSettings: ProjectSettings) => {
-    setSettings(nextSettings);
-    setViewMode(nextSettings.showAdvancedMetrics ? 'advanced' : 'basic');
-  }, [setViewMode]);
-
   const value = useMemo<ProjectSettingsContextValue>(() => ({
     loading,
     settings,
-    showAdvancedMetrics: viewMode === 'advanced',
-    viewMode,
     refreshSettings,
-    setViewMode,
-    setProjectSettings,
-  }), [loading, refreshSettings, setProjectSettings, setViewMode, settings, viewMode]);
+    setProjectSettings: setSettings,
+  }), [loading, refreshSettings, settings]);
 
   return (
     <ProjectSettingsContext.Provider value={value}>
@@ -76,12 +52,4 @@ export function useProjectSettings() {
     throw new Error('useProjectSettings must be used within ProjectSettingsProvider');
   }
   return context;
-}
-
-function storedViewMode(): ViewMode | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const stored = window.localStorage.getItem(viewModeStorageKey);
-  return stored === 'advanced' || stored === 'basic' ? stored : null;
 }

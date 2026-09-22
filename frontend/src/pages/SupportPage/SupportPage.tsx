@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CheckCircle2, ChevronDown, CircleAlert, ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
@@ -15,12 +16,10 @@ import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
@@ -55,7 +54,6 @@ const initialState: SupportState = {
 };
 
 function SupportPage() {
-  const { showAdvancedMetrics } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
   const appState = useApplicationStateRepository();
   const [state, setState] = useState<SupportState>(initialState);
@@ -77,7 +75,7 @@ function SupportPage() {
         SystemAPIClient.supportSummary(),
         SystemAPIClient.doctor(),
         SystemAPIClient.setupStatus(),
-        SystemAPIClient.supportLogs(showAdvancedMetrics ? 160 : 50),
+        SystemAPIClient.supportLogs(160),
       ]);
       setState((current) => ({ ...current, doctor, logs, setup, summary }));
       if (background) {
@@ -95,7 +93,7 @@ function SupportPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [showAdvancedMetrics]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -183,7 +181,7 @@ function SupportPage() {
               <TabsContent className="space-y-5 p-5" value="health">
                 <HealthChecksWorkspace conflict={conflict} findings={findings} healthChecks={healthChecks} />
                 <AdvancedSection icon={Server} title="System details">
-                  <SystemDetailsWorkspace dockerResources={dockerResources} onOpenSettings={() => openSettings('advanced')} ownershipResources={ownershipResources} repairResources={repairResources} setup={state.setup} showAdvancedMetrics={showAdvancedMetrics} summary={summary} tailscaleCheck={tailscaleCheck?.message || summary.tailscaleStatus || 'Unknown'} />
+                  <SystemDetailsWorkspace dockerResources={dockerResources} onOpenSettings={() => openSettings('advanced')} ownershipResources={ownershipResources} repairResources={repairResources} setup={state.setup} summary={summary} tailscaleCheck={tailscaleCheck?.message || summary.tailscaleStatus || 'Unknown'} />
                 </AdvancedSection>
               </TabsContent>
               <TabsContent className="space-y-4 p-5" value="report">
@@ -206,25 +204,12 @@ function SupportPage() {
 
 function DiagnosticsHeader({ error, onRefresh, refreshing, checkedAt }: { error: string | null; onRefresh: () => void; refreshing: boolean; checkedAt?: string }) {
   return (
-    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
-            <ListChecks aria-hidden="true" className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Diagnostics</h1>
-            <p className="mt-1 text-sm text-sky-100/70">Check this server. Collect context when you need help.</p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="flex min-h-8 items-center justify-end text-xs text-muted-foreground">
-            {error ? <ContextChip label="Checks stale" title="Last refresh failed"><p>{error}</p><p>Previous checks remain visible. Use Refresh to try again.</p></ContextChip> : <span>{refreshing ? 'Checking…' : `Checked ${formatDate(checkedAt)}`}</span>}
-          </div>
-          <Button variant="outline" aria-disabled={refreshing} aria-busy={refreshing} onClick={refreshing ? undefined : onRefresh} type="button"><RefreshCw aria-hidden="true" className={cn('size-4', refreshing && 'animate-spin')} />Refresh</Button>
-        </div>
+    <PageHeader icon={ListChecks} title="Diagnostics" description="Check this server. Collect context when you need help.">
+      <div className="flex min-h-8 w-48 items-center justify-end text-xs text-muted-foreground">
+        {error ? <ContextChip label="Checks stale" title="Last refresh failed"><p>{error}</p><p>Previous checks remain visible. Use Refresh to try again.</p></ContextChip> : <span>{refreshing ? 'Checking…' : `Checked ${formatDate(checkedAt)}`}</span>}
       </div>
-    </Surface>
+      <Button variant="outline" aria-disabled={refreshing} aria-busy={refreshing} onClick={refreshing ? undefined : onRefresh} type="button"><RefreshCw aria-hidden="true" className={cn('size-4', refreshing && 'animate-spin')} />Refresh</Button>
+    </PageHeader>
   );
 }
 
@@ -297,7 +282,7 @@ function TechnicalLogsWorkspace({ logs, busy, onRefresh }: { logs: SupportLogLin
   );
 }
 
-function SystemDetailsWorkspace({ dockerResources, onOpenSettings, ownershipResources, repairResources, setup, showAdvancedMetrics, summary, tailscaleCheck }: { dockerResources: ApplicationView[]; onOpenSettings: () => void; ownershipResources: ApplicationView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; showAdvancedMetrics: boolean; summary: SupportSummary | null; tailscaleCheck: string }) {
+function SystemDetailsWorkspace({ dockerResources, onOpenSettings, ownershipResources, repairResources, setup, summary, tailscaleCheck }: { dockerResources: ApplicationView[]; onOpenSettings: () => void; ownershipResources: ApplicationView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; summary: SupportSummary | null; tailscaleCheck: string }) {
   return (
     <div className="grid min-h-full content-start gap-3">
       <section className="grid gap-3 rounded-xl border border-sky-300/15 bg-slate-950/25 p-3 md:grid-cols-2">
@@ -310,7 +295,7 @@ function SystemDetailsWorkspace({ dockerResources, onOpenSettings, ownershipReso
       <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">{dockerResources.length ? dockerResources.map((application) => <ResourceLine application={application} key={application.id} technical />) : <p className="text-sm text-slate-400">No matching Docker evidence is present in the app inventory.</p>}</AdvancedSection>
       </ApplicationStateContent>
       <AdvancedSection defaultOpen={false} icon={LockKeyhole} title="Tailscale details"><div className="grid gap-3 md:grid-cols-2"><InfoLine label="Tailscale" value={tailscaleCheck} /><InfoLine label="Version" value={setup?.tailscaleVersion || 'Unknown'} /><InfoLine label="Instance" value={setup?.instanceSlug || 'Unknown'} /></div></AdvancedSection>
-      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and appliance runtime checks." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
+      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and appliance runtime checks." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." /><RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." /></div></section>
     </div>
   );
 }

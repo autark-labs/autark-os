@@ -6,16 +6,19 @@ async function openDiscover(page: Parameters<typeof installMockApi>[0], viewport
   await page.setViewportSize(viewport);
   await page.goto('/discover', { waitUntil: 'domcontentloaded' });
   await stabilizePage(page);
+  await page.getByRole('combobox', { name: 'Catalog', exact: true }).click();
+  await page.getByRole('option', { name: 'All apps', exact: true }).click();
 }
 
 test('wide Discover keeps a selected app in the dense launcher detail rail', async ({ page }) => {
   await openDiscover(page, { width: 1440, height: 960 });
 
   const rail = page.getByLabel('Selected Discover app');
+  await page.getByRole('button', { name: /^Select Vaultwarden/ }).click();
   await expect(rail).toContainText('Vaultwarden');
   await page.getByRole('button', { name: 'Filter app status' }).click();
   await page.getByRole('menuitemradio', { name: 'Installed' }).click();
-  await expect(page.getByRole('button', { name: 'Select Vaultwarden' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Select Vaultwarden/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select Immich' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Filter app status' }).click();
   await page.getByRole('menuitemradio', { name: 'All statuses' }).click();

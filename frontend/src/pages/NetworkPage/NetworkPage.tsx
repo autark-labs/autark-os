@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Network, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,7 +12,6 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
-import { Surface } from '@/components/primitives/Surface';
 import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 import {
   AlertDialog,
@@ -30,7 +30,6 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import {
   useApplicationStateRepository,
@@ -75,7 +74,6 @@ import {
 } from './extensions/NetworkPage.reachability';
 
 function NetworkPage() {
-  const { showAdvancedMetrics } = useProjectSettings();
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -127,7 +125,7 @@ function NetworkPage() {
     () => Object.fromEntries(Object.keys(processingServiceTokens).map((serviceId) => [serviceId, true])),
     [processingServiceTokens],
   );
-  const selectedTab = !showAdvancedMetrics && activeTab && !['matrix', 'issues'].includes(activeTab) ? 'matrix' : activeTab ?? deepLinkTarget.tab ?? 'matrix';
+  const selectedTab = activeTab ?? deepLinkTarget.tab ?? 'matrix';
   const focusedService = useMemo(() => displayedReachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [displayedReachabilityServices, focusedServiceId]);
   const needsReviewCount = issues.length;
 
@@ -280,8 +278,8 @@ function NetworkPage() {
                   <TabsList className="min-w-0 max-w-full justify-start overflow-x-auto rounded-lg border border-sky-400/20 bg-slate-800 p-1" variant="default">
                     <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="matrix">Matrix</TabsTrigger>
                     <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
-                    {showAdvancedMetrics && <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="devices">Devices</TabsTrigger>}
-                    {showAdvancedMetrics && <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="advanced">Diagnostics</TabsTrigger>}
+                    <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="devices">Devices</TabsTrigger>
+                    <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="advanced">Diagnostics</TabsTrigger>
                   </TabsList>
                 </div>
               )}
@@ -311,15 +309,15 @@ function NetworkPage() {
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="issues">
               <NetworkIssuesPanel onReviewServices={() => handleTabChange('matrix')} issues={issues} onReviewPrivateLinks={() => setPrivateLinksOpen(true)} />
             </TabsContent>
-            {showAdvancedMetrics && <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="devices">
+            <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="devices">
               <NetworkDevicesPanel devices={devices} />
-            </TabsContent>}
-            {showAdvancedMetrics && <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="advanced">
+            </TabsContent>
+            <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="advanced">
               <div className="grid gap-3">
                 <HostSetupPanel setup={network.setupStatus} />
                 <NetworkAdvancedPanel diagnostics={network.diagnostics} guide={network.guide} tailscale={network.tailscale} />
               </div>
-            </TabsContent>}
+            </TabsContent>
           </Tabs>
         </div>
       )}
@@ -345,39 +343,13 @@ function AccessPageHeader({
   updatedAt: Date | null;
 }) {
   return (
-    <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
-          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
-            <Network aria-hidden="true" className="size-5" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Access</h1>
-            <p className="m-0 text-sm text-sky-100/70">Private links, home-network access, and service reachability.</p>
-          </div>
-        </div>
-        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <div className="flex items-center gap-2">
-            <AccessSummaryMetric label="Reachable services" value={serviceCount} />
-            <AccessSummaryMetric attention={needsReviewCount > 0} label="Needs review" value={needsReviewCount} />
-          </div>
-          {context}
-          <RefreshStatus error={error} intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
-        </div>
-      </div>
-    </Surface>
-  );
-}
-
-function AccessSummaryMetric({ attention = false, label, value }: { attention?: boolean; label: string; value: number | null }) {
-  return (
-    <div className={cn(
-      'min-w-28 rounded-xl border border-sky-300/15 bg-slate-950/25 px-3 py-2 text-right',
-      attention && 'border-amber-300/30 bg-amber-400/5',
-    )}>
-      <p className={cn('text-lg font-semibold leading-none text-white', attention && 'text-amber-100')}>{value ?? 'Unavailable'}</p>
-      <p className="mt-1 text-[0.68rem] text-slate-400">{label}</p>
-    </div>
+    <PageHeader icon={Network} title="Access" description="Private links, home-network access, and service reachability." metrics={[
+      { label: 'Reachable services', value: serviceCount },
+      { label: 'Needs review', value: needsReviewCount },
+    ]}>
+      {context}
+      <RefreshStatus error={error} intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
+    </PageHeader>
   );
 }
 

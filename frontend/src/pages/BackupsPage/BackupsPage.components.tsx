@@ -28,7 +28,6 @@ export function RestoreFlowDialog({
   onVerify,
   restoreAvailability,
   running,
-  showAdvancedMetrics,
   timeZone,
   verifyAvailability,
 }: {
@@ -42,7 +41,6 @@ export function RestoreFlowDialog({
   onVerify: (point: RestorePoint) => void;
   restoreAvailability: BackupOperationAvailability;
   running: string | null;
-  showAdvancedMetrics: boolean;
   timeZone: string;
   verifyAvailability: BackupOperationAvailability;
 }) {
@@ -126,16 +124,14 @@ export function RestoreFlowDialog({
                 <InfoBlock title="What will change" values={plan.steps.length ? plan.steps : ['Autark-OS will stop affected apps, replace their data with this restore point, then start them again.']} />
                 <InfoBlock tone="warning" title="What is preserved" values={plan.warnings.length ? plan.warnings : ['A safety restore point is created before data is replaced. Other apps are left unchanged.']} />
                 {flow.error && <RestoreIssue message={flow.error} onRetry={onRetryPlan} title="Restore could not start" />}
-                {showAdvancedMetrics && (
-                  <details className="rounded-lg border border-sky-400/20 bg-slate-950/60 p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-200">Technical restore details</summary>
-                    <div className="mt-3 grid gap-3">
-                      <InfoBlock title="Archive verification" values={[`${plan.restoreConfidence}: ${plan.verificationMessage || 'No verification details recorded yet.'}`]} />
-                      <InfoBlock tone={plan.simulation.status === 'failed' || plan.simulation.status === 'warning' ? 'warning' : 'default'} title="Restore simulation" values={[plan.simulation.message, ...plan.simulation.details]} />
-                      <InfoBlock title="Backup contract check" values={plan.dryRunDetails.length ? plan.dryRunDetails : ['No app-specific backup contract details were found.']} />
-                    </div>
-                  </details>
-                )}
+                <details className="rounded-lg border border-sky-400/20 bg-slate-950/60 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-200">Technical restore details</summary>
+                  <div className="mt-3 grid gap-3">
+                    <InfoBlock title="Archive verification" values={[`${plan.restoreConfidence}: ${plan.verificationMessage || 'No verification details recorded yet.'}`]} />
+                    <InfoBlock tone={plan.simulation.status === 'failed' || plan.simulation.status === 'warning' ? 'warning' : 'default'} title="Restore simulation" values={[plan.simulation.message, ...plan.simulation.details]} />
+                    <InfoBlock title="Backup contract check" values={plan.dryRunDetails.length ? plan.dryRunDetails : ['No app-specific backup contract details were found.']} />
+                  </div>
+                </details>
               </>
             )}
           </div>

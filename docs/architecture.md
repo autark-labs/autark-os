@@ -80,7 +80,29 @@ The popover shows up to 100 recent results, not an unlimited archive. Saved
 receipts follow existing activity retention (30 days for routine results, 180 for
 warnings/errors). If saving fails, the result stays in the current session with a
 retry action; unsaved results cannot survive closing or reloading the browser.
-Page-local error treatments are unchanged in this notification pass.
+Current page conditions use bounded context-chip popovers, not result banners.
+First-load failures replace unavailable content; refresh failures preserve the
+last confirmed content and explain its age. Field errors and destructive
+consequences remain beside the relevant controls.
+
+## Navigation And Local Detail
+
+My Apps, Access, Backups, Storage, Activity Log and Diagnostics share one compact
+operational header. Pages retain ownership of their actions and metrics; the
+header only lays them out. Home, Discover and focused setup/Settings/Pro flows
+keep their distinct compositions.
+
+Storage, Activity Log and Diagnostics are always reachable in System navigation.
+There is no global Basic/Advanced mode or server setting for disclosure. My Apps
+Grid/List remains an independent layout preference. Access troubleshooting,
+Storage technical details, Activity metrics and restore diagnostics use local
+tabs or collapsed details. Required warnings and safety confirmations never
+depend on opening technical detail.
+
+Discover defaults to Starter apps, with local Ready apps / All apps and category
+filters. Ready describes catalog support, not the current host's readiness to
+install. Existing install previews, ownership checks and support warnings still
+apply. Changing these filters does not change navigation or another page.
 
 ## Boundaries
 

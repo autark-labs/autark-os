@@ -18,8 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { apiErrorMessage } from '@/api/httpClient';
 import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import {
   useDiscoverAppsQuery,
@@ -37,7 +36,7 @@ import {
   START_HERE_DISMISSAL_KEY,
   defaultDiscoverAppId,
   marketplaceVisibleAppViews,
-  safeBasicCatalogForDiscover,
+  readyCatalogForDiscover,
   starterCatalogForDiscover,
   shouldShowStartHereSection,
   starterAppsForMarketplace,
@@ -75,7 +74,6 @@ function DiscoverErrorState({ message, onRetry, title = 'Discover needs attentio
 }
 
 function MarketplacePage() {
-  const { showAdvancedMetrics } = useProjectSettings();
   const applicationState = useApplicationStateRepository();
   const wideRailLayout = useDiscoverRailLayout();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,7 +82,7 @@ function MarketplacePage() {
   const [sortBy, setSortBy] = useState('Recommended');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MarketplaceStatusFilter>('all');
-  const [basicCatalogMode, setBasicCatalogMode] = useState<'starter' | 'all-safe'>('starter');
+  const [catalogScope, setCatalogScope] = useState('starter');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -117,18 +115,25 @@ function MarketplacePage() {
     const starterIds = new Set(starterCatalogForDiscover(apps.map((view) => view.app)).map((app: MarketplaceApp) => app.id));
     return apps.filter((view) => starterIds.has(view.application.id));
   }, [apps]);
-  const safeBasicCatalogApps = useMemo(() => {
-    const safeIds = new Set(safeBasicCatalogForDiscover(apps.map((view) => view.app)).map((app: MarketplaceApp) => app.id));
+  const readyCatalogApps = useMemo(() => {
+    const safeIds = new Set(readyCatalogForDiscover(apps.map((view) => view.app)).map((app: MarketplaceApp) => app.id));
     return apps.filter((view) => safeIds.has(view.application.id));
   }, [apps]);
   const catalogApps = useMemo(() => {
-    if (showAdvancedMetrics) {
+    if (catalogScope === 'all') {
       return apps;
     }
-    return basicCatalogMode === 'all-safe' ? safeBasicCatalogApps : starterCatalogApps;
-  }, [apps, basicCatalogMode, safeBasicCatalogApps, showAdvancedMetrics, starterCatalogApps]);
+    return catalogScope === 'ready' ? readyCatalogApps : starterCatalogApps;
+  }, [apps, catalogScope, readyCatalogApps, starterCatalogApps]);
+  const visibleApps = useMemo(() => marketplaceVisibleAppViews({
+    views: catalogApps,
+    searchQuery,
+    selectedCategory,
+    sortBy,
+    statusFilter,
+  }) as DiscoverAppView[], [catalogApps, searchQuery, selectedCategory, sortBy, statusFilter]);
   const detailView = useMemo(() => detailAppId ? apps.find((view) => view.application.id === detailAppId) ?? null : null, [apps, detailAppId]);
-  const selectedView = useMemo(() => detailView ?? apps.find((view) => view.application.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, detailView, selectedAppId]);
+  const selectedView = useMemo(() => detailView ?? visibleApps.find((view) => view.application.id === selectedAppId) ?? visibleApps[0], [detailView, selectedAppId, visibleApps]);
   const selectedApp = selectedView?.app;
   const selectedInstalledApp = selectedView?.application.relationship === 'managed' ? selectedView.application : null;
   const fallbackInstallOptions: InstallOptions = {
@@ -205,25 +210,17 @@ function MarketplacePage() {
   }, [detailAppId]);
 
   useEffect(() => {
-    if (!showAdvancedMetrics) {
-      setSelectedCategory('All');
-      setSelectedAppId((currentAppId) => catalogApps.some((view) => view.application.id === currentAppId) ? currentAppId : catalogApps[0]?.application.id ?? currentAppId);
-    }
-  }, [catalogApps, showAdvancedMetrics]);
-
-  useEffect(() => {
     setDuplicateAcknowledgedAppId(null);
     setInstallReviewOpen(false);
-  }, [selectedAppId]);
+  }, [selectedApp?.id]);
 
   useEffect(() => {
-    const view = apps.find((nextApp) => nextApp.application.id === selectedAppId);
-    if (!view || setupAnswersAppId === selectedAppId) {
+    if (!selectedView || setupAnswersAppId === selectedView.application.id) {
       return;
     }
-    setSetupAnswers(defaultAnswersFromSchema(view.setupSchema));
-    setSetupAnswersAppId(selectedAppId);
-  }, [apps, selectedAppId, setupAnswersAppId]);
+    setSetupAnswers(defaultAnswersFromSchema(selectedView.setupSchema));
+    setSetupAnswersAppId(selectedView.application.id);
+  }, [selectedView, setupAnswersAppId]);
 
   async function installApp(appId = selectedApp?.id, _options = installOptions, mode: 'install' | 'reinstall' = 'install') {
     if (!appId) {
@@ -275,13 +272,6 @@ function MarketplacePage() {
     return installApp(selectedApp.id, installOptions ?? undefined, 'reinstall');
   }
 
-  const visibleApps = useMemo(() => marketplaceVisibleAppViews({
-    views: catalogApps,
-    searchQuery,
-    selectedCategory,
-    sortBy,
-    statusFilter,
-  }) as DiscoverAppView[], [catalogApps, searchQuery, selectedCategory, sortBy, statusFilter]);
   const selectedAppInstalling = Boolean(installJob && !terminalJob(installJob) && installJob.subjectId === selectedApp?.id);
   const selectedAppInstallLocked = !applicationState.freshness.isCurrent
     || Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
@@ -301,38 +291,19 @@ function MarketplacePage() {
     [starterRecommendations],
   );
   const starterGuidanceVisible = Boolean(
-    !showAdvancedMetrics
-    && basicCatalogMode === 'starter'
+    catalogScope === 'starter'
     && !searchQuery.trim()
     && statusFilter === 'all'
     && showStartHere
     && starterRecommendation,
   );
   const canRestoreStarterGuidance = Boolean(
-    !showAdvancedMetrics
-    && basicCatalogMode === 'starter'
+    catalogScope === 'starter'
     && !searchQuery.trim()
     && statusFilter === 'all'
     && startHereDismissed
     && starterRecommendation,
   );
-  const discoverFilters = useMemo(
-    () => showAdvancedMetrics
-      ? categories.map((category) => ({ label: category, value: category }))
-      : [
-          { label: 'Starter apps', value: 'starter' },
-          { label: 'Safe apps', value: 'all-safe' },
-        ],
-    [showAdvancedMetrics],
-  );
-  const discoverFilterValue = showAdvancedMetrics ? selectedCategory : basicCatalogMode;
-
-  useEffect(() => {
-    if (detailAppId || !visibleApps.length) {
-      return;
-    }
-    setSelectedAppId((currentAppId) => visibleApps.some((view) => view.application.id === currentAppId) ? currentAppId : visibleApps[0].application.id);
-  }, [detailAppId, visibleApps]);
 
   function openAppDetails(appId: string) {
     detailTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -363,17 +334,6 @@ function MarketplacePage() {
     void requestPlan(selectedView.application.id);
   }
 
-  function changeDiscoverFilter(nextFilter: string) {
-    if (!nextFilter) {
-      return;
-    }
-    if (showAdvancedMetrics) {
-      setSelectedCategory(nextFilter);
-      return;
-    }
-    setBasicCatalogMode(nextFilter as 'starter' | 'all-safe');
-  }
-
   function changeSetupAnswers(nextAnswers: Record<string, unknown>) {
     if (!selectedApp) {
       return;
@@ -392,7 +352,7 @@ function MarketplacePage() {
     window.localStorage.removeItem(START_HERE_DISMISSAL_KEY);
   }
 
-  if (!selectedApp) {
+  if (!appsQuery.data) {
     return (
       discoverError || applicationState.freshness.phase === 'unavailable' ? (
         <PageShell>
@@ -427,9 +387,10 @@ function MarketplacePage() {
       <ExtensionActionTarget actionId="review-app" className="min-h-0 flex-1" routeId="discover">
         <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
-          filterValue={discoverFilterValue}
-          filters={discoverFilters}
-          onFilterChange={changeDiscoverFilter}
+          catalogScope={catalogScope}
+          onCatalogScopeChange={setCatalogScope}
+          category={selectedCategory}
+          onCategoryChange={setSelectedCategory}
         />
 
         <section className="flex min-h-0 flex-col border-b border-sky-300/15 xl:border-b-0">
@@ -597,38 +558,24 @@ function DiscoverGuidedHeader({ error, lastRefreshAt, onRefresh, refreshing }: {
   );
 }
 
-function MarketplaceBrowseSidebar({
-  filterValue,
-  filters,
-  onFilterChange,
-}: {
-  filterValue: string;
-  filters: Array<{ label: string; value: string }>;
-  onFilterChange: (filter: string) => void;
+function MarketplaceBrowseSidebar({ catalogScope, onCatalogScopeChange, category, onCategoryChange }: {
+  catalogScope: string;
+  onCatalogScopeChange: (scope: string) => void;
+  category: string;
+  onCategoryChange: (category: string) => void;
 }) {
-  return (
-    <aside className="flex min-h-0 flex-col border-b border-sky-300/15 bg-slate-950/30 p-3 xl:border-b-0 xl:border-r">
-      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-sky-100/65">Browse</p>
-      <div aria-label="Discover filters" className="mt-2 grid gap-1">
-        {filters.map((filter) => (
-          <button
-            aria-pressed={filterValue === filter.value}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-              filterValue === filter.value ? 'bg-cyan-300/15 text-cyan-100' : 'text-sky-100/70 hover:bg-slate-800 hover:text-white',
-            )}
-            key={filter.value}
-            onClick={() => onFilterChange(filter.value)}
-            type="button"
-          >
-            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-cyan-200' : 'bg-sky-100/55')} />
-            <span className="truncate">{filter.label}</span>
-          </button>
-        ))}
-      </div>
-
-    </aside>
-  );
+  return <aside className="flex min-h-0 flex-col gap-3 border-b border-border bg-app-surface p-3 xl:border-b-0 xl:border-r">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Browse</p>
+    <Select value={catalogScope} onValueChange={onCatalogScopeChange}>
+      <SelectTrigger aria-label="Catalog"><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="starter">Starter apps</SelectItem><SelectItem value="ready">Ready apps</SelectItem><SelectItem value="all">All apps</SelectItem></SelectContent>
+    </Select>
+    <Select value={category} onValueChange={onCategoryChange}>
+      <SelectTrigger aria-label="Category"><SelectValue /></SelectTrigger>
+      <SelectContent>{categories.map(value => <SelectItem key={value} value={value}>{value === 'All' ? 'All categories' : value}</SelectItem>)}</SelectContent>
+    </Select>
+    {catalogScope === 'all' && <p className="text-xs text-muted-foreground">Includes advanced and experimental apps. Review each app’s support notes before installing.</p>}
+  </aside>;
 }
 
 export default MarketplacePage;

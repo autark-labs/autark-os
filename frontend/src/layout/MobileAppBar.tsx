@@ -16,7 +16,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
@@ -49,10 +48,9 @@ const navIcons: Record<string, LucideIcon> = {
 
 function MobileAppBar() {
   const location = useLocation();
-  const { viewMode } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
   const doctorQuery = useSystemDoctorQuery();
-  const navGroups = navigationGroups(viewMode) as NavGroup[];
+  const navGroups = navigationGroups() as NavGroup[];
   const checks = doctorQuery.data?.checks ?? [];
   const tailscaleCheck = checks.find((check) => check.id === 'tailscale') ?? null;
   const issueCount = checks.filter((check) => check.status !== 'ok').length;

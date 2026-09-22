@@ -114,7 +114,6 @@ public class OnboardingService {
                     current.backupFrequency(),
                     current.backupRetentionDays(),
                     current.backupTime(),
-                    current.showAdvancedMetrics(),
                     Instant.now()));
         }
         return state();

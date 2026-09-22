@@ -41,7 +41,7 @@ test('Storage measurement failure stays unavailable in capacity and advanced det
   await page.route('**/api/system/storage', route => route.fulfill({ json: report }));
   await page.reload();
   await expect(page.getByText('Disk usage is unavailable', { exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'Advanced', exact: true }).click();
+  await page.getByRole('tab', { name: 'Technical details', exact: true }).click();
   const host = page.getByText('Host disk', { exact: true }).locator('../../..');
   await expect(host.getByText('Unknown', { exact: true })).toHaveClass(/bg-app-status-muted-surface/);
   await expect(host.getByText('Unavailable', { exact: true })).toHaveCount(3);
@@ -204,6 +204,11 @@ test('Storage keeps details in the in-page workspace and retains cleanup confirm
   await expect(page).toHaveURL(/\/storage\?tab=apps&app=vaultwarden$/);
   await expect(page.locator('img[src="/app-images/vaultwarden.svg"]').first()).toBeVisible();
   await expect(page.getByText('Managed app storage')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy path', exact: true })).toBeHidden();
+  const technicalDetails = page.getByRole('tabpanel', { name: 'App data', exact: true }).locator('summary', { hasText: 'Technical details' });
+  await technicalDetails.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Copy path', exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: /^Cleanup$/i }).click();
   await expect(page).toHaveURL(/\/storage\?tab=cleanup$/);

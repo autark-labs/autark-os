@@ -238,7 +238,6 @@ export type ProjectSettings = {
   backupFrequency: 'hourly' | 'daily' | 'weekly' | string;
   backupRetentionDays: number;
   backupTime: string;
-  showAdvancedMetrics: boolean;
   updatedAt: string;
 };
 

@@ -37,12 +37,12 @@ class ProjectSettingsRepositoryTests {
                 "daily",
                 14,
                 "03:00",
-                true,
                 Instant.parse("2026-06-19T12:00:00Z")));
         repository.saveValues(Map.of("backupDestination", runtimeRoot.resolve("external-backups").toString()));
 
         assertThat(repository.hasAnySettings()).isTrue();
         assertThat(repository.readAll())
+                .doesNotContainKey("showAdvancedMetrics")
                 .containsEntry("deviceName", "autark-os-test")
                 .containsEntry("backupRetentionDays", "14")
                 .containsEntry("backupDestination", runtimeRoot.resolve("external-backups").toString());

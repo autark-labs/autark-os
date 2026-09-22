@@ -10,8 +10,7 @@ test('Discover keeps its first-run guidance without duplicating global recommend
   assert.doesNotMatch(page, /CanonicalRecommendedAction/);
   assert.match(page, /starterGuidanceVisible/);
   assert.match(page, /starterRecommendation/);
-  assert.match(page, /!showAdvancedMetrics/);
-  assert.match(page, /basicCatalogMode === 'starter'/);
+  assert.match(page, /catalogScope === 'starter'/);
   assert.match(appList, /aria-label="Starter app recommendation"/);
   assert.match(appList, /Start with \{appName\}/);
   assert.match(appList, /Hide starter recommendation/);

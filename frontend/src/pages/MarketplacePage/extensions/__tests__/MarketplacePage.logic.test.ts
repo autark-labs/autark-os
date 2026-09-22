@@ -7,7 +7,7 @@ import {
   marketplaceVisibleAppViews,
   marketplaceVisibleApps,
   optionsFromInstalledSettings,
-  safeBasicCatalogForDiscover,
+  readyCatalogForDiscover,
   shouldShowStartHereSection,
   starterCatalogForDiscover,
   starterAppsForMarketplace,
@@ -218,7 +218,7 @@ test('starterCatalogForDiscover keeps the basic catalog focused on ready starter
   assert.deepEqual(starterCatalogForDiscover(apps).map((item) => item.id), betaStarterAppIds);
 });
 
-test('safeBasicCatalogForDiscover shows only ready apps for basic view all', () => {
+test('readyCatalogForDiscover shows only entries marked Ready', () => {
   const apps = [
     app({ id: 'ready', name: 'Ready App', supportLevel: 'Ready' }),
     app({ id: 'needs-testing', name: 'Needs Testing App', supportLevel: 'Needs testing' }),
@@ -226,7 +226,7 @@ test('safeBasicCatalogForDiscover shows only ready apps for basic view all', () 
     app({ id: 'experimental', name: 'Experimental App', supportLevel: 'Experimental' }),
   ];
 
-  assert.deepEqual(safeBasicCatalogForDiscover(apps).map((item) => item.id), ['ready']);
+  assert.deepEqual(readyCatalogForDiscover(apps).map((item) => item.id), ['ready']);
 });
 
 test('optionsFromInstalledSettings preserves installed app choices for reinstall', () => {

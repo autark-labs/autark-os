@@ -165,7 +165,7 @@ export function starterCatalogForDiscover(apps: MarketplaceApp[]) {
   return betaStarterAppIds.map((appId) => byId.get(appId)).filter((app): app is MarketplaceApp => Boolean(app));
 }
 
-export function safeBasicCatalogForDiscover(apps: MarketplaceApp[]) {
+export function readyCatalogForDiscover(apps: MarketplaceApp[]) {
   return apps.filter((app) => app.supportLevel === 'Ready');
 }
 

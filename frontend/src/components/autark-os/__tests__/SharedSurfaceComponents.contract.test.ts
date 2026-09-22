@@ -2,12 +2,28 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { AppWindow } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const root = process.cwd();
 
 function source(relativePath: string) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
+
+test('operational headers preserve unknown counts, titles, and page-owned actions', () => {
+  const html = renderToStaticMarkup(createElement(PageHeader, {
+    icon: AppWindow, title: 'My Apps', description: 'Manage your apps.',
+    metrics: [{ label: 'Managed apps', value: null }, { label: 'Needs review', value: 0 }],
+  }, createElement('button', { type: 'button' }, 'Refresh')));
+  assert.match(html, /<header /);
+  assert.match(html, /<h1[^>]*>My Apps<\/h1>/);
+  assert.match(html, /<dd[^>]*>Unknown<\/dd><dt[^>]*>Managed apps<\/dt>/);
+  assert.match(html, /<dd[^>]*>0<\/dd><dt[^>]*>Needs review<\/dt>/);
+  assert.match(html, /<button type="button">Refresh<\/button>/);
+});
 
 test('shared surface components provide typed accessible primitives', () => {
   const components = [
@@ -36,7 +52,6 @@ test('shared surface components provide typed accessible primitives', () => {
   const copy = source('src/components/autark-os/CopyField.tsx');
   const detail = source('src/components/autark-os/ResponsiveDetailsSheet.tsx');
   const dateTime = source('src/components/autark-os/LocalizedDateTime.tsx');
-  const pageHeader = source('src/components/layout/PageHeader.tsx');
   const jobProgress = source('src/components/autark-os/JobProgress.tsx');
 
   assert.match(loading, /export type PageLoadingStateModel/);
@@ -72,8 +87,6 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(detail, /sm:max-w-xl lg:max-w-2xl/);
   assert.match(dateTime, /export type LocalizedDateTimeModel/);
   assert.match(dateTime, /<time/);
-  assert.match(pageHeader, /<Surface as="header"/);
-  assert.match(pageHeader, /<Separator/);
   assert.match(jobProgress, /<Progress/);
   assert.match(jobProgress, /terminalJob/);
 });

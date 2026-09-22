@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useState, type ReactNode } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Clock3, Download, HeartPulse, Info, PackageOpen, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -12,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
-import { Surface } from '@/components/primitives/Surface';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
 import { cn } from '@/lib/utils';
 import type { ActivityLog } from '@/types/activity';
@@ -33,7 +33,6 @@ type MonitoringActivityWorkspaceProps = {
   onCategoryChange: (value: string) => void;
   onExportDiagnostics: () => void;
   onLevelChange: (value: string) => void;
-  showAdvancedMetrics: boolean;
   timeZone: string;
 };
 
@@ -44,28 +43,24 @@ const categoryLabels: Record<string, string> = {
 
 export function MonitoringActivityWorkspace({
   activity, monitoring, advancedMetrics, category, categoryFilters, diagnosticsExporting,
-  level, levelFilters, onCategoryChange, onExportDiagnostics, onLevelChange, showAdvancedMetrics, timeZone,
+  level, levelFilters, onCategoryChange, onExportDiagnostics, onLevelChange, timeZone,
 }: MonitoringActivityWorkspaceProps) {
   const [view, setView] = useState('history');
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const { activityQuery, reliabilityQuery, refresh } = monitoring;
   const selectedEvent = activity.find(event => event.id === selectedEventId) ?? activity[0] ?? null;
   const error = activityQuery.error ? apiErrorMessage(activityQuery.error, 'Activity could not be loaded.') : null;
-  const activeView = showAdvancedMetrics ? view : 'history';
 
   return <section className="flex min-h-0 flex-1 flex-col gap-3">
-    <Surface as="header" className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-border bg-app-panel p-5" tone="panel">
-      <div className="flex items-center gap-3"><Activity className="size-8 text-primary" /><div><h1 className="text-3xl font-semibold">Activity Log</h1><p className="mt-1 text-sm text-muted-foreground">A history of your server and apps.</p></div></div>
-      <div className="flex items-center gap-2">
-        {showAdvancedMetrics && <DisabledAction disabled={diagnosticsExporting} reason="Diagnostics export is already being prepared.">
-          <ProjectDarkControlButton disabled={diagnosticsExporting} onClick={onExportDiagnostics}><Download className="size-4" />Export</ProjectDarkControlButton>
-        </DisabledAction>}
-        <RefreshStatus error={error} intervalLabel="History updates every 10s" onRefresh={() => void refresh()} refreshing={activityQuery.isFetching} updatedAt={activityQuery.dataUpdatedAt ? new Date(activityQuery.dataUpdatedAt) : null} />
-      </div>
-    </Surface>
-    <Tabs className="min-h-0 flex-1 gap-0 overflow-hidden rounded-2xl border border-border bg-app-panel" value={activeView} onValueChange={setView}>
+    <PageHeader icon={Activity} title="Activity Log" description="A history of your server and apps.">
+      <DisabledAction disabled={diagnosticsExporting} reason="Diagnostics export is already being prepared.">
+        <ProjectDarkControlButton disabled={diagnosticsExporting} onClick={onExportDiagnostics}><Download className="size-4" />Export</ProjectDarkControlButton>
+      </DisabledAction>
+      <RefreshStatus error={error} intervalLabel="History updates every 10s" onRefresh={() => void refresh()} refreshing={activityQuery.isFetching} updatedAt={activityQuery.dataUpdatedAt ? new Date(activityQuery.dataUpdatedAt) : null} />
+    </PageHeader>
+    <Tabs className="min-h-0 flex-1 gap-0 overflow-hidden rounded-2xl border border-border bg-app-panel" value={view} onValueChange={setView}>
       <div className="shrink-0 border-b border-border px-4 pt-3">
-        <TabsList variant="line"><TabsTrigger value="history"><Activity />History</TabsTrigger>{showAdvancedMetrics && <TabsTrigger value="metrics"><BarChart3 />System metrics</TabsTrigger>}</TabsList>
+        <TabsList variant="line"><TabsTrigger value="history"><Activity />History</TabsTrigger><TabsTrigger value="metrics"><BarChart3 />System metrics</TabsTrigger></TabsList>
       </div>
       <TabsContent value="history" className="m-0 min-h-0 overflow-y-auto">
         <div className="grid min-h-full md:grid-cols-[minmax(0,1fr)_18rem] xl:h-full">
@@ -83,10 +78,10 @@ export function MonitoringActivityWorkspace({
                 timeZone={timeZone}
               />}
           </section>
-          <ActivityAttentionRail event={selectedEvent} query={reliabilityQuery} showAdvancedMetrics={showAdvancedMetrics} timeZone={timeZone} />
+          <ActivityAttentionRail event={selectedEvent} query={reliabilityQuery} timeZone={timeZone} />
         </div>
       </TabsContent>
-      {showAdvancedMetrics && <TabsContent value="metrics" className="m-0 min-h-0 overflow-y-auto p-4">{advancedMetrics}</TabsContent>}
+      <TabsContent value="metrics" className="m-0 min-h-0 overflow-y-auto p-4">{advancedMetrics}</TabsContent>
     </Tabs>
   </section>;
 }
@@ -151,7 +146,7 @@ function ActivityEventRow({ event, onSelect, selected, timeZone }: { event: Acti
   );
 }
 
-function ActivityAttentionRail({ event, query, showAdvancedMetrics, timeZone }: { event: ActivityLog | null; query: MonitoringRepository['reliabilityQuery']; showAdvancedMetrics: boolean; timeZone: string }) {
+function ActivityAttentionRail({ event, query, timeZone }: { event: ActivityLog | null; query: MonitoringRepository['reliabilityQuery']; timeZone: string }) {
   const issues = query.data?.issues ?? [];
   return (
     <aside className="min-h-0 overflow-y-auto border-l border-border bg-app-surface/40 p-4">
@@ -163,7 +158,7 @@ function ActivityAttentionRail({ event, query, showAdvancedMetrics, timeZone }: 
       <Link className="mt-2 inline-flex items-center gap-1 text-sm text-primary" to="/apps">Open My Apps <ChevronRight className="size-4" /></Link>
       <section aria-label="Selected activity" className="mt-5 border-t border-border pt-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected activity</h2>
-        {event ? <SelectedActivityDetail key={event.id} event={event} showAdvancedMetrics={showAdvancedMetrics} timeZone={timeZone} /> : <p className="mt-3 text-sm text-muted-foreground">No event selected.</p>}
+        {event ? <SelectedActivityDetail key={event.id} event={event} timeZone={timeZone} /> : <p className="mt-3 text-sm text-muted-foreground">No event selected.</p>}
       </section>
     </aside>
   );
@@ -183,14 +178,14 @@ function AttentionIssueCard({ issue, remainingCount }: { issue: AppReliabilityIs
   );
 }
 
-function SelectedActivityDetail({ event, showAdvancedMetrics, timeZone }: { event: ActivityLog; showAdvancedMetrics: boolean; timeZone: string }) {
+function SelectedActivityDetail({ event, timeZone }: { event: ActivityLog; timeZone: string }) {
   const Icon = eventIcon(event);
   return (
     <div className="mt-2 rounded-xl border border-sky-300/15 bg-slate-900 p-3">
       <div className="flex gap-2"><span className={cn('grid size-7 shrink-0 place-items-center rounded-lg border', eventIconTone(event))}><Icon aria-hidden="true" className="size-3.5" /></span><div className="min-w-0"><p className={cn('text-xs font-semibold', eventTextTone(event))}>{humanize(event.category)}</p><h3 className="mt-0.5 text-sm font-semibold text-white">{event.title}</h3></div></div>
       <p className="mt-3 text-xs leading-5 text-sky-100/65">{event.message}</p>
       <div className="mt-3 grid gap-1.5 border-t border-sky-300/15 pt-3"><RailFact icon={Clock3} label="Recorded" value={<LocalizedDateTime className="font-semibold text-white" model={{ timeZone, value: event.createdAt }} />} /><RailFact icon={event.appId ? PackageOpen : Activity} label={event.appId ? 'Related app' : 'Scope'} value={event.appId || 'This server'} /><RailFact icon={event.category === 'repair' ? Wrench : Info} label="Type" value={humanize(event.category)} /></div>
-      {(showAdvancedMetrics || event.category === 'pro') && <AdvancedEventDetail event={event} />}
+      <AdvancedEventDetail event={event} />
     </div>
   );
 }

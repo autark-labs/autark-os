@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useMemo, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
@@ -25,7 +26,6 @@ import {
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -241,25 +241,12 @@ function BackupsHeader({
   updatedAt: string | null;
 }) {
   return (
-    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
-          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid"><DatabaseBackup aria-hidden="true" className="size-5" /></span>
-          <div className="min-w-0"><h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Backups</h1><p className="mt-1 text-sm text-sky-100/70">Browse recovery points like the files they protect.</p></div>
-        </div>
-        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <HeaderMetric label="Protected" value={`${protectedApps}/${totalApps}`} />
-          <div className="w-44">{context}<p className="mt-1 text-right text-xs text-muted-foreground">Checked {formatUpdatedAt(updatedAt)}</p></div>
-          <DisabledAction disabled={refreshing} reason="Backup status is already refreshing."><button aria-label="Refresh backup status" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={refreshing} onClick={onRefresh} type="button"><RefreshCw className={cn('size-4', refreshing && 'animate-spin')} /></button></DisabledAction>
-          <button aria-label="Backup settings" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white" onClick={onOpenSettings} type="button"><Settings2 className="size-4" /></button>
-        </div>
-      </div>
-    </Surface>
+    <PageHeader icon={DatabaseBackup} title="Backups" description="Browse recovery points like the files they protect." metrics={[{ label: 'Protected apps', value: `${protectedApps}/${totalApps}` }]}>
+      <div className="w-44">{context}<p className="mt-1 text-right text-xs text-muted-foreground">Checked {formatUpdatedAt(updatedAt)}</p></div>
+      <DisabledAction disabled={refreshing} reason="Backup status is already refreshing."><ProjectDarkControlButton aria-label="Refresh backup status" disabled={refreshing} onClick={onRefresh} type="button"><RefreshCw aria-hidden="true" className={cn('size-4', refreshing && 'animate-spin')} />Refresh</ProjectDarkControlButton></DisabledAction>
+      <ProjectDarkControlButton aria-label="Backup settings" onClick={onOpenSettings} type="button"><Settings2 aria-hidden="true" className="size-4" />Settings</ProjectDarkControlButton>
+    </PageHeader>
   );
-}
-
-function HeaderMetric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-24 rounded-xl border border-sky-300/15 bg-slate-950/25 px-3 py-2 text-right"><p className="truncate text-sm font-semibold leading-none text-white">{value}</p><p className="mt-1 text-[0.68rem] text-slate-400">{label}</p></div>;
 }
 
 function BackupActions({

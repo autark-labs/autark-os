@@ -51,7 +51,11 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
       if (!(target instanceof Node) || detailsPanelRef.current?.contains(target)) {
         return;
       }
-      if (target instanceof HTMLElement && target.closest('[data-discover-details-toggle], [data-slot="dialog-content"], [data-slot="dialog-overlay"]')) {
+      // Keep the selected app mounted until its action's click handler runs.
+      if (target instanceof Element && target.closest('button, a')?.closest('[aria-label="Selected Discover app"]')) {
+        return;
+      }
+      if (target instanceof Element && target.closest('[data-discover-details-toggle], [data-slot="dialog-content"], [data-slot="dialog-overlay"]')) {
         return;
       }
 

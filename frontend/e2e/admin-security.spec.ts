@@ -18,7 +18,7 @@ test('claims an unclaimed appliance without disclosing the local setup proof', a
   await page.getByRole('button', { name: 'Claim and continue' }).click();
 
   await expect(page).toHaveURL(/\/storage$/);
-  await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Storage', exact: true, level: 1 })).toBeVisible();
   await page.getByRole('button', { name: 'Open system status' }).click();
   await page.locator('button[aria-label="Log out of Autark-OS"]:visible').click();
   await expect(page.getByText('You are logged out. Log in again when you are ready.')).toBeVisible();

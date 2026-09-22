@@ -14,7 +14,8 @@ test('a rejected app action shows the server explanation, not a started notifica
   await page.goto('/apps');
   await stabilizePage(page);
   await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
-  await page.getByRole('button', { name: /^Restart$/i }).click();
+  await page.getByRole('button', { name: 'App actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Restart app', exact: true }).click();
   await expect(page.getByText(message).first()).toBeVisible();
   await expect(page.getByText('App action started', { exact: true })).toHaveCount(0);
   expect(requests).toBe(1);

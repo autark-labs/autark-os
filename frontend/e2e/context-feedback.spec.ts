@@ -6,36 +6,44 @@ for (const width of [320, 390, 640, 768, 1024, 1280, 1440]) {
   test(`${width}px page headers keep internal rows together without clipping`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
     await installMockApi(page, 'ready');
-    for (const [route, title, metrics] of [
-      ['/apps', 'My Apps', ['Managed apps', 'Needs review']],
-      ['/access', 'Access', ['Reachable services', 'Needs review']],
-      ['/backups', 'Backups', ['Protected']],
-    ] as const) {
-      await page.goto(route);
-      const heading = page.getByRole('heading', { name: title, exact: true });
-      await expect(heading).toBeVisible();
-      const header = heading.locator('xpath=ancestor::header');
-      const bounds = (await header.boundingBox())!;
-      for (const element of [heading, ...await header.getByRole('button').all(), ...metrics.map(label => header.getByText(label, { exact: true }))]) {
-        const box = (await element.boundingBox())!;
-        expect(box.x).toBeGreaterThanOrEqual(bounds.x);
-        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
-        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height);
-        expect(await element.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    for (const collapsed of width >= 1024 ? [false, true] : [false]) {
+      for (const [route, title, metrics] of [
+        ['/apps', 'My Apps', ['Managed apps', 'Needs review']],
+        ['/access', 'Access', ['Reachable services', 'Needs review']],
+        ['/backups', 'Backups', ['Protected apps']],
+        ['/storage', 'Storage', ['Used', 'Free']],
+        ['/activity', 'Activity Log', []],
+        ['/diagnostics', 'Diagnostics', []],
+      ] as const) {
+        await page.goto(route);
+        const heading = page.getByRole('heading', { name: title, exact: true });
+        await expect(heading).toBeVisible();
+        if (collapsed && await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).count()) {
+          await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+        }
+        const header = heading.locator('xpath=ancestor::header');
+        const bounds = (await header.boundingBox())!;
+        for (const element of [heading, ...await header.getByRole('button').all(), ...metrics.map(label => header.getByText(label, { exact: true }))]) {
+          const box = (await element.boundingBox())!;
+          expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+          expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+          expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+          expect(await element.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+        }
+        if (metrics.length === 2) {
+          const first = (await header.getByText(metrics[0], { exact: true }).boundingBox())!;
+          const second = (await header.getByText(metrics[1], { exact: true }).boundingBox())!;
+          expect(second.y).toBe(first.y);
+          expect(second.x).toBeGreaterThan(first.x + first.width);
+        }
+        if (route === '/access') {
+          const refresh = (await header.getByRole('button', { name: 'Refresh', exact: true }).boundingBox())!;
+          const status = (await header.getByText('Auto-updates every 10s', { exact: true }).boundingBox())!;
+          expect(refresh.y).toBeLessThan(status.y + status.height);
+          expect(status.y).toBeLessThan(refresh.y + refresh.height);
+        }
+        await expectNoHorizontalOverflow(page);
       }
-      if (metrics.length === 2) {
-        const first = (await header.getByText(metrics[0], { exact: true }).boundingBox())!;
-        const second = (await header.getByText(metrics[1], { exact: true }).boundingBox())!;
-        expect(second.y).toBe(first.y);
-        expect(second.x).toBeGreaterThan(first.x + first.width);
-      }
-      if (route === '/access') {
-        const refresh = (await header.getByRole('button', { name: 'Refresh', exact: true }).boundingBox())!;
-        const status = (await header.getByText('Auto-updates every 10s', { exact: true }).boundingBox())!;
-        expect(refresh.y).toBeLessThan(status.y + status.height);
-        expect(status.y).toBeLessThan(refresh.y + refresh.height);
-      }
-      await expectNoHorizontalOverflow(page);
     }
   });
 }
@@ -185,12 +193,14 @@ test('lost Discover job progress is not reported as a failed install and can be 
 test('an already-failed install response still gets global feedback without a result banner', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await installMockApi(page, 'idle');
+  await page.clock.install();
   await page.goto('/home');
   const apps: DiscoverAppView[] = await page.evaluate(async () => (await fetch('/api/discover/apps')).json());
   const app = apps.find(view => view.application.id === 'immich')!.application;
   app.relationship = 'available';
   app.primaryAction = { id: 'review_setup', label: 'Review install', kind: 'install', href: null, method: null, disabled: false, reason: '' };
-  await page.route('**/api/discover/apps', route => route.fulfill({ json: apps }));
+  let catalogRequests = 0;
+  await page.route('**/api/discover/apps', route => { catalogRequests++; return route.fulfill({ json: apps }); });
   await page.route('**/api/discover/apps/immich/install', route => route.fulfill({ json: {
     jobId: 'failed-install', type: 'install_app', subjectId: 'immich', status: 'failed', steps: [],
     createdAt: '2025-01-15T12:00:00Z', updatedAt: '2025-01-15T12:00:00Z',
@@ -200,6 +210,11 @@ test('an already-failed install response still gets global feedback without a re
   await page.getByRole('button', { name: 'Review install', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Install Immich', exact: true });
   await dialog.getByRole('checkbox', { name: 'Confirm install plan', exact: true }).check();
+  const beforePoll = catalogRequests;
+  await page.clock.fastForward(31_000);
+  await expect.poll(() => catalogRequests).toBeGreaterThan(beforePoll);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('checkbox', { name: 'Confirm install plan', exact: true })).toBeChecked();
   await dialog.getByRole('button', { name: 'Install app', exact: true }).click();
   await expect(page.locator('[data-sonner-toast]')).toContainText('The selected port is already in use.');
   await expect(page.getByRole('button', { name: 'Dismiss install result', exact: true })).toHaveCount(0);

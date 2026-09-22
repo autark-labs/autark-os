@@ -77,7 +77,6 @@ class ProjectSettingsServiceTests {
                 "monthly",
                 120,
                 "02:00",
-                false,
                 Instant.parse("2026-06-21T13:00:00Z")));
         ProjectSettingsAppDefaultsResult result = saveResult.appDefaults();
 
@@ -138,7 +137,6 @@ class ProjectSettingsServiceTests {
                 defaults.backupFrequency(),
                 defaults.backupRetentionDays(),
                 defaults.backupTime(),
-                defaults.showAdvancedMetrics(),
                 Instant.now()));
 
         assertThat(saved.timeZone()).isEqualTo("America/Chicago");

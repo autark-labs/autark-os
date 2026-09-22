@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { test } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import { settingsGroups, sectionsForGroup, defaultSettingsGroup, visibleSettingsGroups } from '../SettingsPage.sections';
+import { settingsGroups, sectionsForGroup, defaultSettingsGroup } from '../SettingsPage.sections';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -25,11 +25,6 @@ test('places low-frequency technical settings in advanced', () => {
 test('falls back to the general group for unknown values', () => {
   assert.equal(defaultSettingsGroup('missing'), 'general');
   assert.deepEqual(sectionsForGroup('missing'), ['general']);
-});
-
-test('can hide advanced group for simplified views', () => {
-  assert.deepEqual(visibleSettingsGroups(false).map((group) => group.id), ['general', 'apps', 'backups', 'network']);
-  assert.deepEqual(visibleSettingsGroups(true).map((group) => group.id), ['general', 'apps', 'backups', 'network', 'advanced']);
 });
 
 test('does not expose appliance update controls in settings', () => {

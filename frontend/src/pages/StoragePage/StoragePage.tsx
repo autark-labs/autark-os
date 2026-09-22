@@ -8,7 +8,6 @@ import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -27,7 +26,6 @@ import { formatStorageBytes } from './StoragePage.presentation';
 
 function StoragePage() {
   const queryClient = useQueryClient();
-  const { showAdvancedMetrics } = useProjectSettings();
   const storage = useStorageReportRepository();
   const applicationState = useApplicationStateRepository();
   const cleanupOrphanMutation = useCleanupOrphanMutation();
@@ -58,7 +56,6 @@ function StoragePage() {
     applicationState.applications,
   ), [applicationState.applications, report?.apps]);
   const error = storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null;
-
   function refreshStorage() {
     void storage.refresh();
     void jobs.refetch();
@@ -119,7 +116,7 @@ function StoragePage() {
             }}
             refreshing={storage.isFetching}
             report={report}
-            showAdvancedMetrics={showAdvancedMetrics}
+
             updatedAt={storage.updatedAt}
           />
           ) : (

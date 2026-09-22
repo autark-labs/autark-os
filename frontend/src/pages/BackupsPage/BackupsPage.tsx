@@ -8,7 +8,6 @@ import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
@@ -43,7 +42,6 @@ import { BackupColumnNavigatorWorkspace } from './BackupColumnNavigatorWorkspace
 
 function BackupsPage() {
   const queryClient = useQueryClient();
-  const { showAdvancedMetrics } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
   const applicationState = useApplicationStateRepository();
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
@@ -131,7 +129,6 @@ function BackupsPage() {
   const appBackupOperationAvailability = destinationUnavailableReason
     ? { disabled: true, reason: destinationUnavailableReason }
     : appBackupAvailability;
-
   async function runManualAppBackup(app: AppBackupStatus) {
     if (appBackupOperationAvailability.disabled) return;
     await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
@@ -284,7 +281,7 @@ function BackupsPage() {
         onVerify={(point) => void verifyRestorePoint(point)}
         restoreAvailability={restoreAvailability}
         running={running}
-        showAdvancedMetrics={showAdvancedMetrics}
+
         timeZone={report?.settings.timeZone || 'UTC'}
         verifyAvailability={verifyAvailability}
       />

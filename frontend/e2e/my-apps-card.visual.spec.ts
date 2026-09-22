@@ -1,13 +1,13 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage } from './support/mockApi';
 
-test('My Apps basic cards use the compact homepage launcher treatment', async ({ page }) => {
+test('My Apps grid cards use the compact homepage launcher treatment', async ({ page }) => {
   await installMockApi(page, 'ready');
   await page.setViewportSize({ width: 1280, height: 960 });
   await page.goto('/apps', { waitUntil: 'domcontentloaded' });
   await stabilizePage(page);
 
-  await page.getByRole('button', { name: /^Basic$/i }).click();
+  await page.getByRole('radio', { name: 'Grid view' }).click();
   await expect(page.getByText(/My Apps/i).first()).toBeVisible();
   const manageButton = page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i });
   await expect(manageButton).toBeVisible();

@@ -54,9 +54,6 @@ export const settingsGroups: SettingsGroup[] = [
 
 export type SettingsGroupId = (typeof settingsGroups)[number]['id'];
 
-export function visibleSettingsGroups(showAdvanced = true) {
-  return showAdvanced ? settingsGroups : settingsGroups.filter((group) => group.id !== 'advanced');
-}
 
 export function defaultSettingsGroup(groupId: string): SettingsGroupId {
   return settingsGroups.find((group) => group.id === groupId)?.id ?? 'general';

@@ -6,7 +6,6 @@ import { test } from 'vitest';
 const page = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/ApplicationsPage.tsx'), 'utf8');
 const advancedView = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/AdvancedApplicationsView.tsx'), 'utf8');
 const card = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/ApplicationCard.tsx'), 'utf8');
-const header = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppsPageHeader.tsx'), 'utf8');
 const stateBadges = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppStateBadges.tsx'), 'utf8');
 
 test('My Apps renders only canonical managed applications', () => {
@@ -27,8 +26,6 @@ test('My Apps renders only canonical managed applications', () => {
   assert.doesNotMatch(advancedView, /min-w-\[74rem\]/);
   assert.doesNotMatch(advancedView, /Recent activity/);
   assert.match(advancedView, /<RelationshipBadge \/>/);
-  assert.match(header, /title="My Apps"/);
-  assert.match(header, /<AppWindow aria-hidden="true" className="size-5" \/>/);
 });
 
 test('My Apps uses quiet status dots and compact action affordances on dark app cards', () => {

@@ -202,8 +202,10 @@ test('reload resumes job observation and a failed candidate leaves existing guid
   status.module.jobId = 'pro-lifecycle-job';
   const job: AutarkOsJob = { ...jobFixture(), status: 'running' };
   await openPro(page, true, { moduleJob: job, status, recommendedAction: 'review_guardian' });
+  await page.getByRole('button', { name: 'Pro operation in progress', exact: true }).click();
   await expect(page.getByRole('region', { name: /for Private extension: running/ })).toBeVisible();
   await page.reload();
+  await page.getByRole('button', { name: 'Pro operation in progress', exact: true }).click();
   await expect(page.getByRole('region', { name: /for Private extension: running/ })).toBeVisible();
 
   status.module.state = 'ACTIVE';

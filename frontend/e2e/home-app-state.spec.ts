@@ -149,6 +149,8 @@ test('canonical Open agrees across Home, app grid/list/management/guide, and Dis
     await page.getByRole('tab', { name: 'Guide', exact: true }).click();
     await assertOpen(page.getByRole('dialog'));
     await page.goto('/discover');
+    await page.getByRole('combobox', { name: 'Catalog', exact: true }).click();
+    await page.getByRole('option', { name: 'All apps', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Select Vaultwarden', exact: true })).toBeVisible();
     await assertOpen(page.getByRole('main').last());
     await page.setViewportSize({ width: 1024, height: 960 });

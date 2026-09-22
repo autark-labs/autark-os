@@ -20,7 +20,7 @@ const categoryFilters = ['all', 'app-related', 'install', 'backup', 'repair', 'a
 const MonitoringChartsSection = lazy(() => import('./MonitoringChartsSection'));
 
 function MonitoringPage() {
-  const { settings, showAdvancedMetrics } = useProjectSettings();
+  const { settings } = useProjectSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [level, setLevel] = useState('all');
   const category = categoryFilters.find(value => value === searchParams.get('category')) ?? 'all';
@@ -75,7 +75,6 @@ function MonitoringPage() {
           onCategoryChange={changeCategory}
           onExportDiagnostics={() => void exportDiagnostics()}
           onLevelChange={setLevel}
-          showAdvancedMetrics={showAdvancedMetrics}
           timeZone={settings?.timeZone || 'UTC'}
         />
       </ExtensionActionTarget>

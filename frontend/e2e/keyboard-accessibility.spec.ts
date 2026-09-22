@@ -17,7 +17,7 @@ test('setup, app management, and Access controls work with the keyboard', async 
   await expect(continueButton).toBeVisible();
 
   await openRoute(page, '/apps');
-  await page.getByRole('button', { name: 'Basic', exact: true }).click();
+  await page.getByRole('radio', { name: 'Grid view' }).click();
   const selectApp = page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i });
   await selectApp.focus();
   await expect(selectApp).toBeFocused();

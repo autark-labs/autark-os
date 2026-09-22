@@ -12,18 +12,15 @@ export const primaryNavigation = [
   { id: 'pro', label: 'Autark Pro', to: appRoutes.pro, icon: 'pro', activePaths: [appRoutes.pro] },
 ].filter((item) => item.id !== 'pro' || betaScope.proInstallationAvailable);
 
-export const advancedNavigation = [
+export const systemNavigation = [
   { id: 'storage', label: 'Storage', to: appRoutes.storage, icon: 'storage', activePaths: [appRoutes.storage, '/files-storage'] },
-  { id: 'diagnostics', label: 'Diagnostics', to: appRoutes.diagnostics, icon: 'diagnostics', activePaths: [appRoutes.diagnostics, '/terminal', '/safe-diagnostics'] },
   { id: 'activity', label: 'Activity Log', to: appRoutes.activity, icon: 'activity', activePaths: [appRoutes.activity, '/monitoring', '/system-activity'] },
+  { id: 'diagnostics', label: 'Diagnostics', to: appRoutes.diagnostics, icon: 'diagnostics', activePaths: [appRoutes.diagnostics, '/terminal', '/safe-diagnostics'] },
 ];
 
-export function navigationGroups(viewMode = 'basic') {
-  const groups = [
+export function navigationGroups() {
+  return [
     { label: 'Autark-OS', items: primaryNavigation },
+    { label: 'System', items: systemNavigation },
   ];
-  if (viewMode === 'advanced') {
-    groups.push({ label: 'Advanced', items: advancedNavigation });
-  }
-  return groups;
 }

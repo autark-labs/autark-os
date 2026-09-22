@@ -1,60 +1,14 @@
 import type { ReactNode } from 'react';
-import { AppWindow, TriangleAlert } from 'lucide-react';
-import { Surface } from '@/components/primitives/Surface';
-import { cn } from '@/lib/utils';
+import { AppWindow } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
 
-type AppsPageHeaderProps = {
+export function AppsPageHeader({ attentionCount, managedCount, children }: {
   children?: ReactNode;
   attentionCount: number | null;
   managedCount: number | null;
-};
-
-const metrics = [
-  { key: 'managed', label: 'Managed apps', icon: AppWindow },
-  { key: 'attention', label: 'Needs review', icon: TriangleAlert },
-] as const;
-
-export function AppsPageHeader({ attentionCount, managedCount, children }: AppsPageHeaderProps) {
-  const values = { attention: attentionCount, managed: managedCount };
-
-  return (
-    <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
-          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
-            <AppWindow aria-hidden="true" className="size-5" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]" title="My Apps">My Apps</h1>
-            <p className="m-0 text-sm text-sky-100/70">Open, manage, and monitor apps installed by Autark-OS.</p>
-          </div>
-        </div>
-        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          {children}
-          <div className="flex items-center gap-2">
-            {metrics.map(({ icon: Icon, key, label }) => (
-              <div
-                className={cn(
-                  'flex min-w-0 items-center gap-2 rounded-xl border border-sky-300/15 bg-slate-950/25 px-2.5 py-2',
-                  key === 'attention' && attentionCount !== null && attentionCount > 0 && 'border-amber-300/30 bg-amber-400/5',
-                )}
-                key={key}
-              >
-                <span className={cn(
-                  'hidden size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200 sm:grid',
-                  key === 'attention' && 'border-amber-300/15 bg-amber-400/10 text-amber-200',
-                )}>
-                  <Icon aria-hidden="true" className="size-3.5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-lg font-semibold leading-none text-white">{values[key] ?? 'Unavailable'}</span>
-                  <span className="mt-1 block truncate text-[0.68rem] text-slate-400">{label}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </Surface>
-  );
+}) {
+  return <PageHeader icon={AppWindow} title="My Apps" description="Open, manage, and monitor apps installed by Autark-OS." metrics={[
+    { label: 'Managed apps', value: managedCount },
+    { label: 'Needs review', value: attentionCount },
+  ]}>{children}</PageHeader>;
 }

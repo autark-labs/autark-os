@@ -119,7 +119,6 @@ public class ProjectSettingsService {
                 oneOf(settings.backupFrequency(), BACKUP_FREQUENCIES, fallback.backupFrequency()),
                 clamp(settings.backupRetentionDays(), 1, 90, fallback.backupRetentionDays()),
                 clean(settings.backupTime(), fallback.backupTime(), 8),
-                settings.showAdvancedMetrics(),
                 Instant.now());
     }
 
@@ -139,7 +138,6 @@ public class ProjectSettingsService {
                 oneOf(string(values, "backupFrequency", fallback.backupFrequency()), BACKUP_FREQUENCIES, fallback.backupFrequency()),
                 clamp(intValue(values, "backupRetentionDays", fallback.backupRetentionDays()), 1, 90, fallback.backupRetentionDays()),
                 string(values, "backupTime", fallback.backupTime()),
-                bool(values, "showAdvancedMetrics", fallback.showAdvancedMetrics()),
                 instant(values, "updatedAt", fallback.updatedAt()));
     }
 

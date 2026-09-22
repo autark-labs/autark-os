@@ -15,7 +15,6 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import { Button } from '@/components/ui/button';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
@@ -54,7 +53,7 @@ type SidebarProps = {
 
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
-  const { setViewMode, settings, viewMode } = useProjectSettings();
+  const { settings } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
   const [version, setVersion] = useState<ProjectVersionInfo | null>(null);
   const [setup, setSetup] = useState<SystemSetupStatus | null>(null);
@@ -85,7 +84,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const setupReady = setup?.status === 'ready' || setup?.status === 'ready_with_notes';
   const deviceName = settings?.deviceName || setup?.runAsUser || 'Autark-OS';
   const versionLabel = version?.version ? `v${version.version}` : 'Version unknown';
-  const navGroups = navigationGroups(viewMode) as NavGroup[];
+  const navGroups = navigationGroups() as NavGroup[];
 
   return (
     <aside className={cn(
@@ -118,8 +117,8 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       <nav className={cn('grid gap-2 overflow-x-hidden overflow-y-auto pb-0', collapsed ? 'px-0' : 'pr-0')} aria-label="Primary navigation">
         {navGroups.map((group, groupIndex) => (
-          <div className={cn('contents lg:grid', collapsed ? 'lg:gap-2' : 'lg:gap-2')} key={group.label || `group-${groupIndex}`}>
-            {!collapsed && group.label && <p className="sr-only">{group.label}</p>}
+          <div className={cn('grid gap-2', groupIndex > 0 && 'mt-3 border-t border-border/50 pt-3')} key={group.label || `group-${groupIndex}`}>
+            {!collapsed && group.label && <p className="px-3 text-xs text-muted-foreground">{group.label}</p>}
             {group.items.map((item) => {
               const Icon = navIcons[item.icon] || House;
               const isActive = item.activePaths?.includes(location.pathname);
@@ -171,15 +170,6 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           >
             <Settings className="size-4" />
           </button>
-          <button
-            aria-label={`Switch to ${viewMode === 'advanced' ? 'Basic' : 'Advanced'} view`}
-            className="grid size-9 place-items-center rounded-lg border border-sky-400/30 bg-slate-900 text-xs font-bold text-sky-100 transition hover:border-cyan-300/45 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-            onClick={() => setViewMode(viewMode === 'advanced' ? 'basic' : 'advanced')}
-            title={`View mode: ${viewMode === 'advanced' ? 'Advanced' : 'Basic'}`}
-            type="button"
-          >
-            {viewMode === 'advanced' ? 'A' : 'B'}
-          </button>
           <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
         </div>
       ) : <div className="mt-6 hidden rounded-xl border border-sky-400/25 bg-slate-900 p-3 shadow-lg shadow-slate-950/20 lg:mt-auto lg:block">
@@ -207,46 +197,8 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
         </div>
-        <div className="mt-3 grid gap-2">
-          <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
-            <span>View mode</span>
-            <span className="font-semibold text-white">{viewMode === 'advanced' ? 'Advanced' : 'Basic'}</span>
-          </div>
-          <SidebarViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-        </div>
       </div>}
     </aside>
-  );
-}
-
-function SidebarViewModeToggle({ onChange, viewMode }: { onChange: (value: 'basic' | 'advanced') => void; viewMode: 'basic' | 'advanced' }) {
-  const advanced = viewMode === 'advanced';
-
-  return (
-    <div className="grid grid-cols-2 rounded-lg border border-sky-400/25 bg-slate-800 p-1 text-xs font-semibold">
-      <Button
-        className={cn(
-          'h-7 rounded-md px-2 text-xs',
-          !advanced ? 'bg-cyan-300 text-slate-950 shadow-md shadow-cyan-950/25 hover:bg-cyan-200' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white',
-        )}
-        onClick={() => onChange('basic')}
-        type="button"
-        variant="ghost"
-      >
-        Basic
-      </Button>
-      <Button
-        className={cn(
-          'h-7 rounded-md px-2 text-xs',
-          advanced ? 'bg-cyan-300 text-slate-950 shadow-md shadow-cyan-950/25 hover:bg-cyan-200' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white',
-        )}
-        onClick={() => onChange('advanced')}
-        type="button"
-        variant="ghost"
-      >
-        Advanced
-      </Button>
-    </div>
   );
 }
 

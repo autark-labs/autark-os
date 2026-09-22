@@ -12,7 +12,6 @@ const workspaceTabs = new Set<StorageWorkspaceTab>(['overview', 'apps', 'backups
 export function parseStorageWorkspaceRoute(
   searchParams: URLSearchParams,
   apps: AppStorageUsage[],
-  showAdvancedMetrics: boolean,
 ): Required<StorageWorkspaceSelection> {
   const requestedAppId = searchParams.get('app');
   const appId = requestedAppId && apps.some((app) => app.appId === requestedAppId) ? requestedAppId : null;
@@ -22,10 +21,6 @@ export function parseStorageWorkspaceRoute(
     : appId
       ? 'apps'
       : 'overview';
-
-  if (tab === 'advanced' && !showAdvancedMetrics) {
-    return { appId: null, tab: 'overview' };
-  }
 
   return { appId: tab === 'apps' ? appId : null, tab };
 }

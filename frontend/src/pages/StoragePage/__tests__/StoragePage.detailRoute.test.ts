@@ -11,14 +11,14 @@ const apps = [{ appId: 'vaultwarden' }] as AppStorageUsage[];
 
 test('a Storage app link opens the nested App data workspace', () => {
   assert.deepEqual(
-    parseStorageWorkspaceRoute(new URLSearchParams('app=vaultwarden'), apps, false),
+    parseStorageWorkspaceRoute(new URLSearchParams('app=vaultwarden'), apps),
     { appId: 'vaultwarden', tab: 'apps' },
   );
 });
 
-test('Storage route ignores missing apps and unavailable advanced details', () => {
-  assert.deepEqual(parseStorageWorkspaceRoute(new URLSearchParams('tab=apps&app=missing'), apps, false), { appId: null, tab: 'apps' });
-  assert.deepEqual(parseStorageWorkspaceRoute(new URLSearchParams('tab=advanced'), apps, false), { appId: null, tab: 'overview' });
+test('Storage route ignores missing apps and keeps technical details reachable', () => {
+  assert.deepEqual(parseStorageWorkspaceRoute(new URLSearchParams('tab=apps&app=missing'), apps), { appId: null, tab: 'apps' });
+  assert.deepEqual(parseStorageWorkspaceRoute(new URLSearchParams('tab=advanced'), apps), { appId: null, tab: 'advanced' });
 });
 
 test('Storage route selection preserves unrelated page parameters', () => {
