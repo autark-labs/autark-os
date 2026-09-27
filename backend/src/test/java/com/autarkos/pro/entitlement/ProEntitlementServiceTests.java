@@ -70,6 +70,7 @@ class ProEntitlementServiceTests {
             new ObjectMapper().registerModule(new JavaTimeModule());
 
     private KeyPair issuerKeyPair;
+    private final java.util.Map<String, PublicKey> trustedKeys = new java.util.HashMap<>();
     private InMemoryRepository repository;
     private FakeControlPlane controlPlane;
     private FakeIdentityService identityService;
@@ -79,6 +80,7 @@ class ProEntitlementServiceTests {
     void setUp() throws Exception {
         issuerKeyPair =
                 KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        trustedKeys.put(KEY_ID, issuerKeyPair.getPublic());
         repository = new InMemoryRepository();
         identityService = new FakeIdentityService(identity());
         controlPlane = new FakeControlPlane(documents(ISSUED_AT, '3', '4'));
@@ -124,6 +126,49 @@ class ProEntitlementServiceTests {
                 .isEqualTo(validCache.serviceLeaseEnvelope());
         assertThat(afterFailure.nextRefreshAt())
                 .isEqualTo(LOCAL_NOW.plus(Duration.ofMinutes(1)));
+    }
+
+    @Test
+    void renewsWithOverlappingSignerAndRestoresOfflineWithoutReplacingGrant() throws Exception {
+        var service = service();
+        service.refresh();
+        var original = repository.load().orElseThrow();
+        KeyPair nextKey = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        String nextKeyId = "next-entitlement-key";
+        trustedKeys.put(nextKeyId, nextKey.getPublic());
+        Instant renewedAt = ISSUED_AT.plusSeconds(60);
+        var lease = MAPPER.readTree(Base64.getUrlDecoder().decode(
+                documents(renewedAt, '3', '5').onlineServiceLease().payload()));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) lease).put("keyId", nextKeyId);
+        var renewedLease = sign(lease, ServiceLeaseVerifier.DOCUMENT_TYPE, nextKeyId, nextKey);
+        controlPlane.documents = new ProControlPlaneClient.EntitlementDocuments(
+                "1", original.durableGrantEnvelope(), renewedLease, renewedAt, UUID.randomUUID());
+
+        assertThat(service.refresh().entitlement().state()).isEqualTo(ProEntitlementState.ACTIVE);
+        var renewed = repository.load().orElseThrow();
+        assertThat(renewed.durableGrantEnvelope()).isEqualTo(original.durableGrantEnvelope());
+        assertThat(renewed.durableGrantKeyId()).isEqualTo(KEY_ID);
+        assertThat(renewed.serviceLeaseEnvelope()).isEqualTo(renewedLease);
+        assertThat(renewed.serviceLeaseKeyId()).isEqualTo(nextKeyId);
+
+        controlPlane.renewalFailure = new ProControlPlaneException(
+                "control_plane_unavailable", "Control plane is unavailable.");
+        var restarted = service();
+        assertThat(restarted.status().entitlement().state()).isEqualTo(ProEntitlementState.ACTIVE);
+        assertThat(restarted.refresh().entitlement().state()).isEqualTo(ProEntitlementState.ACTIVE);
+        controlPlane.renewalFailure = null;
+        String unknownKeyId = "untrusted-entitlement-key";
+        ((com.fasterxml.jackson.databind.node.ObjectNode) lease).put("keyId", unknownKeyId);
+        controlPlane.documents = new ProControlPlaneClient.EntitlementDocuments(
+                "1", original.durableGrantEnvelope(),
+                sign(lease, ServiceLeaseVerifier.DOCUMENT_TYPE, unknownKeyId,
+                        KeyPairGenerator.getInstance("Ed25519").generateKeyPair()),
+                renewedAt, UUID.randomUUID());
+        assertThat(restarted.refresh().refresh().lastFailureCategory()).isEqualTo("verification");
+        var afterFailure = repository.load().orElseThrow();
+        assertThat(afterFailure.durableGrantEnvelope()).isEqualTo(original.durableGrantEnvelope());
+        assertThat(afterFailure.serviceLeaseEnvelope()).isEqualTo(renewedLease);
+        assertThat(restarted.status().entitlement().state()).isEqualTo(ProEntitlementState.ACTIVE);
     }
 
     @Test
@@ -441,15 +486,16 @@ class ProEntitlementServiceTests {
         ProTrustStore trustStore = new ProTrustStore() {
             @Override
             public PublicKey verificationKey(String requestedKeyId) {
-                if (!KEY_ID.equals(requestedKeyId)) {
-                    throw new IllegalArgumentException("unknown key");
+                if (!trustedKeys.containsKey(requestedKeyId)) {
+                    throw new com.autarkos.pro.model.ProContractVerificationException(
+                            "unknown_key", "Unknown verification key.");
                 }
-                return issuerKeyPair.getPublic();
+                return trustedKeys.get(requestedKeyId);
             }
 
             @Override
             public Set<String> keyIds() {
-                return Set.of(KEY_ID);
+                return trustedKeys.keySet();
             }
         };
         return new ProEntitlementService(
@@ -457,7 +503,7 @@ class ProEntitlementServiceTests {
                 controlPlane,
                 identityService,
                 new DeviceRegistrationProofFactory(identityService),
-                new DeviceOperationProofFactory(identityService),
+                new DeviceOperationProofFactory(identityService, "1.2.3"),
                 new GrantVerifier(trustStore),
                 new ServiceLeaseVerifier(trustStore),
                 new ProEntitlementStateReducer(),
@@ -523,11 +569,16 @@ class ProEntitlementServiceTests {
 
     private SignedEnvelopeV1 sign(Object payload, String type)
             throws Exception {
+        return sign(payload, type, KEY_ID, issuerKeyPair);
+    }
+
+    private SignedEnvelopeV1 sign(Object payload, String type, String keyId, KeyPair signerKey)
+            throws Exception {
         String protectedHeader = encode(MAPPER.writeValueAsBytes(
-                new ProtectedHeader("EdDSA", KEY_ID, type)));
+                new ProtectedHeader("EdDSA", keyId, type)));
         String encodedPayload = encode(MAPPER.writeValueAsBytes(payload));
         Signature signer = Signature.getInstance("Ed25519");
-        signer.initSign(issuerKeyPair.getPrivate());
+        signer.initSign(signerKey.getPrivate());
         signer.update((protectedHeader + "." + encodedPayload)
                 .getBytes(StandardCharsets.US_ASCII));
         return new SignedEnvelopeV1(
@@ -680,7 +731,7 @@ class ProEntitlementServiceTests {
                     "1",
                     REGISTRATION_ID,
                     DEVICE_ID,
-                    "/entitlements/renew",
+                    "/entitlements-renew",
                     requestId);
         }
 

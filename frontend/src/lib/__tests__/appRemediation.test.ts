@@ -19,7 +19,6 @@ test('describes broken local links as restart or URL updates without reset optio
   assert.equal(remediation.safeAction.kind, 'app-action');
   assert.equal(remediation.safeAction.action, 'restart');
   assert.match(remediation.nextStep, /update the app address/i);
-  assert.deepEqual(remediation.dangerousActions, []);
 });
 
 test('routes private-link remediation to Access instead of generic restart guidance', () => {
@@ -34,7 +33,7 @@ test('routes private-link remediation to Access instead of generic restart guida
   assert.doesNotMatch(remediation.nextStep, /restart first/i);
 });
 
-test('keeps reinstall and reset recovery backup-first for unhealthy apps', () => {
+test('keeps restart as the first suggested action for unhealthy apps', () => {
   const remediation = buildAppRemediation({
     app,
     health: { status: 'Needs attention', detail: 'Container keeps restarting.', message: 'Restart loop' },
@@ -43,9 +42,6 @@ test('keeps reinstall and reset recovery backup-first for unhealthy apps', () =>
   assert.equal(remediation.cause, 'app-health');
   assert.equal(remediation.severity, 'critical');
   assert.equal(remediation.safeAction.action, 'restart');
-  assert.equal(remediation.dangerousActions.length, 2);
-  assert.match(remediation.dangerousActions[0].warning, /backup/i);
-  assert.match(remediation.dangerousActions[1].warning, /remove app state/i);
 });
 
 test('normalizes reliability issues into the same private-link model for Overview and Monitoring', () => {

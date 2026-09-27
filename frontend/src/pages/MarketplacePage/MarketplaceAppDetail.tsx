@@ -12,13 +12,12 @@ import { JobProgress } from '@/components/autark-os/JobProgress';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, queuedJobText, terminalJob } from '@/repositories/jobRepository';
 import type { ApplicationView } from '@/types/applicationState';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
-import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
+import type { MarketplaceApp } from '@/types/marketplace';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
 import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
@@ -30,28 +29,24 @@ type AppDetailProps = {
   appView: DiscoverAppView;
   backupJob: AutarkOsJob | null;
   installJob: AutarkOsJob | null;
-  installOptions: InstallOptions;
-  installPlan: InstallPlan | null;
   installLocked: boolean;
   installStatusMessage: string;
   installing: boolean;
   installedApp: ApplicationView | null;
   installPreview: DiscoverInstallPreview | null;
+  previewError: string;
   hasAppSettings: boolean;
   onBack: () => void;
   onCreateBackup: (appId: string) => Promise<void>;
   onDuplicateInstallAcknowledged: () => void;
-  onInstall: (options: InstallOptions) => Promise<void>;
+  onInstall: () => Promise<boolean>;
   onOpenSettings: () => void;
-  onReinstallCurrent: () => void | Promise<void>;
-  onRequestPlan: (options: InstallOptions) => Promise<void>;
-  recoveryMode?: string | null;
+  onRequestPlan: () => void;
   setupAnswers: Record<string, unknown>;
-  setupReady: boolean;
   setupSchema: DiscoverSetupSchema;
 };
 
-export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onOpenSettings, onReinstallCurrent, onRequestPlan, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, installJob, installedApp, installLocked, installPreview, previewError, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onOpenSettings, onRequestPlan, setupAnswers, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
@@ -62,16 +57,14 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   const canInstallSecondCopy = application.availableActions.some((action) => action.id === 'install_copy' && !action.disabled);
   const manageInstalledAppHref = installedApp ? marketplacePrimaryRoute({ application: installedApp }) : null;
   const reviewExistingHref = needsExistingServiceReview ? marketplacePrimaryRoute(appView) : null;
-  const installDisabled = installing || installLocked || !setupReady;
+  const installDisabled = installing || installLocked;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
-    : installLocked
-      ? installStatusMessage || 'Another install is active.'
-      : 'Finish the required app settings before installing.';
+    : installStatusMessage || 'Another install is active.';
 
   function openInstallReview() {
     setInstallReviewOpen(true);
-    void onRequestPlan(installOptions);
+    onRequestPlan();
   }
 
   function openDuplicateWarning() {
@@ -127,7 +120,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
             <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
               <ProjectPrimaryButton className="w-full" disabled={installDisabled} onClick={openInstallReview} type="button">
                 {installing ? <Loader2 className="size-4 animate-spin" /> : null}
-                {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Review install'}
+                {installing ? 'Installing...' : installLocked ? 'Install blocked' : 'Review install'}
               </ProjectPrimaryButton>
             </DisabledAction>
           )}
@@ -137,7 +130,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
               App settings
             </ProjectDarkControlButton>
           )}
-          {!isInstalled && <InstallWizard app={app} hasAppSettings={hasAppSettings} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required app settings before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOpenSettings={onOpenSettings} open={installReviewOpen} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
+          {!isInstalled && <InstallWizard app={app} hasAppSettings={hasAppSettings} installLocked={installLocked} installPreview={installPreview} previewError={previewError} onRequestPlan={onRequestPlan} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOpenSettings={onOpenSettings} open={installReviewOpen} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
         </div>
       </div>
 
@@ -152,13 +145,6 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
           {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
           {needsExistingServiceReview && <ExistingServiceNotice appView={appView} reviewHref={reviewExistingHref} />}
           {isInstalled && <InstalledAppNotice app={installedApp} manageHref={manageInstalledAppHref} />}
-          {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
-            <RecoveryInstallNotice
-              disabled={installLocked || installing}
-              mode={recoveryMode}
-              onReinstallCurrent={onReinstallCurrent}
-            />
-          )}
           {(installJob || backupJob || installing) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} />}
           <AppOverview app={app} />
         </TabsContent>
@@ -166,7 +152,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
         {!isInstalled && (
           <TabsContent className="mt-4 grid gap-3" value="install">
             {requiresInstallCaution(app) && <InstallCautionNotice app={app} />}
-            <InstallReadinessSummary app={app} hasAppSettings={hasAppSettings} />
+            <InstallReadinessSummary app={app} />
           </TabsContent>
         )}
 
@@ -223,20 +209,18 @@ function AppFactList({ items, title }: { items: string[]; title: string }) {
   );
 }
 
-function InstallReadinessSummary({ app, hasAppSettings }: { app: MarketplaceApp; hasAppSettings: boolean }) {
+function InstallReadinessSummary({ app }: { app: MarketplaceApp }) {
   return (
     <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-semibold text-slate-50">Install readiness</h4>
+          <h4 className="font-semibold text-slate-50">Installation overview</h4>
           <p className="mt-1 text-sm leading-5 text-slate-300">Review the final plan before Autark-OS changes this server.</p>
         </div>
-        <span className="shrink-0 rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{hasAppSettings ? 'Configuration ready' : 'Safe defaults'}</span>
       </div>
       <dl className="mt-4 grid gap-2 text-sm">
         <DrawerDetail label="Typical install" value={app.installTime} />
         <DrawerDetail label="Ready when" value={app.health.successLabel} />
-        <DrawerDetail label="Backup protection" value="Included by default" />
       </dl>
     </section>
   );
@@ -293,35 +277,6 @@ function InstallBlockedNotice({ message }: { message: string }) {
         <div>
           <h4 className="font-bold text-current">Another install is active</h4>
           <p className="mt-1 leading-6 text-current/80">{message}</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { disabled: boolean; mode: string; onReinstallCurrent: () => void | Promise<void> }) {
-  return (
-    <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4">
-      <div className="flex items-start gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
-        <div className="min-w-0">
-          <h4 className="font-bold text-slate-50">Reinstall requested</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-300">
-            {backupSafetyWarning('reinstall')}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <ProjectDarkControlButton asChild size="sm" type="button">
-              <Link to="/backups">
-                <Archive className="size-3.5" />
-                Open Backups
-              </Link>
-            </ProjectDarkControlButton>
-            <DisabledAction disabled={disabled} reason="Wait for the active install or reinstall job to finish.">
-              <ProjectWarningButton disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
-                I backed up, reinstall
-              </ProjectWarningButton>
-            </DisabledAction>
-          </div>
         </div>
       </div>
     </section>

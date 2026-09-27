@@ -266,6 +266,36 @@ class ReleaseManifestVerifierTests {
     }
 
     @Test
+    void retainsOldReleaseDuringKeyOverlapAndRejectsItAfterKeyRemoval() throws Exception {
+        var oldEnvelope = signed(payload());
+        var accepted = verifier.verifyForDownload(oldEnvelope, context());
+        verifier.markKnownGood(accepted, NOW.plusSeconds(30));
+        KeyPair nextKey = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        String nextKeyId = "next-release-key";
+        var overlap = new ReleaseManifestVerifier(
+                trustStore(Map.of(KEY_ID, keyPair.getPublic(), nextKeyId, nextKey.getPublic())),
+                state, REPOSITORY);
+        assertThat(overlap.verifyForDownload(oldEnvelope, context()).fingerprint())
+                .isEqualTo(accepted.fingerprint());
+        var nextPayload = payload();
+        nextPayload.put("sequence", 8);
+        nextPayload.put("signingKeyId", nextKeyId);
+        nextPayload.put("digest", "sha256:" + "e".repeat(64));
+        var nextContext = context("1.0.0", "linux/amd64", null, entitlement());
+        assertThat(overlap.verifyForDownload(signed(nextPayload, nextKeyId, nextKey), nextContext)
+                .manifest().sequence()).isEqualTo(8);
+        var offline = new VerificationContext(
+                "linux/amd64", "1.0.0", 1, "staging", DIGEST,
+                entitlement(Instant.parse("2026-07-19T13:00:00Z"), true, false),
+                Instant.parse("2026-08-01T12:00:00Z"));
+        assertThat(overlap.verifyRetainedKnownGood(oldEnvelope, offline).fingerprint())
+                .isEqualTo(accepted.fingerprint());
+        var removed = new ReleaseManifestVerifier(
+                trustStore(Map.of(nextKeyId, nextKey.getPublic())), state, REPOSITORY);
+        assertCode(() -> removed.verifyRetainedKnownGood(oldEnvelope, offline), "unknown_release_key");
+    }
+
+    @Test
     void releaseTrustStoreIsASeparateKeyRole() {
         ClasspathReleaseTrustStore releaseKeys = new ClasspathReleaseTrustStore();
 
@@ -345,16 +375,20 @@ class ReleaseManifestVerifierTests {
     }
 
     private SignedEnvelopeV1 signed(Map<String, Object> payload) {
+        return signed(payload, KEY_ID, keyPair);
+    }
+
+    private SignedEnvelopeV1 signed(Map<String, Object> payload, String keyId, KeyPair signerKey) {
         try {
             String header = canonical(Map.of(
                     "alg", "EdDSA",
-                    "kid", KEY_ID,
+                    "kid", keyId,
                     "typ", ReleaseManifestVerifier.DOCUMENT_TYPE));
             String body = canonical(payload);
             String protectedHeader = base64Url(header);
             String encodedPayload = base64Url(body);
             Signature signature = Signature.getInstance("Ed25519");
-            signature.initSign(keyPair.getPrivate());
+            signature.initSign(signerKey.getPrivate());
             signature.update(
                     (protectedHeader + "." + encodedPayload)
                             .getBytes(StandardCharsets.US_ASCII));
@@ -407,20 +441,24 @@ class ReleaseManifestVerifierTests {
     }
 
     private static ReleaseTrustStore trustStore(PublicKey publicKey) {
+        return trustStore(Map.of(KEY_ID, publicKey));
+    }
+
+    private static ReleaseTrustStore trustStore(Map<String, PublicKey> keys) {
         return new ReleaseTrustStore() {
             @Override
             public PublicKey verificationKey(String keyId) {
-                if (!KEY_ID.equals(keyId)) {
+                if (!keys.containsKey(keyId)) {
                     throw new ProContractVerificationException(
                             "unknown_release_key",
                             "Unknown release key.");
                 }
-                return publicKey;
+                return keys.get(keyId);
             }
 
             @Override
             public Set<String> keyIds() {
-                return Set.of(KEY_ID);
+                return keys.keySet();
             }
         };
     }

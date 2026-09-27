@@ -65,8 +65,8 @@ test('Discover install confirmation uses the approved plan review and requires e
   const wizard = source('src/pages/MarketplacePage/MarketplaceInstallWizard.tsx');
 
   assert.match(wizard, /Install plan/);
-  assert.match(wizard, /<InstallPlanStep icon=\{PackageOpen\}/);
-  assert.match(wizard, /<InstallPlanStep icon=\{LockKeyhole\}/);
+  assert.match(wizard, /installPreview\.sections\.map/);
+  assert.doesNotMatch(wizard, /technicalDetails\.friendly|willBackUp|willExpose/);
   assert.match(wizard, /<InstallConfigurationCallout/);
   assert.match(wizard, /aria-label="Confirm install plan"/);
   assert.match(wizard, /Confirm the install plan before starting\./);

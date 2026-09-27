@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Cloud, FolderOpen, LockKeyhole, PackageOpen, Settings2, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Check, Cloud, Info, LockKeyhole, PackageOpen, Settings2, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import {
@@ -12,49 +12,48 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
-import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
+import type { MarketplaceApp } from '@/types/marketplace';
 import { appSpecificSetupInputs } from './MarketplaceAppSettingsDialog';
 
 type InstallWizardProps = {
   app: MarketplaceApp;
   hasAppSettings: boolean;
-  hideTrigger?: boolean;
   installLocked: boolean;
-  installOptions: InstallOptions;
-  installPlan: InstallPlan | null;
   installStatusMessage: string;
   installing: boolean;
   installPreview: DiscoverInstallPreview | null;
-  onInstall: (options: InstallOptions) => Promise<void>;
+  previewError: string;
+  onRequestPlan: () => void;
+  onInstall: () => Promise<boolean>;
   onOpenSettings: () => void;
-  onOpenChange?: (open: boolean) => void;
-  open?: boolean;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
   setupAnswers: Record<string, unknown>;
   setupSchema: DiscoverSetupSchema;
-  triggerLabel?: string;
 };
 
-export function InstallWizard({ app, hasAppSettings, hideTrigger = false, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onInstall, onOpenChange, onOpenSettings, open: controlledOpen, setupAnswers, setupSchema, triggerLabel = 'Customize' }: InstallWizardProps) {
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+const sectionIcons: Record<string, LucideIcon> = { create: PackageOpen, connect: LockKeyhole, protect: Cloud, check: Check, afterInstall: Info };
+
+export function InstallWizard({ app, hasAppSettings, installLocked, installPreview, previewError, onRequestPlan, installStatusMessage, installing, onInstall, onOpenChange: setOpen, onOpenSettings, open, setupAnswers, setupSchema }: InstallWizardProps) {
   const [confirmed, setConfirmed] = useState(false);
-  const open = controlledOpen ?? uncontrolledOpen;
-  const setOpen = onOpenChange ?? setUncontrolledOpen;
-  const installDisabled = installing || installLocked || !confirmed;
+  const planReady = installPreview?.valid === true;
+  const planMessage = previewError ? 'Could not check installation.' : !installPreview ? 'Checking installation…' : installPreview.blockingIssues.map(issue => issue.message).join(' ');
+  const installDisabled = installing || installLocked || !planReady || !confirmed;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
     : installLocked
       ? installStatusMessage || 'Resolve the blocked install state before continuing.'
-      : 'Confirm the install plan before starting.';
+      : !planReady ? planMessage : 'Confirm the install plan before starting.';
 
   useEffect(() => {
     if (open) {
       setConfirmed(false);
     }
-  }, [app.id, open]);
+  }, [app.id, open, setupAnswers, installPreview]);
 
   async function startInstall() {
-    await onInstall(installOptions);
-    setOpen(false);
+    if (installDisabled) return;
+    if (await onInstall()) setOpen(false);
   }
 
   function openSettings() {
@@ -64,11 +63,6 @@ export function InstallWizard({ app, hasAppSettings, hideTrigger = false, instal
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {!hideTrigger && (
-        <ProjectDarkControlButton onClick={() => setOpen(true)} type="button">
-          {triggerLabel}
-        </ProjectDarkControlButton>
-      )}
       <DialogContent className="max-h-[88vh] overflow-y-auto border-sky-300/25 bg-app-overlay-panel text-slate-50 shadow-2xl shadow-slate-950/40 sm:max-w-xl">
         <DialogHeader className="pr-8">
           <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100/65">Install plan</p>
@@ -79,10 +73,17 @@ export function InstallWizard({ app, hasAppSettings, hideTrigger = false, instal
         <div className="grid gap-2">
           {installLocked && <InstallBlockedCard message={installStatusMessage} />}
           {requiresInstallCaution(app) && <InstallCaution app={app} />}
-          <InstallPlanStep icon={PackageOpen} label="Create the app" text={installPlan?.friendly.willCreate[0] || `${app.name} will run as a managed Autark-OS app.`} />
-          <InstallPlanStep icon={LockKeyhole} label="Set up access" text={installPlan?.friendly.willExpose[0] || 'A local link and private access will be configured when supported.'} />
-          <InstallPlanStep icon={FolderOpen} label="Prepare app data" text={installPlan?.friendly.willConfigure[0] || 'App data stays in a dedicated location, separate from other apps.'} />
-          <InstallPlanStep icon={Cloud} label="Protect it" text={installPlan?.friendly.willBackUp[0] || 'Backup protection will be enabled before the app is ready to use.'} />
+          {!planReady && <div className="grid gap-2 rounded-lg border border-border bg-muted p-3 text-sm" role="status">
+            <p>{planMessage}</p>
+            {previewError && <>
+              <p className="text-muted-foreground">{previewError}</p>
+              <ProjectDarkControlButton onClick={onRequestPlan} type="button">Retry plan</ProjectDarkControlButton>
+            </>}
+          </div>}
+          {planReady && installPreview.sections.map(section => (
+            <InstallPlanStep key={section.id} icon={sectionIcons[section.id] ?? Info} label={section.title}
+              text={section.items.map(item => [item.label, item.description].filter(Boolean).join(' ')).join(' ')} />
+          ))}
         </div>
 
         <InstallConfigurationCallout answers={setupAnswers} hasAppSettings={hasAppSettings} onOpenSettings={openSettings} schema={setupSchema} />
@@ -90,7 +91,7 @@ export function InstallWizard({ app, hasAppSettings, hideTrigger = false, instal
         {installPreview?.warnings.length ? <InstallWarnings warnings={installPreview.warnings} /> : null}
 
         <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-sky-300/15 bg-slate-950/25 p-3 text-xs leading-5 text-sky-100/70">
-          <Checkbox aria-label="Confirm install plan" checked={confirmed} className="mt-0.5 border-sky-300/35 data-checked:border-cyan-300 data-checked:bg-cyan-300 data-checked:text-slate-950" onCheckedChange={(checked) => setConfirmed(checked === true)} />
+          <Checkbox aria-label="Confirm install plan" checked={confirmed} disabled={!planReady || installing || installLocked} className="mt-0.5 border-sky-300/35 data-checked:border-cyan-300 data-checked:bg-cyan-300 data-checked:text-slate-950" onCheckedChange={(checked) => setConfirmed(checked === true)} />
           <span>I understand Autark-OS will create and manage this app.</span>
         </label>
 
@@ -130,6 +131,7 @@ function InstallConfigurationCallout({ answers, hasAppSettings, onOpenSettings, 
 }
 
 function InstallPlanStep({ icon: Icon, label, text }: { icon: LucideIcon; label: string; text: string }) {
+  if (!text) return null;
   return (
     <div className="flex gap-3 rounded-xl border border-sky-300/15 bg-slate-950/25 p-3">
       <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-100"><Icon className="size-3.5" /></span>

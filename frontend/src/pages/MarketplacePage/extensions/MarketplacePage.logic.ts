@@ -4,7 +4,7 @@ import betaScope from '@beta-scope';
 import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import type { DiscoverAppView } from '@/types/discover';
 import type { ApplicationView } from '@/types/applicationState';
-import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
+import type { MarketplaceApp } from '@/types/marketplace';
 import type { StorageReport, SystemDoctorStatus } from '@/types/system';
 import type { MarketplaceStatusFilter } from './MarketplacePage.constants';
 
@@ -236,51 +236,4 @@ export function marketplaceUpdateRank(lastUpdated: string) {
   if (value.includes('week')) return 2;
   if (value.includes('month')) return 3;
   return 4;
-}
-
-export function optionsFromInstalledSettings(
-  settings: {
-    accessUrl?: string | null;
-    backup?: { enabled?: boolean; frequency?: string; retention?: number } | null;
-    expectedLocalPort?: number | null;
-    storageSubfolders?: Record<string, string> | null;
-    tailscaleEnabled?: boolean;
-  } | null | undefined,
-  fallback: InstallOptions,
-) {
-  if (!settings) {
-    return fallback;
-  }
-  return {
-    ports: { hostPort: settings.expectedLocalPort ?? portFromUrl(settings.accessUrl) ?? fallback.ports.hostPort },
-    access: { tailscaleEnabled: settings.tailscaleEnabled },
-    storage: { subfolders: settings.storageSubfolders ?? fallback.storage.subfolders },
-    backup: {
-      enabled: settings.backup?.enabled ?? fallback.backup.enabled,
-      frequency: settings.backup?.frequency ?? fallback.backup.frequency,
-      retention: settings.backup?.retention ?? fallback.backup.retention,
-    },
-    reinstall: true,
-  };
-}
-
-export function portFromUrl(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-  try {
-    const parsed = new URL(value);
-    if (parsed.port) {
-      return Number(parsed.port);
-    }
-    if (parsed.protocol === 'http:') {
-      return 80;
-    }
-    if (parsed.protocol === 'https:') {
-      return 443;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }

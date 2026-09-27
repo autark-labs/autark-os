@@ -6,12 +6,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.autarkos.pro.identity.DeviceChallengeSignature;
 import com.autarkos.pro.identity.DeviceIdentity;
 import com.autarkos.pro.identity.DeviceIdentityService;
 import com.autarkos.pro.model.SignedEnvelopeV1;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
@@ -22,10 +24,14 @@ public class DeviceOperationProofFactory {
             new java.time.format.DateTimeFormatterBuilder().appendInstant(3).toFormatter();
 
     private final DeviceIdentityService identityService;
+    private final String coreVersion;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DeviceOperationProofFactory(DeviceIdentityService identityService) {
+    public DeviceOperationProofFactory(
+            DeviceIdentityService identityService,
+            @Value("${autark.pro.core-version:${AUTARK_OS_VERSION:0.0.1-SNAPSHOT}}") String coreVersion) {
         this.identityService = identityService;
+        this.coreVersion = coreVersion;
     }
 
     public ProControlPlaneClient.DeviceProofRequest create(
@@ -35,13 +41,15 @@ public class DeviceOperationProofFactory {
             throw new IllegalArgumentException("Challenge purpose and response are required.");
         }
         DeviceIdentity identity = identityService.current();
+        boolean reportsCompatibility = purpose != ProControlPlaneClient.ChallengePurpose.ENTITLEMENT_RENEW;
         var payload = new CanonicalOperationChallenge(
+                reportsCompatibility ? coreVersion : null,
                 identity.deviceId(),
                 MILLIS_INSTANT.format(challenge.expiresAt().truncatedTo(ChronoUnit.MILLIS)),
                 MILLIS_INSTANT.format(challenge.issuedAt().truncatedTo(ChronoUnit.MILLIS)),
                 challenge.nonce(),
                 purpose.wireValue(),
-                "1");
+                reportsCompatibility ? "2" : "1");
         var header = new CanonicalProtectedHeader("EdDSA", identity.keyId(), PROOF_TYPE);
 
         try {
@@ -76,7 +84,9 @@ public class DeviceOperationProofFactory {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonPropertyOrder({
+            "coreVersion",
             "deviceId",
             "expiresAt",
             "issuedAt",
@@ -85,6 +95,7 @@ public class DeviceOperationProofFactory {
             "schemaVersion"
     })
     private record CanonicalOperationChallenge(
+            String coreVersion,
             String deviceId,
             String expiresAt,
             String issuedAt,

@@ -15,6 +15,7 @@ EXAMPLE_NAMES = (
     "device-registration-request-v1",
     "device-registration-challenge-v1",
     "device-operation-challenge-v1",
+    "device-operation-challenge-v2",
     "durable-product-grant-v1",
     "online-service-lease-v1",
     "pro-entitlement-status-v1",
@@ -51,6 +52,14 @@ def main():
         )
         validators[name] = validator
         validator.validate(load_json(CONTRACTS / "examples" / f"{name}.json"))
+
+    compatibility = load_json(CONTRACTS / "examples" / "device-operation-challenge-v2.json")
+    for field, value in [("coreVersion", "latest"), ("schemaVersion", "1"),
+                         ("purpose", "entitlement_renew"), ("architecture", "linux/arm64")]:
+        invalid = {**compatibility, field: value}
+        assert not validators["device-operation-challenge-v2"].is_valid(invalid)
+    del compatibility["coreVersion"]
+    assert not validators["device-operation-challenge-v2"].is_valid(compatibility)
 
     invalid_capability = load_json(
         CONTRACTS / "examples" / "durable-product-grant-v1.json"

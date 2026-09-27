@@ -191,6 +191,24 @@ class DiscoverServiceTests {
     }
 
     @Test
+    void invalidInstallChoicesNeverCreateAJobOrPersistSetup() {
+        var installService = new RecordingMarketplaceInstallService();
+        var jobs = jobService();
+        var service = discoverService(observedRepository(), installService, jobs);
+        var request = new DiscoverInstallModels.DiscoverInstallRequest(Map.of(
+                "jellyfinMediaFolder", "existing_folder",
+                "jellyfinExistingMediaPath", runtimeRoot.resolve("missing").toString()), false, false);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.install("jellyfin", request))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(jobs.list()).isEmpty();
+        jobs.runQueuedJobsNow();
+        assertThat(installService.lastOptions).isNull();
+        assertThat(JpaTestRepositories.discoverSetupRepository(runtimeLayout()).recordByAppId("jellyfin")).isEmpty();
+    }
+
+    @Test
     void installRetriesJoinOnlyMatchingChoicesAndNeverPersistRejectedChoices() {
         var installService = new RecordingMarketplaceInstallService();
         var jobs = jobService();

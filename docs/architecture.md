@@ -104,6 +104,15 @@ filters. Ready describes catalog support, not the current host's readiness to
 install. Existing install previews, ownership checks and support warnings still
 apply. Changing these filters does not change navigation or another page.
 
+Install review uses the existing preview query keyed by app and setup answers.
+Only a successful, valid preview for those choices enables confirmation; loading,
+failed rechecks (including cached previews), and invalid choices cannot authorize
+an install. The wizard renders the backend's plain-language plan sections, offers
+retry on preview failures, and clears confirmation when the choices or plan change.
+The backend independently revalidates before creating an install job. Discover's
+obsolete URL-only reinstall controls are removed; managed apps still lead to My
+Apps and its canonical recovery actions.
+
 ## Boundaries
 
 - **Core is local-first.** It works without a cloud service, native mobile app,

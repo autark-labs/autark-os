@@ -1,4 +1,3 @@
-import { backupSafetyWarning } from './backupSafety';
 import type { AppAccessCheck, AppHealthSnapshot, AppReliabilityIssue, AppRuntimeView, AppTelemetry } from '@/types/app';
 
 type PrivateAccessReconciliation = {
@@ -10,7 +9,6 @@ type PrivateAccessReconciliation = {
 type AppActionRemediation = { kind: 'app-action'; action: 'restart'; label: string };
 type LinkRemediation = { kind: 'link'; to: string; label: string };
 type NoopRemediation = { kind: 'none'; label: string };
-type DangerousRemediationAction = { label: string; warning: string; target: string };
 
 export type AppRemediation = {
   cause: 'private-access' | 'app-health' | 'local-link' | 'resource';
@@ -21,7 +19,6 @@ export type AppRemediation = {
   nextStep: string;
   safeAction: AppActionRemediation | LinkRemediation | NoopRemediation;
   checklist: string[];
-  dangerousActions: DangerousRemediationAction[];
 };
 
 type BuildAppRemediationInput = {
@@ -36,7 +33,6 @@ type BuildAppRemediationInput = {
  * @typedef {{ kind: 'app-action', action: 'restart', label: string }} AppActionRemediation
  * @typedef {{ kind: 'link', to: string, label: string }} LinkRemediation
  * @typedef {{ kind: 'none', label: string }} NoopRemediation
- * @typedef {{ label: string, warning: string, target: string }} DangerousRemediationAction
  * @typedef {{
  *   cause: 'private-access' | 'app-health' | 'local-link' | 'resource',
  *   severity: 'warning' | 'critical',
@@ -46,7 +42,6 @@ type BuildAppRemediationInput = {
  *   nextStep: string,
  *   safeAction: AppActionRemediation | LinkRemediation | NoopRemediation,
  *   checklist: string[],
- *   dangerousActions: DangerousRemediationAction[],
  * }} AppRemediation
  */
 
@@ -85,7 +80,6 @@ export function buildAppRemediation({ access, app, health, reconciliation, telem
       nextStep: 'Restart the app. If the URL was changed outside Autark-OS, update the app address in Settings.',
       safeAction: { kind: 'app-action', action: 'restart', label: 'Restart app' },
       checklist: ['Confirm the local address is still correct.', 'Restart before changing app data.', 'Use Settings to update the app URL if needed.'],
-      dangerousActions: [],
     };
   }
 
@@ -99,7 +93,6 @@ export function buildAppRemediation({ access, app, health, reconciliation, telem
       nextStep: 'Open the app, review what it is doing, and restart only if it feels stuck.',
       safeAction: { kind: 'none', label: 'Review app' },
       checklist: ['High resource use can be normal during imports or scans.', 'Avoid reinstalling for a temporary resource spike.'],
-      dangerousActions: [],
     };
   }
 
@@ -142,7 +135,6 @@ function privateAccessRemediation({ summary }: { appId?: string; summary: string
     nextStep: 'Repair the private link from Access, then reopen this app from a private device.',
     safeAction: { kind: 'link', to: '/access', label: 'Open Access' },
     checklist: ['Tailscale must be connected.', 'This app should stay installed.', 'No app data is removed when repairing a private link.'],
-    dangerousActions: [],
   };
 }
 
@@ -150,7 +142,7 @@ function privateAccessRemediation({ summary }: { appId?: string; summary: string
  * @param {{ appId?: string, appName: string, summary: string }} input
  * @returns {AppRemediation}
  */
-function appHealthRemediation({ appId, appName, summary }: { appId?: string; appName: string; summary: string }): AppRemediation {
+function appHealthRemediation({ appName, summary }: { appId?: string; appName: string; summary: string }): AppRemediation {
   return {
     cause: 'app-health',
     severity: 'critical',
@@ -160,26 +152,7 @@ function appHealthRemediation({ appId, appName, summary }: { appId?: string; app
     nextStep: 'Restart first. If it returns to this state, create a backup before reinstalling or resetting the app.',
     safeAction: { kind: 'app-action', action: 'restart', label: 'Restart app' },
     checklist: ['Check the latest failure reason below.', 'Let the restart finish before trying another fix.', 'Create a backup before reinstalling or resetting.'],
-    dangerousActions: recoveryActions(appId),
   };
-}
-
-function recoveryActions(appId?: string) {
-  if (!appId) {
-    return [];
-  }
-  return [
-    {
-      label: 'Reinstall with current settings',
-      warning: backupSafetyWarning('reinstall'),
-      target: `/discover?app=${encodeURIComponent(appId)}&mode=reinstall`,
-    },
-    {
-      label: 'Reset and reinstall',
-      warning: backupSafetyWarning('reset'),
-      target: `/discover?app=${encodeURIComponent(appId)}&mode=reset-reinstall`,
-    },
-  ];
 }
 
 function resourceWarning(telemetry?: AppTelemetry | null) {

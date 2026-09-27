@@ -84,7 +84,7 @@ class DeviceRegistrationProofFactoryTests {
         KeyPair keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         DeviceIdentity identity = identity(keyPair);
         DeviceOperationProofFactory factory =
-                new DeviceOperationProofFactory(signingService(identity, keyPair));
+                new DeviceOperationProofFactory(signingService(identity, keyPair), "1.2.3");
         var challenge = new ProControlPlaneClient.RegistrationChallenge(
                 "1",
                 Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]),
@@ -113,6 +113,37 @@ class DeviceRegistrationProofFactoryTests {
                 .getBytes(StandardCharsets.US_ASCII));
         assertThat(verifier.verify(Base64.getUrlDecoder().decode(
                 request.challengeProof().signature()))).isTrue();
+    }
+
+    @Test
+    void reportsCurrentVersionForDiscoveryAndPullAfterUpgradeAndDowngrade() throws Exception {
+        KeyPair keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        var identityService = signingService(identity(keyPair), keyPair);
+        var challenge = new ProControlPlaneClient.RegistrationChallenge(
+                "1", Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]),
+                Instant.parse("2026-09-25T12:00:00Z"), Instant.parse("2026-09-25T12:05:00Z"),
+                UUID.randomUUID());
+        for (String version : new String[] {"1.2.3", "2.0.0", "1.2.3"}) {
+            var factory = new DeviceOperationProofFactory(identityService, version);
+            for (var purpose : ProControlPlaneClient.ChallengePurpose.values()) {
+                var envelope = factory.create(purpose, challenge).challengeProof();
+                JsonNode payload = decode(envelope.payload());
+                boolean reports = purpose != ProControlPlaneClient.ChallengePurpose.ENTITLEMENT_RENEW;
+                assertThat(payload.path("schemaVersion").asText()).isEqualTo(reports ? "2" : "1");
+                assertThat(payload.has("coreVersion")).isEqualTo(reports);
+                if (reports) assertThat(payload.path("coreVersion").asText()).isEqualTo(version);
+                assertThat(payload.has("installationId")).isFalse();
+                assertThat(payload.has("architecture")).isFalse();
+                var names = new java.util.ArrayList<String>();
+                payload.fieldNames().forEachRemaining(names::add);
+                assertThat(names).isSorted();
+                Signature verifier = Signature.getInstance("Ed25519");
+                verifier.initVerify(keyPair.getPublic());
+                verifier.update((envelope.protectedHeader() + "." + envelope.payload())
+                        .getBytes(StandardCharsets.US_ASCII));
+                assertThat(verifier.verify(Base64.getUrlDecoder().decode(envelope.signature()))).isTrue();
+            }
+        }
     }
 
     private static DeviceIdentity identity(KeyPair keyPair) throws Exception {

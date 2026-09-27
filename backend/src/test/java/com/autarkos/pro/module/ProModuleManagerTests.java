@@ -910,7 +910,7 @@ class ProModuleManagerTests {
                 jobs,
                 controlPlane,
                 identity,
-                new DeviceOperationProofFactory(identity),
+                new DeviceOperationProofFactory(identity, "1.2.3"),
                 verifier,
                 audit,
                 runtime,

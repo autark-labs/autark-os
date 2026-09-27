@@ -12,6 +12,16 @@ Durable grants, service leases, release manifests, and device proofs use RFC
 CE verifies signatures, device binding, trusted time, release eligibility,
 repository scope, digest, architecture, and image signature independently.
 
+Release discovery and registry requests sign `device-operation-challenge-v2`,
+including the running CE `coreVersion`. The factory uses the same configured
+version as CE's independent release verifier. The outer HTTP envelope remains
+v1; entitlement renewal continues to sign the v1 operation payload. The v1
+proof schema remains as historical documentation for older clients, but release
+and registry operations require v2 after the coordinated server/client rollout.
+A downgrade reports its actual version on the next fresh challenge; it does not
+retain eligibility from an earlier, newer version. Installation identity,
+architecture, and key authority are not mutable fields in this proof.
+
 Capability identifiers in signed documents are opaque strings. CE checks
 membership and equality but has no compiled product catalog.
 

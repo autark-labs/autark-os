@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -128,6 +129,28 @@ class EntitlementDocumentVerifierTests {
     }
 
     @Test
+    void verifiesGrantAndLeaseFromDifferentTrustedSigners() throws Exception {
+        KeyPair first = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        KeyPair second = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        String nextKeyId = "next-entitlement-key";
+        var overlap = trustStore(Map.of(KEY_ID, first.getPublic(), nextKeyId, second.getPublic()));
+        var grant = new GrantVerifier(overlap).verify(
+                sign(grant(DEVICE_ID), GrantVerifier.DOCUMENT_TYPE, KEY_ID, first), identity());
+        var leasePayload = MAPPER.valueToTree(lease("active"));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) leasePayload).put("keyId", nextKeyId);
+        var envelope = sign(leasePayload, ServiceLeaseVerifier.DOCUMENT_TYPE, nextKeyId, second);
+        var verifiedLease = new ServiceLeaseVerifier(overlap).verify(envelope, identity(), grant.grant());
+
+        assertThat(grant.keyId()).isEqualTo(KEY_ID);
+        assertThat(verifiedLease.keyId()).isEqualTo(nextKeyId);
+        assertThat(verifiedLease.lease().grantId()).isEqualTo(grant.grant().grantId());
+        assertThatThrownBy(() -> new ServiceLeaseVerifier(trustStore(KEY_ID, first.getPublic()))
+                .verify(envelope, identity(), grant.grant()))
+                .isInstanceOfSatisfying(ProContractVerificationException.class,
+                        error -> assertThat(error.code()).isEqualTo("unknown_key"));
+    }
+
+    @Test
     void embeddedTrustStoreContainsOnlyRotatablePublicKeys() {
         ClasspathProTrustStore trustStore = new ClasspathProTrustStore();
 
@@ -138,20 +161,24 @@ class EntitlementDocumentVerifierTests {
     }
 
     private static ProTrustStore trustStore(String keyId, PublicKey publicKey) {
+        return trustStore(Map.of(keyId, publicKey));
+    }
+
+    private static ProTrustStore trustStore(Map<String, PublicKey> keys) {
         return new ProTrustStore() {
             @Override
             public PublicKey verificationKey(String requestedKeyId) {
-                if (!keyId.equals(requestedKeyId)) {
+                if (!keys.containsKey(requestedKeyId)) {
                     throw new ProContractVerificationException(
                             "unknown_key",
                             "Signed document references an unknown verification key.");
                 }
-                return publicKey;
+                return keys.get(requestedKeyId);
             }
 
             @Override
             public Set<String> keyIds() {
-                return Set.of(keyId);
+                return keys.keySet();
             }
         };
     }

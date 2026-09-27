@@ -49,7 +49,7 @@ class RegistryCredentialClientTests {
         RegistryCredentialClient client = new RegistryCredentialClient(
                 controlPlane,
                 identityService,
-                new DeviceOperationProofFactory(identityService));
+                new DeviceOperationProofFactory(identityService, "1.2.3"));
 
         RegistryCredential credential = client.issue(verifiedRelease());
         char[][] observed = new char[1][];
@@ -85,7 +85,7 @@ class RegistryCredentialClientTests {
         RegistryCredentialClient client = new RegistryCredentialClient(
                 controlPlane,
                 identityService,
-                new DeviceOperationProofFactory(identityService));
+                new DeviceOperationProofFactory(identityService, "1.2.3"));
         char[][] observed = new char[1][];
 
         assertThatThrownBy(() ->
@@ -114,7 +114,7 @@ class RegistryCredentialClientTests {
         RegistryCredentialClient client = new RegistryCredentialClient(
                 controlPlane,
                 identityService,
-                new DeviceOperationProofFactory(identityService),
+                new DeviceOperationProofFactory(identityService, "1.2.3"),
                 audit);
 
         try (RegistryCredential ignored =
@@ -149,7 +149,7 @@ class RegistryCredentialClientTests {
         RegistryCredentialClient client = new RegistryCredentialClient(
                 controlPlane,
                 identityService,
-                new DeviceOperationProofFactory(identityService),
+                new DeviceOperationProofFactory(identityService, "1.2.3"),
                 audit);
 
         assertThatThrownBy(() ->

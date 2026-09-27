@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v2/device-operation-challenge.schema.json",
+  "title": "Registered device compatibility operation payload v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "nonce",
+    "purpose",
+    "deviceId",
+    "issuedAt",
+    "expiresAt",
+    "coreVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,256}$"
+    },
+    "purpose": {
+      "enum": [
+        "release_check",
+        "registry_token"
+      ]
+    },
+    "deviceId": {
+      "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/uuid"
+    },
+    "issuedAt": {
+      "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/dateTime"
+    },
+    "expiresAt": {
+      "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/dateTime"
+    },
+    "coreVersion": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    }
+  }
+}

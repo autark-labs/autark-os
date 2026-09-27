@@ -154,13 +154,14 @@ paths:
                     type: string
                     format: uuid
                   entitlementPath:
+                    description: Append this path to the configured versioned API base after trimming its trailing slash (for example, https://api.autarklabs.com/v1 + /entitlements-renew). It is not relative to the bare origin and must not replace the /v1 prefix.
                     const: /entitlements-renew
                   requestId:
                     type: string
                     format: uuid
         default:
           $ref: "#/components/responses/Error"
-  /entitlements/renew:
+  /entitlements-renew:
     post:
       operationId: renewEntitlements
       summary: Return the latest signed durable grant and short-lived online lease.
@@ -198,6 +199,7 @@ paths:
   /releases-check:
     post:
       operationId: checkRelease
+      description: Requires a device-operation-challenge-v2 signed payload with the current coreVersion and release_check purpose. Older proof payloads are rejected.
       summary: Return the exact signed release manifest assigned to the device.
       requestBody:
         $ref: "#/components/requestBodies/DeviceProof"
@@ -232,6 +234,7 @@ paths:
   /registry-token:
     post:
       operationId: issueRegistryCredential
+      description: Requires a fresh device-operation-challenge-v2 signed payload with the current coreVersion and registry_token purpose, including after a downgrade.
       summary: Issue a short-lived pull-only credential for an assigned digest.
       requestBody:
         required: true

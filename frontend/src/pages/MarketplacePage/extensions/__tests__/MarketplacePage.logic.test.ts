@@ -6,7 +6,6 @@ import {
   marketplacePrimaryRoute,
   marketplaceVisibleAppViews,
   marketplaceVisibleApps,
-  optionsFromInstalledSettings,
   readyCatalogForDiscover,
   shouldShowStartHereSection,
   starterCatalogForDiscover,
@@ -227,29 +226,4 @@ test('readyCatalogForDiscover shows only entries marked Ready', () => {
   ];
 
   assert.deepEqual(readyCatalogForDiscover(apps).map((item) => item.id), ['ready']);
-});
-
-test('optionsFromInstalledSettings preserves installed app choices for reinstall', () => {
-  const fallback = {
-    access: { tailscaleEnabled: false },
-    backup: { enabled: true, frequency: 'daily', retention: 7 },
-    ports: { hostPort: 8080 },
-    reinstall: false,
-    storage: { subfolders: { data: 'data' } },
-  };
-  const options = optionsFromInstalledSettings({
-    accessUrl: 'http://host.local:8096',
-    backup: { enabled: false, frequency: 'weekly', retention: 3 },
-    expectedLocalPort: null,
-    storageSubfolders: { config: 'custom-config' },
-    tailscaleEnabled: true,
-  }, fallback);
-
-  assert.deepEqual(options, {
-    access: { tailscaleEnabled: true },
-    backup: { enabled: false, frequency: 'weekly', retention: 3 },
-    ports: { hostPort: 8096 },
-    reinstall: true,
-    storage: { subfolders: { config: 'custom-config' } },
-  });
 });
