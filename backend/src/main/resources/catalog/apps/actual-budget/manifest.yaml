@@ -4,21 +4,15 @@ metadata:
   category: Productivity
   description: Private envelope budgeting and personal finance tracking.
   shortValue: Run a private budgeting app for household finances.
-  badge: Verified
-  downloads: 520K
-  rating: '4.7'
   image: /app-images/actual-budget.svg
   version: 26.6.0
-  lastUpdated: Recently
-  size: 190 MB
   maintainer: Actual Budget Community
   source: GitHub
   sourceUrl: https://github.com/actualbudget/actual
   documentationUrl: https://actualbudget.org/docs/
-  installTime: 2-4 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:5006
   tags:
     - Budgeting
@@ -27,30 +21,18 @@ metadata:
     - Privacy
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -83,33 +65,36 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/actual-budget/data
     - label: Backup
-      value: Budget data daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Private
 access:
   kind: web
+  privateDashboard: true
   defaultMode: private
   privateAccessRecommended: true
   requiresFirstRunSetup: true
   notes:
-    - Private access is recommended because this stores financial information.
+    - Private HTTPS is required for this installation because Actual Budget needs a secure browser context.
     - First-run setup creates or imports a budget file.
 usage:
   kind: web-app
+  privateHttpsRequired: true
   primaryAction: open-dashboard
   openUrlLabel: Open Actual Budget
   headline: Start a private household budget
   summary: Autark-OS starts Actual Budget and prepares storage. Create or import your first budget in the app.
   setupSteps:
-    - Open Actual Budget.
-    - Create or import a budget.
-    - Keep private access enabled for use away from home.
+    - Enable private HTTPS access in Autark-OS Access, then open Actual Budget using that HTTPS link.
+    - Create the server password, then create or import a budget.
+    - Use the same private HTTPS address on your other devices; ordinary LAN HTTP lacks required browser features.
   fields:
     - label: Budget URL
       value: "{accessUrl}"
       sensitive: false
       qr: true
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Backups are important because this stores finance records.
 health:
   type: http
@@ -135,6 +120,6 @@ runtime:
     - autark-os.version=26.6.0
   backupPaths:
     - data
-  backupStrategy: sqlite_aware
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

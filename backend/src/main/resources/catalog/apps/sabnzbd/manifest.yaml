@@ -1,0 +1,80 @@
+id: sabnzbd
+metadata:
+  name: "SABnzbd"
+  category: Media
+  description: "Download from your own Usenet provider."
+  shortValue: "Download from your own Usenet provider."
+  image: /app-images/sabnzbd.svg
+  version: "5.1.3-ls274"
+  maintainer: "LinuxServer.io"
+  source: GitHub
+  sourceUrl: https://github.com/sabnzbd/sabnzbd
+  documentationUrl: https://docs.linuxserver.io/images/docker-sabnzbd/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18015
+  tags: ["Media", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Download from your own Usenet provider."
+  bestFor: ["Download from your own Usenet provider."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["SABnzbd", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open SABnzbd"
+  headline: "Set up SABnzbd"
+  summary: "Download from your own Usenet provider."
+  setupSteps:
+    - "Complete the wizard with your Usenet provider account."
+    - "Set a dashboard username and password; use /downloads for completed files."
+  notes:
+    - "Requires a separate Usenet subscription. Downloads are isolated from other apps; no shared media library is configured."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: sabnzbd
+  composeProject: autark-os-sabnzbd
+  image: lscr.io/linuxserver/sabnzbd@sha256:4f7ee6c53834bc336365bd0a7c35f4fc870156a72d33a334753010258aa077a4
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/sabnzbd
+  ports: ["18015:8080"]
+  volumes:
+    - "/var/lib/autark-os/apps/sabnzbd/config:/config"
+    - "/var/lib/autark-os/apps/sabnzbd/downloads:/downloads"
+    - "/var/lib/autark-os/apps/sabnzbd/incomplete-downloads:/incomplete-downloads"
+  environment: ["PUID=1000","PGID=1000","TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=sabnzbd"]
+  backupPaths: ["config","downloads","incomplete-downloads"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

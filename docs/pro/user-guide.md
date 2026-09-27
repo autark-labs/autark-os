@@ -9,8 +9,8 @@ The Pro navigation item and new-activation controls are hidden in this beta.
 
 The [current beta scope](../beta-scope.md) is the release authority. Its initial
 qualification target is Debian 12 AMD64, systemd, Docker Engine with Compose v2,
-and local Linux filesystem storage. FreshRSS, Homepage, and Syncthing are the
-new-install candidates; qualification remains pending. Existing apps remain
+and local Linux filesystem storage. The scope record lists current app candidates;
+the three starter suggestions are not the full catalog. Qualification remains pending. Existing apps remain
 manageable. Raspberry Pi/ARM64 and other hosts require separate qualification.
 
 ## What is available and what is planned

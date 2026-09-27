@@ -1,2 +1,0 @@
-# Placeholder compose file for uptime-kuma. Autark-OS renders the runtime compose file from manifest.yaml.
-services: {}

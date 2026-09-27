@@ -36,7 +36,8 @@ class MarketplaceCatalogServiceTests {
     void loadsCatalogAppsFromManifests() {
         assertThat(catalogService.findAll())
                 .extracting(ApplicationManifest::id)
-                .containsExactlyInAnyOrder(
+                .hasSize(49)
+                .contains(
                         "actual-budget",
                         "adguard-home",
                         "bazarr",
@@ -69,7 +70,9 @@ class MarketplaceCatalogServiceTests {
     @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
         applicationStateService.refreshNow();
-        assertThat(discoverController.apps()).extracting(view -> view.application().id()).containsExactlyInAnyOrder("freshrss", "homepage", "syncthing");
+        assertThat(discoverController.apps()).extracting(view -> view.application().id())
+                .containsExactlyInAnyOrderElementsOf(com.autarkos.system.BetaScope.CURRENT.apps().stream()
+                        .map(com.autarkos.system.BetaScope.App::id).toList());
         DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("homepage", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
 
         assertThat(preview.technicalDetails())

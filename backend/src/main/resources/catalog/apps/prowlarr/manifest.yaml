@@ -4,21 +4,15 @@ metadata:
   category: Media
   description: Indexer manager for Sonarr, Radarr, and other media automation tools.
   shortValue: Manage media indexers once and share them with compatible apps.
-  badge: Verified
-  downloads: 1.1M
-  rating: '4.7'
   image: /app-images/prowlarr.svg
   version: 2.4.0.5397
-  lastUpdated: Recently
-  size: 190 MB
   maintainer: Prowlarr Community
   source: GitHub
   sourceUrl: https://github.com/Prowlarr/Prowlarr
   documentationUrl: https://wiki.servarr.com/prowlarr
-  installTime: 3-5 minutes
   difficulty: Advanced
-  supportLevel: Advanced
-  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:9696
   tags:
     - Indexers
@@ -27,30 +21,18 @@ metadata:
     - Advanced
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -83,7 +65,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/prowlarr/config
     - label: Backup
-      value: Configuration daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -101,16 +83,17 @@ usage:
   headline: Centralize media indexers
   summary: Autark-OS starts Prowlarr. Add indexers and connect compatible media apps from the dashboard.
   setupSteps:
-    - Open Prowlarr.
+    - Open Prowlarr and configure a username, password, and authentication method when prompted.
     - Add indexers you are allowed to use.
-    - Connect Sonarr, Radarr, or other compatible apps.
+    - Connect Sonarr, Radarr, or other compatible apps manually using their reachable URLs and API keys.
   fields:
     - label: Dashboard URL
       value: "{accessUrl}"
       sensitive: false
       qr: false
   notes:
-    - Prowlarr is an advanced companion service, not a media player.
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
+    - Prowlarr is an advanced companion service, not a media player. No app connections are created automatically.
 setup:
   kind: media-stack
   automation: manual
@@ -148,6 +131,6 @@ runtime:
     - autark-os.version=2.4.0.5397
   backupPaths:
     - config
-  backupStrategy: sqlite_aware
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

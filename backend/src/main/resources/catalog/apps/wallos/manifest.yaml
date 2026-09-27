@@ -1,0 +1,79 @@
+id: wallos
+metadata:
+  name: "Wallos"
+  category: Productivity
+  description: "Track recurring subscriptions and household expenses."
+  shortValue: "Track recurring subscriptions and household expenses."
+  image: /app-images/wallos.svg
+  version: "5.8.1"
+  maintainer: "Upstream project"
+  source: GitHub
+  sourceUrl: https://github.com/ellite/Wallos
+  documentationUrl: https://github.com/ellite/Wallos
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18020
+  tags: ["Productivity", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Track recurring subscriptions and household expenses."
+  bestFor: ["Track recurring subscriptions and household expenses."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Wallos", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Wallos"
+  headline: "Set up Wallos"
+  summary: "Track recurring subscriptions and household expenses."
+  setupSteps:
+    - "Create your account on first visit."
+    - "Choose your currency and add a subscription."
+  notes:
+    - "Email delivery is not configured. Database and uploaded logos are included in stopped-app backups."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: wallos
+  composeProject: autark-os-wallos
+  image: bellamy/wallos@sha256:0f049dbab45b9f8e8d43b84fd1b77ef9e55909bd1a384a0f4fe8597ab68a1d5d
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/wallos
+  ports: ["18020:80"]
+  volumes:
+    - "/var/lib/autark-os/apps/wallos/db:/var/www/html/db"
+    - "/var/lib/autark-os/apps/wallos/logos:/var/www/html/images/uploads/logos"
+  environment: ["TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=wallos"]
+  backupPaths: ["db","logos"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

@@ -31,7 +31,7 @@ type OnboardingWizardProps = {
   onComplete: () => void;
 };
 
-const starterApps = betaScope.apps;
+const starterApps = betaScope.apps.filter((app) => app.starter);
 
 function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [state, setState] = useState<OnboardingState | null>(null);

@@ -4,21 +4,15 @@ metadata:
   category: Monitoring
   description: Friendly status checks for websites, apps, and home services.
   shortValue: Know when a service is down before someone else notices.
-  badge: Verified
-  downloads: 2.8M
-  rating: '4.8'
   image: /app-images/uptime-kuma.svg
   version: 2.4.0
-  lastUpdated: Recently
-  size: 310 MB
   maintainer: Uptime Kuma Community
   source: GitHub
   sourceUrl: https://github.com/louislam/uptime-kuma
   documentationUrl: https://github.com/louislam/uptime-kuma/wiki
-  installTime: 2-4 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:3001
   tags:
     - Monitoring
@@ -27,30 +21,18 @@ metadata:
     - Health checks
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -83,7 +65,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/uptime-kuma/data
     - label: Backup
-      value: Monitor data daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -101,7 +83,7 @@ usage:
   headline: Add your first service check
   summary: Open Uptime Kuma, create the administrator account, then add a simple monitor for a service you control.
   setupSteps:
-    - Open Uptime Kuma and create the administrator account.
+    - Open Uptime Kuma, choose SQLite for local managed storage if prompted, and create the administrator account.
     - Add one HTTP or ping monitor and verify it reports correctly.
     - Add notification channels only after confirming the monitor behavior.
   fields:
@@ -110,7 +92,9 @@ usage:
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Keep monitor names and notification settings on your local or private network.
+    - External databases are not part of this installation or its backups.
 health:
   type: http
   path: /
@@ -135,6 +119,6 @@ runtime:
     - autark-os.version=2.4.0
   backupPaths:
     - data
-  backupStrategy: sqlite_aware
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

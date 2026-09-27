@@ -1,7 +1,5 @@
 package com.autarkos.discover;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +56,7 @@ public class DiscoverInstallPreviewService {
         return new InstallOptionsRequest(
                 new InstallOptionsRequest.PortOptions(hostPort),
                 new InstallOptionsRequest.AccessOptions(tailscale, mode),
-                new InstallOptionsRequest.StorageOptions(storageSubfolders(manifest, answers), storageHostPaths(manifest, answers)),
+                new InstallOptionsRequest.StorageOptions(storageSubfolders(manifest, answers), Map.of()),
                 new InstallOptionsRequest.BackupOptions(backupEnabled, "daily", 7));
     }
 
@@ -74,22 +72,18 @@ public class DiscoverInstallPreviewService {
                 issues.add(error("localBrowserPort", "Use Auto or a port from 1 to 65535."));
             }
         }
-        if ("jellyfin".equals(manifest.id()) && "existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))) {
-            String path = answers.stringValue("jellyfinExistingMediaPath");
-            if (path.isBlank()) {
-                issues.add(error("jellyfinExistingMediaPath", "Choose the media folder path to connect after install."));
-            } else {
-                Path mediaPath = Path.of(path);
-                if (!Files.isDirectory(mediaPath) || !Files.isReadable(mediaPath)) {
-                    issues.add(error("jellyfinExistingMediaPath", "Choose a media folder that exists and can be read by Autark-OS."));
-                }
-            }
+        if (manifest.usage().privateHttpsRequired() && !"private_only".equals(answers.stringValue("accessMode"))) {
+            issues.add(error("accessMode", manifest.name() + " requires private HTTPS access. Choose Private HTTPS."));
+        }
+        if (!"autark_os_default".equals(answers.stringValue("storageMode"))) {
+            issues.add(error("storageMode", "This installation uses Autark-OS managed storage. Existing folders cannot be connected here."));
+        }
+        if ("jellyfin".equals(manifest.id()) && ("existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))
+                || !answers.stringValue("jellyfinExistingMediaPath").isBlank())) {
+            issues.add(error("jellyfinMediaFolder", "Choose a managed media folder. Existing folders cannot be connected by this installation."));
         }
         if ("pi-hole".equals(manifest.id()) && "custom".equals(answers.stringValue("piholeDnsProvider")) && !validDnsList(answers.stringValue("piholeCustomDns"))) {
             issues.add(error("piholeCustomDns", "Enter one or more DNS server IP addresses, separated by commas."));
-        }
-        if ("existing_folder".equals(answers.stringValue("storageMode")) && !"jellyfin".equals(manifest.id())) {
-            issues.add(new DiscoverInstallModels.DiscoverInstallIssue("storageMode", "warning", "Existing folders need a review before Autark-OS treats them as protected app data."));
         }
         return issues;
     }
@@ -108,9 +102,7 @@ public class DiscoverInstallPreviewService {
         items.add(item("Create " + answers.stringValue("displayName") + " as a managed Autark-OS app.", null, "default"));
         items.add(item("Create managed folders for app data.", "Autark-OS uses predictable app folders for recovery and cleanup.", "default"));
         if ("jellyfin".equals(manifest.id())) {
-            if ("existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))) {
-                items.add(item("Connect the existing media folder after validating it.", answers.stringValue("jellyfinExistingMediaPath"), "default"));
-            } else if ("create_new".equals(answers.stringValue("jellyfinMediaFolder"))) {
+            if ("create_new".equals(answers.stringValue("jellyfinMediaFolder"))) {
                 items.add(item("Create an empty media folder for Jellyfin.", null, "default"));
             }
         }
@@ -119,7 +111,7 @@ public class DiscoverInstallPreviewService {
 
     private List<DiscoverInstallModels.DiscoverInstallPreviewItem> connectItems(DiscoverSetupModels.DiscoverSetupAnswers answers) {
         return switch (answers.stringValue("accessMode")) {
-            case "private_only" -> List.of(item("Keep the dashboard on this server and request a private Tailscale link.", "Peer sync and discovery ports remain available on the home network.", "default"));
+            case "private_only" -> List.of(item("Keep the dashboard on this server and request a private Tailscale link.", "Only apps with declared peer ports also provide peer access on the home network.", "default"));
             case "private_lan" -> List.of(item("Create a home network link and request private Tailscale access.", null, "default"));
             case "local_only" -> List.of(item("Keep the dashboard limited to this server.", "Other devices cannot open this dashboard without private access. App peer ports, where declared, remain on the home network.", "warning"));
             default -> List.of(item("Create a home network link for devices on your LAN.", null, "default"));
@@ -170,13 +162,6 @@ public class DiscoverInstallPreviewService {
             subfolders.put("media", "media");
         }
         return subfolders;
-    }
-
-    private Map<String, String> storageHostPaths(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
-        if ("jellyfin".equals(manifest.id()) && "existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))) {
-            return Map.of("media", answers.stringValue("jellyfinExistingMediaPath"));
-        }
-        return Map.of();
     }
 
     private DiscoverInstallModels.DiscoverInstallPreviewItem item(String label, String description, String tone) {

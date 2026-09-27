@@ -4,21 +4,15 @@ metadata:
   category: Productivity
   description: Lightweight personal notes and quick knowledge capture.
   shortValue: A private notes app for thoughts, links, snippets, and logs.
-  badge: Verified
-  downloads: 620K
-  rating: '4.7'
   image: /app-images/memos.svg
   version: 0.29.1
-  lastUpdated: Recently
-  size: 120 MB
   maintainer: Memos Community
   source: GitHub
   sourceUrl: https://github.com/usememos/memos
   documentationUrl: https://www.usememos.com/docs
-  installTime: 2-3 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:5230
   tags:
     - Notes
@@ -27,30 +21,18 @@ metadata:
     - Journaling
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -83,7 +65,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/memos/data
     - label: Backup
-      value: Notes daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Tailscale recommended
 access:
@@ -110,6 +92,7 @@ usage:
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Use a private access link rather than a public URL for personal notes.
 health:
   type: http
@@ -135,6 +118,6 @@ runtime:
     - autark-os.version=0.29.1
   backupPaths:
     - data
-  backupStrategy: sqlite_aware
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

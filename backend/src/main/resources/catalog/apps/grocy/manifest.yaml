@@ -1,0 +1,100 @@
+id: grocy
+metadata:
+  name: "Grocy"
+  category: Productivity
+  description: "Track household groceries, shopping lists, and chores."
+  shortValue: "Track household groceries, shopping lists, and chores."
+  image: /app-images/grocy.svg
+  version: "4.7.1"
+  source: GitHub
+  sourceUrl: https://github.com/grocy/grocy
+  documentationUrl: https://docs.linuxserver.io/images/docker-grocy/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18005
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Track household groceries, shopping lists, and chores."
+  bestFor: ["Organize your household"]
+technical:
+  summary: "Runs Grocy as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 512 MB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Grocy web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Grocy"
+  headline: "Organize your household"
+  summary: "Change the initial administrator password, then add a product and a storage location."
+  setupSteps:
+    - "Open Grocy and sign in with username admin and password admin."
+    - "Change the administrator password immediately in user settings."
+    - "Add a storage location and a product, then record a purchase."
+  notes:
+    - "Keep this dashboard private because the initial account uses a public default password."
+    - "The configuration folder includes the household database and uploaded files."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Grocy web interface is responding"
+  startingLabel: "Starting Grocy"
+  failureLabel: "Grocy is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: grocy
+  composeProject: autark-os-grocy
+  image: lscr.io/linuxserver/grocy@sha256:3c1ce96cb2d0f0c7ea0c2e0b89f5769be7f2f102204fbeef87aeef56afd6036e
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/grocy
+  ports:
+    - 18005:80
+  volumes:
+    - /var/lib/autark-os/apps/grocy/config:/config
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=grocy
+    - autark-os.version=4.7.1
+  backupPaths:
+    - config
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

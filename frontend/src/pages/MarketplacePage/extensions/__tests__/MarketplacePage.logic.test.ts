@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
+import betaScope from '@beta-scope';
 import {
   START_HERE_DISMISSAL_KEY,
   betaStarterAppIds,
@@ -179,7 +180,7 @@ test('starterAppsForMarketplace falls back to curated starter apps when onboardi
   assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), betaStarterAppIds);
 });
 
-test('starterAppsForMarketplace does not revive an excluded onboarding recommendation', () => {
+test('starterAppsForMarketplace does not turn a non-starter app into an onboarding recommendation', () => {
   const apps = [
     app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }),
     app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity' }),
@@ -204,7 +205,15 @@ test('shouldShowStartHereSection hides dismissed or fully installed starter reco
   assert.equal(shouldShowStartHereSection(recommendations.map((recommendation) => ({ ...recommendation, installed: true })), false), false);
 });
 
-test('starterCatalogForDiscover keeps the basic catalog focused on ready starter apps', () => {
+test('expanded catalog keeps onboarding and the starter filter limited to three apps', () => {
+  assert.equal(betaScope.apps.length, 35);
+  assert.deepEqual(betaStarterAppIds, ['freshrss', 'homepage', 'syncthing']);
+  const catalog = betaScope.apps.map(({ id, label }) => app({ id, name: label, supportLevel: 'Needs testing' }));
+  assert.equal(marketplaceVisibleApps({ apps: catalog }).length, 35);
+  assert.deepEqual(starterCatalogForDiscover(catalog).map((item) => item.id), betaStarterAppIds);
+});
+
+test('starterCatalogForDiscover keeps the basic catalog focused on selected starter apps', () => {
   const apps = [
     app({ id: 'advanced', name: 'Advanced App', difficulty: 'Advanced', supportLevel: 'Advanced' }),
     app({ id: 'homepage', name: 'Homepage', category: 'Utilities', supportLevel: 'Ready' }),

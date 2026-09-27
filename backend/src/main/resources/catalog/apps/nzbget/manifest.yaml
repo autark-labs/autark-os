@@ -1,0 +1,79 @@
+id: nzbget
+metadata:
+  name: "NZBGet"
+  category: Media
+  description: "Queue Usenet downloads on your server."
+  shortValue: "Queue Usenet downloads on your server."
+  image: /app-images/nzbget.svg
+  version: "v26.3-ls265"
+  maintainer: "LinuxServer.io"
+  source: GitHub
+  sourceUrl: https://github.com/nzbgetcom/nzbget
+  documentationUrl: https://docs.linuxserver.io/images/docker-nzbget/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18017
+  tags: ["Media", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Queue Usenet downloads on your server."
+  bestFor: ["Queue Usenet downloads on your server."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["NZBGet", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open NZBGet"
+  headline: "Set up NZBGet"
+  summary: "Queue Usenet downloads on your server."
+  setupSteps:
+    - "Sign in with nzbget and tegbzn6789; change ControlUsername and ControlPassword in Settings > Security."
+    - "Configure your Usenet provider and save the settings."
+  notes:
+    - "Requires your own Usenet provider. Completed files remain in this app's managed downloads folder."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: nzbget
+  composeProject: autark-os-nzbget
+  image: lscr.io/linuxserver/nzbget@sha256:ac88c1293bec960e287bdaaca174020fab4c0f179f739e26f500d3def8015ed7
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/nzbget
+  ports: ["18017:6789"]
+  volumes:
+    - "/var/lib/autark-os/apps/nzbget/config:/config"
+    - "/var/lib/autark-os/apps/nzbget/downloads:/downloads"
+  environment: ["PUID=1000","PGID=1000","TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=nzbget"]
+  backupPaths: ["config","downloads"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

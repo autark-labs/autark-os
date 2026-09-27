@@ -1,0 +1,98 @@
+id: trilium
+metadata:
+  name: "Trilium Notes"
+  category: Productivity
+  description: "Keep a personal knowledge base with linked notes and attachments."
+  shortValue: "Keep a personal knowledge base with linked notes and attachments."
+  image: /app-images/trilium.svg
+  version: "0.106.0"
+  source: GitHub
+  sourceUrl: https://github.com/TriliumNext/Trilium
+  documentationUrl: https://docs.triliumnotes.org/user-guide/setup/server/installation/docker
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18008
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Keep a personal knowledge base with linked notes and attachments."
+  bestFor: ["Start your knowledge base"]
+technical:
+  summary: "Runs Trilium Notes as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 1 GB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Trilium Notes web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Trilium Notes"
+  headline: "Start your knowledge base"
+  summary: "Initialize a new notes database and protect it with a password."
+  setupSteps:
+    - "Open Trilium Notes and choose to create a new document database."
+    - "Set a strong password during setup."
+    - "Create a note and add an attachment, then refresh to confirm they remain."
+  notes:
+    - "Notes, attachments, configuration, and built-in database backups are preserved together."
+    - "Desktop synchronization is configured separately in Trilium."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Trilium Notes web interface is responding"
+  startingLabel: "Starting Trilium Notes"
+  failureLabel: "Trilium Notes is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: trilium
+  composeProject: autark-os-trilium
+  image: triliumnext/trilium@sha256:be93e82699b12950ac4e2e7b565ce092fe215b8dd6ddfc47921e37b49e6a0e8b
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/trilium
+  ports:
+    - 18008:8080
+  volumes:
+    - /var/lib/autark-os/apps/trilium/data:/home/node/trilium-data
+  environment:
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=trilium
+    - autark-os.version=0.106.0
+  backupPaths:
+    - data
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

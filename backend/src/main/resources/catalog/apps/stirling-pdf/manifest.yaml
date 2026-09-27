@@ -4,21 +4,15 @@ metadata:
   category: Utilities
   description: Private PDF tools for merging, splitting, converting, and compressing documents.
   shortValue: Handle common PDF tasks without uploading files to random websites.
-  badge: Verified
-  downloads: 1.1M
-  rating: '4.7'
   image: /app-images/stirling-pdf.svg
   version: 2.14.0
-  lastUpdated: Recently
-  size: 690 MB
   maintainer: Stirling Tools
   source: GitHub
   sourceUrl: https://github.com/Stirling-Tools/Stirling-PDF
   documentationUrl: https://docs.stirlingpdf.com/
-  installTime: 3-5 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:8095
   tags:
     - PDF
@@ -27,30 +21,18 @@ metadata:
     - Utilities
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -71,7 +53,7 @@ technical:
   includes:
     - Web PDF toolbox
     - Managed configuration folder
-    - Temporary processing folder
+    - Persisted OCR language files and custom assets
     - Backup profile
   configuration:
     - label: Container name
@@ -83,14 +65,15 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/stirling-pdf/config
     - label: Backup
-      value: Configuration daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local or Tailscale
 access:
   kind: web
-  defaultMode: local-and-private
+  privateDashboard: true
+  defaultMode: private
   privateAccessRecommended: true
-  requiresFirstRunSetup: false
+  requiresFirstRunSetup: true
   notes:
     - Private access is useful when working with documents away from home.
     - Public exposure is not recommended because PDFs may contain sensitive information.
@@ -101,7 +84,8 @@ usage:
   headline: Process documents privately
   summary: Open Stirling PDF and try one small document before using it for important files.
   setupSteps:
-    - Open Stirling PDF.
+    - Open Stirling PDF through private access and sign in with username admin and initial password stirling.
+    - Replace the default password when prompted before uploading documents.
     - Process a small non-sensitive document to confirm the workflow.
     - Use private access when working away from your local network.
   fields:
@@ -110,7 +94,9 @@ usage:
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Processed documents can contain sensitive information; do not expose this service publicly.
+    - Download completed documents to your device; temporary processing files are not a document archive.
 health:
   type: http
   path: /
@@ -130,12 +116,19 @@ runtime:
   volumes:
     - /var/lib/autark-os/apps/stirling-pdf/config:/configs
     - /var/lib/autark-os/apps/stirling-pdf/work:/usr/share/tessdata
+    - /var/lib/autark-os/apps/stirling-pdf/pipeline:/pipeline
+    - /var/lib/autark-os/apps/stirling-pdf/custom-files:/customFiles
+    - /var/lib/autark-os/apps/stirling-pdf/storage:/storage
   labels:
     - autark-os.managed=true
     - autark-os.app-id=stirling-pdf
     - autark-os.version=2.14.0
   backupPaths:
     - config
+    - work
+    - pipeline
+    - custom-files
+    - storage
   backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

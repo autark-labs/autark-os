@@ -19,7 +19,7 @@ class DiscoverControllerTests {
         var service = mock(DiscoverService.class);
         var mvc = MockMvcBuilders.standaloneSetup(new DiscoverController(service))
                 .setControllerAdvice(new MarketplaceExceptionHandler(mock(ActivityLogService.class))).build();
-        for (String app : List.of("immich", "obsidian-livesync", "vaultwarden", "unknown")) {
+        for (String app : List.of("immich", "obsidian-livesync", "portainer", "pi-hole", "paperless-ngx", "unknown")) {
             mvc.perform(get("/api/discover/apps/" + app)).andExpect(status().isNotFound());
             for (var request : List.of(get("/api/discover/apps/" + app + "/setup-schema"),
                     post("/api/discover/apps/" + app + "/install-preview"),
@@ -42,7 +42,7 @@ class DiscoverControllerTests {
         when(included.application()).thenReturn(includedApplication);
         when(excluded.application()).thenReturn(excludedApplication);
         when(includedApplication.id()).thenReturn("freshrss");
-        when(excludedApplication.id()).thenReturn("vaultwarden");
+        when(excludedApplication.id()).thenReturn("immich");
         when(service.apps()).thenReturn(List.of(included, excluded));
         var controller = new DiscoverController(service);
         assertThat(controller.apps()).containsExactly(included);

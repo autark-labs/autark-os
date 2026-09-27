@@ -4,21 +4,15 @@ metadata:
   category: Utilities
   description: A fast dashboard for links, service status, and homelab widgets.
   shortValue: One clean start page for everything running in your home lab.
-  badge: Verified
-  downloads: 900K
-  rating: '4.8'
   image: /app-images/homepage.svg
   version: 1.13.2
-  lastUpdated: Recently
-  size: 180 MB
   maintainer: Homepage Community
   source: GitHub
   sourceUrl: https://github.com/gethomepage/homepage
   documentationUrl: https://gethomepage.dev/latest/
-  installTime: 2-3 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:3003
   tags:
     - Dashboard
@@ -27,30 +21,18 @@ metadata:
     - Bookmarks
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -82,7 +64,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/homepage/config
     - label: Backup
-      value: Configuration daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -101,7 +83,7 @@ usage:
   summary: Autark-OS starts Homepage. Add the apps and links you want to see from its configuration files.
   setupSteps:
     - Open Homepage.
-    - Add services, bookmarks, and widgets.
+    - Edit services.yaml, bookmarks.yaml, and widgets.yaml in the managed configuration folder to add entries.
     - Keep private access enabled if the dashboard lists sensitive internal links.
   fields:
     - label: Dashboard URL
@@ -109,6 +91,7 @@ usage:
       sensitive: false
       qr: true
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Add and maintain dashboard entries in Homepage's configuration files.
 setup:
   kind: dashboard
@@ -119,7 +102,7 @@ setup:
       sensitive: false
   userSteps:
     - Open Homepage after install.
-    - Add services, bookmarks, and widgets from Homepage's dashboard settings.
+    - Edit the YAML files in /var/lib/autark-os/apps/homepage/config to add services, bookmarks, and widgets; there is no dashboard editor.
   automationCapabilities: []
 health:
   type: http

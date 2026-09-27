@@ -4,21 +4,15 @@ metadata:
   category: Media
   description: TV library manager for monitoring, organizing, and automating episodes.
   shortValue: Keep TV libraries organized and monitored from one dashboard.
-  badge: Verified
-  downloads: 2.2M
-  rating: '4.8'
   image: /app-images/sonarr.svg
   version: 4.0.19.2979
-  lastUpdated: Recently
-  size: 210 MB
   maintainer: Sonarr Community
   source: GitHub
   sourceUrl: https://github.com/Sonarr/Sonarr
   documentationUrl: https://wiki.servarr.com/sonarr
-  installTime: 3-5 minutes
   difficulty: Advanced
-  supportLevel: Advanced
-  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:8989
   tags:
     - TV
@@ -27,30 +21,18 @@ metadata:
     - Arr stack
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -84,7 +66,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/sonarr/config
     - label: Backup
-      value: Configuration daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -99,20 +81,22 @@ usage:
   kind: companion-service
   primaryAction: open-dashboard
   openUrlLabel: Open Sonarr
-  headline: Set up TV library automation
-  summary: Autark-OS starts Sonarr and prepares folders. You connect indexers, download clients, and library paths in Sonarr.
+  headline: Set up an isolated TV library
+  summary: Autark-OS starts Sonarr with its own library and downloads folders. Other apps do not share these files, and connectors require manual setup.
   setupSteps:
-    - Open Sonarr.
-    - Add your TV library path.
-    - Connect Prowlarr for indexers if installed.
-    - Connect qBittorrent or another download client if desired.
+    - Open Sonarr and configure a username, password, and authentication method when prompted.
+    - Put existing media in /var/lib/autark-os/apps/sonarr/tv on the server, then select /tv as the library root.
+    - Configure indexers manually if needed.
+    - Only configure a download client after arranging access to the same downloaded files; installing another app does not share its storage.
   fields:
     - label: Dashboard URL
       value: "{accessUrl}"
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - This is a power-user media tool. It is not required for Jellyfin playback.
+    - This install does not provide a shared media pipeline or automatically connect Jellyfin, Bazarr, or download clients.
 setup:
   kind: media-stack
   automation: manual
@@ -121,8 +105,8 @@ setup:
       value: "{accessUrl}"
       sensitive: false
   userSteps:
-    - Review media folders before enabling automated downloads.
-    - Configure indexers and download clients manually from Sonarr's settings.
+    - Select /tv as the root folder and review that media and downloads are isolated from other apps.
+    - Configure indexers manually from Sonarr's settings; download automation additionally requires shared file access not supplied by this installation.
   automationCapabilities: []
 health:
   type: http
@@ -152,6 +136,8 @@ runtime:
     - autark-os.version=4.0.19.2979
   backupPaths:
     - config
-  backupStrategy: sqlite_aware
+    - tv
+    - downloads
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

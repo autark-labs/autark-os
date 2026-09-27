@@ -1,0 +1,80 @@
+id: transmission
+metadata:
+  name: "Transmission"
+  category: Media
+  description: "Download and share authorized torrents."
+  shortValue: "Download and share authorized torrents."
+  image: /app-images/transmission.svg
+  version: "4.1.3-r0-ls362"
+  maintainer: "LinuxServer.io"
+  source: GitHub
+  sourceUrl: https://github.com/transmission/transmission
+  documentationUrl: https://docs.linuxserver.io/images/docker-transmission/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18016
+  tags: ["Media", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Download and share authorized torrents."
+  bestFor: ["Download and share authorized torrents."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Transmission", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Transmission"
+  headline: "Set up Transmission"
+  summary: "Download and share authorized torrents."
+  setupSteps:
+    - "Open the private dashboard and add a torrent you are authorized to download."
+    - "Find completed files in the managed downloads folder."
+  notes:
+    - "The dashboard has no separate login in this template, so it stays private. No inbound peer port or VPN is configured; outbound transfers use the server internet connection."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: transmission
+  composeProject: autark-os-transmission
+  image: lscr.io/linuxserver/transmission@sha256:1a12fef3c89eca48b7be9e7d36b17b4eb4e1bcf5e1ee7fbf372e3a38b562939d
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/transmission
+  ports: ["18016:9091"]
+  volumes:
+    - "/var/lib/autark-os/apps/transmission/config:/config"
+    - "/var/lib/autark-os/apps/transmission/downloads:/downloads"
+    - "/var/lib/autark-os/apps/transmission/watch:/watch"
+  environment: ["PUID=1000","PGID=1000","TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=transmission"]
+  backupPaths: ["config","downloads","watch"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

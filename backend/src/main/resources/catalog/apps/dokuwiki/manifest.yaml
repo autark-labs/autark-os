@@ -1,0 +1,101 @@
+id: dokuwiki
+metadata:
+  name: "DokuWiki"
+  category: Productivity
+  description: "Write a personal or household wiki with pages stored as files."
+  shortValue: "Write a personal or household wiki with pages stored as files."
+  image: /app-images/dokuwiki.svg
+  version: "2026-07-14c"
+  source: GitHub
+  sourceUrl: https://github.com/dokuwiki/dokuwiki
+  documentationUrl: https://docs.linuxserver.io/images/docker-dokuwiki/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18006
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Write a personal or household wiki with pages stored as files."
+  bestFor: ["Create your private wiki"]
+technical:
+  summary: "Runs DokuWiki as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 512 MB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "DokuWiki web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open DokuWiki"
+  headline: "Create your private wiki"
+  summary: "Run the installer, create an administrator, and choose who may read or edit the wiki."
+  setupSteps:
+    - "Open DokuWiki and append /install.php to its address to start the first-run installer."
+    - "Create an administrator with a strong password and choose a closed wiki for private content."
+    - "After installation, restart DokuWiki from its Autark-OS management screen and open the main address."
+    - "Create a page and verify that only the intended users can read and edit it."
+  notes:
+    - "The installer must be completed before the wiki is ready for use."
+    - "Pages, uploaded media, accounts, and configuration are included in backups."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "DokuWiki web interface is responding"
+  startingLabel: "Starting DokuWiki"
+  failureLabel: "DokuWiki is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: dokuwiki
+  composeProject: autark-os-dokuwiki
+  image: lscr.io/linuxserver/dokuwiki@sha256:c2d3125e994e9d508f39af4ee04caf4ee07a47149305974d3275febd3b81a45d
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/dokuwiki
+  ports:
+    - 18006:80
+  volumes:
+    - /var/lib/autark-os/apps/dokuwiki/config:/config
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=dokuwiki
+    - autark-os.version=2026-07-14c
+  backupPaths:
+    - config
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

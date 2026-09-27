@@ -1,0 +1,79 @@
+id: gokapi
+metadata:
+  name: "Gokapi"
+  category: Productivity
+  description: "Share files using expiring download links."
+  shortValue: "Share files using expiring download links."
+  image: /app-images/gokapi.svg
+  version: "2.2.4"
+  maintainer: "Upstream project"
+  source: GitHub
+  sourceUrl: https://github.com/Forceu/Gokapi
+  documentationUrl: https://gokapi.readthedocs.io/en/latest/setup.html
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18014
+  tags: ["Productivity", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Share files using expiring download links."
+  bestFor: ["Share files using expiring download links."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Gokapi", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Gokapi"
+  headline: "Set up Gokapi"
+  summary: "Share files using expiring download links."
+  setupSteps:
+    - "Open /setup on the app link and choose local storage and local authentication."
+    - "Use the exact app URL shown by Autark-OS for the server URL, then upload a test file."
+  notes:
+    - "Recipients need access to the same private network. Changing authentication or storage after setup requires the upstream reconfiguration procedure."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: gokapi
+  composeProject: autark-os-gokapi
+  image: f0rc3/gokapi@sha256:7303dc0e658b8442f00d8363937ac0ffca3b4690930801b47aac6c0631d0cbcf
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/gokapi
+  ports: ["18014:53842"]
+  volumes:
+    - "/var/lib/autark-os/apps/gokapi/data:/app/data"
+    - "/var/lib/autark-os/apps/gokapi/config:/app/config"
+  environment: ["TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=gokapi"]
+  backupPaths: ["data","config"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

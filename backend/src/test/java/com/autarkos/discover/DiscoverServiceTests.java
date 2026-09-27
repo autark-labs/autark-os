@@ -44,6 +44,41 @@ class DiscoverServiceTests {
     Path runtimeRoot;
 
     @Test
+    void simpleCatalogOffersOnlyManagedStorageAndRejectsStaleExternalFolderChoices() throws Exception {
+        var service = discoverService(observedRepository());
+        var media = Files.createDirectory(runtimeRoot.resolve("external-media"));
+        for (String appId : List.of("jellyfin", "navidrome")) {
+            var preview = service.installPreview(appId, new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of(
+                    "storageMode", "existing_folder",
+                    "jellyfinMediaFolder", "existing_folder",
+                    "jellyfinExistingMediaPath", media.toString())));
+            assertThat(preview.valid()).as(appId).isFalse();
+            assertThat(preview.blockingIssues()).extracting(DiscoverInstallModels.DiscoverInstallIssue::fieldId)
+                    .contains("storageMode");
+            assertThat(service.setupSchema(appId).inputs()).filteredOn(input -> input.id().equals("storageMode"))
+                    .singleElement().satisfies(input -> assertThat(input.options())
+                            .extracting(DiscoverSetupModels.DiscoverSetupOption::value).containsExactly("autark_os_default"));
+        }
+        assertThat(service.setupSchema("jellyfin").inputs()).extracting(DiscoverSetupModels.DiscoverSetupInput::id)
+                .doesNotContain("jellyfinExistingMediaPath");
+    }
+
+    @Test
+    void httpsRequiredAppsRejectServerOnlyInsteadOfSilentlyEnablingPrivateAccess() {
+        var service = discoverService(observedRepository());
+        for (String appId : List.of("actual-budget", "vaultwarden")) {
+            var preview = service.installPreview(appId, new DiscoverSetupModels.DiscoverSetupAnswersRequest(
+                    Map.of("accessMode", "local_only")));
+            assertThat(preview.valid()).as(appId).isFalse();
+            assertThat(preview.blockingIssues()).extracting(DiscoverInstallModels.DiscoverInstallIssue::fieldId)
+                    .contains("accessMode");
+            assertThat(service.setupSchema(appId).inputs()).filteredOn(input -> input.id().equals("accessMode"))
+                    .singleElement().satisfies(input -> assertThat(input.options())
+                            .extracting(DiscoverSetupModels.DiscoverSetupOption::value).containsExactly("private_only"));
+        }
+    }
+
+    @Test
     void returnsMergedDiscoverCardsWithoutShowingForeignAppsAsInstalled() throws Exception {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("docker:autarkos_other_jellyfin", "jellyfin", "foreign_autark_os", "observed"));
@@ -116,7 +151,8 @@ class DiscoverServiceTests {
         DiscoverSetupModels.DiscoverSetupSchema schema = service.setupSchema("jellyfin");
 
         assertThat(schema.inputs()).extracting(DiscoverSetupModels.DiscoverSetupInput::id)
-                .contains("displayName", "accessMode", "storageMode", "backupPolicy", "localBrowserPort", "jellyfinMediaFolder", "jellyfinExistingMediaPath");
+                .contains("displayName", "accessMode", "storageMode", "backupPolicy", "localBrowserPort", "jellyfinMediaFolder")
+                .doesNotContain("jellyfinExistingMediaPath");
         assertThat(schema.inputs()).filteredOn(input -> input.id().equals("accessMode"))
                 .singleElement()
                 .satisfies(input -> {
@@ -129,7 +165,6 @@ class DiscoverServiceTests {
     @Test
     void installPreviewValidatesSetupAnswersAndUsesThemInPlainEnglishPlan() throws Exception {
         DiscoverService service = discoverService(observedRepository());
-        Path media = Files.createDirectory(runtimeRoot.resolve("media"));
 
         DiscoverInstallModels.DiscoverInstallPreview invalid = service.installPreview("jellyfin", new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of(
                 "displayName", "Family Movies",
@@ -142,7 +177,7 @@ class DiscoverServiceTests {
 
         assertThat(invalid.valid()).isFalse();
         assertThat(invalid.blockingIssues()).extracting(DiscoverInstallModels.DiscoverInstallIssue::fieldId)
-                .containsExactly("jellyfinExistingMediaPath");
+                .containsExactly("jellyfinMediaFolder");
 
         DiscoverInstallModels.DiscoverInstallPreview valid = service.installPreview("jellyfin", new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of(
                 "displayName", "Family Movies",
@@ -150,8 +185,7 @@ class DiscoverServiceTests {
                 "storageMode", "autark_os_default",
                 "backupPolicy", "disabled",
                 "localBrowserPort", 19096,
-                "jellyfinMediaFolder", "existing_folder",
-                "jellyfinExistingMediaPath", media.toString())));
+                "jellyfinMediaFolder", "create_new")));
 
         assertThat(valid.valid()).isTrue();
         assertThat(valid.sections()).filteredOn(section -> section.id().equals("connect"))
@@ -166,8 +200,9 @@ class DiscoverServiceTests {
                 .anySatisfy(item -> assertThat(((DiscoverInstallModels.DiscoverInstallPreviewItem) item).tone()).isEqualTo("warning"));
         assertThat(valid.installOptions().ports().hostPort()).isEqualTo(19096);
         assertThat(valid.installOptions().backup().enabled()).isFalse();
+        assertThat(valid.installOptions().storage().hostPaths()).isEmpty();
         assertThat(valid.technicalDetails().technical().volumes())
-                .anySatisfy(volume -> assertThat(volume).startsWith(media.toString() + ":/media"));
+                .anySatisfy(volume -> assertThat(volume).isEqualTo(runtimeRoot.resolve("apps/jellyfin/media") + ":/media"));
     }
 
     @Test
@@ -175,7 +210,7 @@ class DiscoverServiceTests {
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(runtimeLayout());
         DiscoverSetupModels.DiscoverSetupAnswers answers = new DiscoverSetupModels.DiscoverSetupAnswers(Map.of(
                 "displayName", "Family Passwords",
-                "accessMode", "private_lan",
+                "accessMode", "private_only",
                 "storageMode", "autark_os_default",
                 "backupPolicy", "enabled_first_checkpoint",
                 "localBrowserPort", "auto"));
@@ -184,28 +219,32 @@ class DiscoverServiceTests {
 
         assertThat(setupRepository.recordByAppId("vaultwarden")).hasValueSatisfying(record -> {
             assertThat(record.displayName()).isEqualTo("Family Passwords");
-            assertThat(record.accessMode()).isEqualTo("private_lan");
+            assertThat(record.accessMode()).isEqualTo("private_only");
             assertThat(record.backupPolicy()).isEqualTo("enabled_first_checkpoint");
             assertThat(record.answers().values()).containsEntry("displayName", "Family Passwords");
         });
     }
 
     @Test
-    void invalidInstallChoicesNeverCreateAJobOrPersistSetup() {
+    void invalidInstallChoicesNeverCreateAJobOrPersistSetup() throws Exception {
         var installService = new RecordingMarketplaceInstallService();
         var jobs = jobService();
         var service = discoverService(observedRepository(), installService, jobs);
         var request = new DiscoverInstallModels.DiscoverInstallRequest(Map.of(
                 "jellyfinMediaFolder", "existing_folder",
-                "jellyfinExistingMediaPath", runtimeRoot.resolve("missing").toString()), false, false);
+                "jellyfinExistingMediaPath", Files.createDirectory(runtimeRoot.resolve("existing-media")).toString()), false, false);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.install("jellyfin", request))
                 .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.install("vaultwarden",
+                new DiscoverInstallModels.DiscoverInstallRequest(Map.of("accessMode", "local_only"), false, false)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("private HTTPS");
 
         assertThat(jobs.list()).isEmpty();
         jobs.runQueuedJobsNow();
         assertThat(installService.lastOptions).isNull();
         assertThat(JpaTestRepositories.discoverSetupRepository(runtimeLayout()).recordByAppId("jellyfin")).isEmpty();
+        assertThat(JpaTestRepositories.discoverSetupRepository(runtimeLayout()).recordByAppId("vaultwarden")).isEmpty();
     }
 
     @Test
@@ -256,7 +295,7 @@ class DiscoverServiceTests {
 
         service.install("vaultwarden", new DiscoverInstallModels.DiscoverInstallRequest(Map.of(
                 "displayName", "Family Passwords",
-                "accessMode", "private_lan",
+                "accessMode", "private_only",
                 "storageMode", "autark_os_default",
                 "backupPolicy", "enabled_first_checkpoint",
                 "localBrowserPort", "auto"), false, true));
@@ -265,7 +304,7 @@ class DiscoverServiceTests {
         jobs.runQueuedJobsNow();
         assertThat(setupRepository.recordByAppId("vaultwarden")).hasValueSatisfying(record -> {
             assertThat(record.displayName()).isEqualTo("Family Passwords");
-            assertThat(record.accessMode()).isEqualTo("private_lan");
+            assertThat(record.accessMode()).isEqualTo("private_only");
             assertThat(record.backupPolicy()).isEqualTo("enabled_first_checkpoint");
         });
     }

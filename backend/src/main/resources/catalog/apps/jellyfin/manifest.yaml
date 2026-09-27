@@ -4,21 +4,15 @@ metadata:
   category: Media
   description: Stream movies, shows, music, and home videos from your server.
   shortValue: Your own Netflix-style media library with no subscription.
-  badge: Official
-  downloads: 2.4M
-  rating: '4.7'
   image: /app-images/jellyfin.svg
   version: 10.11.11
-  lastUpdated: 5 days ago
-  size: 390 MB
   maintainer: Jellyfin Project
   source: GitHub
   sourceUrl: https://github.com/jellyfin/jellyfin
   documentationUrl: https://jellyfin.org/docs/
-  installTime: 3-5 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:8096
   tags:
     - Movies
@@ -27,30 +21,18 @@ metadata:
     - Media library
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -60,20 +42,20 @@ user:
   highlights:
     - No paid account required
     - User profiles
-    - Hardware transcoding support
+    - Direct playback and software transcoding
   plainLanguage: Jellyfin organizes your media and makes it easy to stream from TVs, phones, tablets, and browsers around your home.
 technical:
-  summary: Deploys a Jellyfin container with mapped media directories, config storage, optional GPU device passthrough, and private network access.
+  summary: Deploys Jellyfin with an isolated media folder, persistent configuration, and software transcoding; GPU devices are not passed through.
   requirements:
     - 1 CPU core
     - 1 GB RAM
     - Media storage location
-    - Optional GPU for transcoding
+    - CPU capacity for software transcoding when direct playback is unavailable
   includes:
     - Jellyfin server
     - Config volume
     - Media mounts
-    - Optional hardware profile
+    - Software transcoding
   configuration:
     - label: Container name
       value: jellyfin
@@ -84,7 +66,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/jellyfin/config
     - label: Backup
-      value: Configuration daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local network and Tailscale
 access:
@@ -103,7 +85,7 @@ usage:
   summary: Open Jellyfin, create the administrator account, and add the media folders you want to share.
   setupSteps:
     - Open Jellyfin and create the administrator account.
-    - Add a media library and let Jellyfin scan a small folder first.
+    - Copy a small media sample into /var/lib/autark-os/apps/jellyfin/media on the server, then add /media as the library path in Jellyfin.
     - Add household user profiles and trusted playback devices.
   fields:
     - label: Web UI
@@ -111,7 +93,9 @@ usage:
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Keep remote streaming on the private access link instead of exposing a public port.
+    - This media folder is separate from other apps; Autark-OS does not import their libraries automatically.
 health:
   type: http
   path: /health
@@ -138,6 +122,8 @@ runtime:
     - autark-os.version=10.11.11
   backupPaths:
     - config
-  backupStrategy: sqlite_aware
+    - cache
+    - media
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

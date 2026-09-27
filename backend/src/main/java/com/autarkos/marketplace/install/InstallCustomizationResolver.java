@@ -96,14 +96,14 @@ public class InstallCustomizationResolver {
     public static String accessMode(ApplicationManifest manifest, InstallOptionsRequest.AccessOptions access) {
         String mode = access == null ? null : access.mode();
         if (mode == null || mode.isBlank()) {
-            mode = manifest.access().privateDashboard() ? "private"
+            mode = manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired() ? "private"
                     : access != null && Boolean.TRUE.equals(access.tailscaleEnabled()) ? "local-and-private" : "network";
         }
         if (!List.of("local", "network", "private", "local-and-private").contains(mode)) {
             throw new InstallationException("Choose this server, home network, or private access.");
         }
         if (manifest.access().privateDashboard() && (mode.equals("network") || mode.equals("local-and-private"))) {
-            throw new InstallationException(manifest.name() + " dashboard must stay on this server or private Tailscale devices. Peer synchronization remains available on the home network.");
+            throw new InstallationException(manifest.name() + " dashboard must stay on this server or private Tailscale devices.");
         }
         if (manifest.usage().privateHttpsRequired()) return "private";
         if (manifest.runtime().network().equalsIgnoreCase("host") && (mode.equals("local") || mode.equals("private"))) {

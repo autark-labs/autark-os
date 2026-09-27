@@ -4,21 +4,15 @@ metadata:
   category: Development
   description: Host private Git repositories, issues, releases, and project notes.
   shortValue: A lightweight private GitHub-style home for your code.
-  badge: Official
-  downloads: 1.9M
-  rating: '4.7'
   image: /app-images/gitea.svg
   version: 1.26.4
-  lastUpdated: Recently
-  size: 250 MB
   maintainer: Gitea
   source: GitHub
   sourceUrl: https://github.com/go-gitea/gitea
   documentationUrl: https://docs.gitea.com/
-  installTime: 3-5 minutes
   difficulty: Moderate
-  supportLevel: Advanced
-  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:3002
   tags:
     - Git
@@ -27,30 +21,18 @@ metadata:
     - Development
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -84,7 +66,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/gitea/data
     - label: Backup
-      value: Repositories daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -100,9 +82,11 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open Gitea
   headline: Create your first private Git account
-  summary: Open Gitea, create the administrator account, then create or import a repository.
+  summary: Complete Gitea's installation with its local SQLite3 database, create the administrator account, then add a repository.
   setupSteps:
-    - Open Gitea and create the first administrator account.
+    - Open Gitea and select SQLite3 in the installation wizard; keep its database under /data/gitea.
+    - Set the server domain and base URL to the address you will use, and set the advertised SSH port to 2222.
+    - Create the administrator account before completing installation.
     - Create a repository or import one from another Git service.
     - Add a trusted device or SSH key before pushing code.
   fields:
@@ -111,7 +95,9 @@ usage:
       sensitive: false
       qr: false
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - Keep the web UI and repositories on your local network or private access link.
+    - This backup profile covers SQLite and repositories under /data only; do not select an external database.
 health:
   type: http
   path: /
@@ -137,6 +123,6 @@ runtime:
     - autark-os.version=1.26.4
   backupPaths:
     - data
-  backupStrategy: database_dump_required
+  backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

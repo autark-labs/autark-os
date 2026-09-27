@@ -12,8 +12,8 @@ artifacts and do not qualify the current release.
   removal, and deactivation remain available for existing installations.
 - [Beta qualification](../beta-scope.md) remains pending. Debian 12 AMD64 with
   systemd, Docker/Compose v2, and local Linux filesystem storage is the initial
-  target; FreshRSS, Homepage, and Syncthing are app candidates, not certified
-  recovery claims. ARM64/Pi and other hosts require separate qualification.
+  target; catalog eligibility is not a certified recovery claim. The linked scope
+  record lists current candidates. ARM64/Pi and other hosts require separate qualification.
 - Existing signed release, health-check, and rollback mechanisms are not a
   substitute for testing the current customer flow on supported hardware.
 - Operator release controls exist in source. Current deployment and release

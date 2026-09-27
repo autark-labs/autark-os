@@ -79,6 +79,7 @@ class AppLifecycleServiceTests {
     BackupDestinationService backupDestinationService;
     FakeAppAccessChecker accessChecker;
     AutarkOsIdentity identity;
+    MarketplaceCatalogService lifecycleCatalog;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -95,10 +96,11 @@ class AppLifecycleServiceTests {
         accessChecker = new FakeAppAccessChecker();
         identity = new AutarkOsIdentity("pos_test", "test", runtimeRoot.toString(),
                 "runtime-hash", Instant.parse("2026-06-11T00:00:00Z"), 1);
+        lifecycleCatalog = legacyDashboardCatalog();
         service = new AppLifecycleService(
                 repository,
                 composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                lifecycleCatalog,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
@@ -141,6 +143,28 @@ class AppLifecycleServiceTests {
         assertThat(app.telemetry().cpuPercent()).isEqualTo("Unavailable");
         assertThat(app.appConfiguration()).isNotEmpty();
         assertThat(app.recentEvents()).hasSize(1);
+    }
+
+    @Test
+    void httpsAppPrivateToggleDoesNotBlockUnrelatedPreferenceEdits() {
+        var currentCatalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        when(lifecycleCatalog.findById("vaultwarden")).thenReturn(currentCatalog.findById("vaultwarden"));
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
+                "autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up", "127.0.0.1:8090->80/tcp"));
+        service.enablePrivateAccess("vaultwarden");
+        service.disablePrivateAccess("vaultwarden");
+        var current = repository.settingsFor("vaultwarden").orElseThrow();
+        assertThat(current.tailscaleEnabled()).isFalse();
+        assertThat(current.privateAccessRequirement()).isEqualTo("disabled");
+        var preferences = new InstallModels.InstallSettings(current.accessUrl(), null, false,
+                current.storageSubfolders(), new InstallModels.BackupPolicy(true, "weekly", 14),
+                current.desiredAccessMode(), current.privateAccessRequirement(), current.expectedLocalPort(),
+                current.expectedProtocol(), null, null, null, null, current.autoRepairEnabled());
+
+        assertThat(service.settingsChangePlan("vaultwarden", preferences).saveAllowed()).isTrue();
+        var updated = service.updateSettings("vaultwarden", preferences);
+        assertThat(updated.settings().backup().frequency()).isEqualTo("weekly");
+        assertThat(updated.settings().tailscaleEnabled()).isFalse();
     }
 
     @Test
@@ -569,7 +593,7 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void runtimeViewDoesNotRecommendRestoreForUnsupportedCurrentContract() {
+    void runtimeViewDoesNotRecommendRestoreForIncompatibleBackupContract() {
         repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
@@ -598,7 +622,10 @@ class AppLifecycleServiceTests {
         assertThat(withoutRestorePoint.remediation().state()).isEqualTo("repair_failed");
         assertThat(withoutRestorePoint.remediation().summary()).doesNotContain("restore point");
 
-        RestorePointTestRecords.recordVerified(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", 128, "Backup completed.");
+        var incompatible = RestorePoints.create("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden",
+                "/backups/vaultwarden.zip", "completed", 128, "Backup completed.", "a".repeat(64), "sqlite_aware", 1);
+        incompatible.updateVerification("verified", "Checksum matched.", "high", "2026-06-20T12:00:00Z");
+        backupRepository.save(incompatible);
 
         AppRuntimeView withRestorePoint = service.getApp("vaultwarden");
 
@@ -700,7 +727,7 @@ class AppLifecycleServiceTests {
         AppLifecycleService devService = new AppLifecycleService(
                 repository,
                 composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                lifecycleCatalog,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new com.autarkos.network.tailscale.DevTailscaleService(),
@@ -785,7 +812,7 @@ class AppLifecycleServiceTests {
         AppLifecycleService devService = new AppLifecycleService(
                 repository,
                 composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                lifecycleCatalog,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
@@ -816,7 +843,7 @@ class AppLifecycleServiceTests {
         AppLifecycleService rediscoveryService = new AppLifecycleService(
                 repository,
                 composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                lifecycleCatalog,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
@@ -876,7 +903,7 @@ class AppLifecycleServiceTests {
         AppLifecycleService checkpointFailureService = new AppLifecycleService(
                 repository,
                 composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                lifecycleCatalog,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
@@ -1413,6 +1440,18 @@ class AppLifecycleServiceTests {
         assertThat(saved.storageSubfolders()).isEqualTo(desired.storageSubfolders());
         assertThat(saved.autoRepairEnabled()).isFalse();
         assertThat(saved.lastAccessCheckAt()).isNotNull();
+    }
+
+    private MarketplaceCatalogService legacyDashboardCatalog() {
+        var catalog = org.mockito.Mockito.spy(new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()));
+        // Generic lifecycle and rollback scenarios predate Vaultwarden's HTTPS-only catalog policy.
+        // Keep their ordinary dashboard fixture explicit; security policy uses the real catalog in its regression test.
+        var dashboard = org.mockito.Mockito.spy(catalog.findById("vaultwarden").orElseThrow());
+        when(dashboard.access()).thenReturn(new com.autarkos.marketplace.model.AccessManifest(
+                "web", "local-and-private", true, true, List.of(), false));
+        when(dashboard.usage()).thenReturn(com.autarkos.marketplace.model.UsageManifest.defaults());
+        when(catalog.findById("vaultwarden")).thenReturn(java.util.Optional.of(dashboard));
+        return catalog;
     }
 
     private ManagedAppAttestationService managedApps() {

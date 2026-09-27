@@ -1,0 +1,102 @@
+id: heimdall
+metadata:
+  name: "Heimdall"
+  category: Utilities
+  description: "Organize links to your frequently used websites and services."
+  shortValue: "Organize links to your frequently used websites and services."
+  image: /app-images/heimdall.svg
+  version: "2.8.3"
+  source: GitHub
+  sourceUrl: https://github.com/linuxserver/Heimdall
+  documentationUrl: https://docs.linuxserver.io/images/docker-heimdall/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18010
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Organize links to your frequently used websites and services."
+  bestFor: ["Build a personal start page"]
+technical:
+  summary: "Runs Heimdall as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 512 MB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Heimdall web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Heimdall"
+  headline: "Build a personal start page"
+  summary: "Add named links and icons to a dashboard available through private access."
+  setupSteps:
+    - "Open Heimdall through private access; the initial dashboard has no password."
+    - "Add a link with a name and the address of a website or service you use."
+    - "Open the new link to check its destination."
+  notes:
+    - "Heimdall links do not make external services managed by Autark-OS."
+    - "Dashboard password protection requires advanced upstream configuration; keep access private."
+    - "Internal service lookups are disabled. Links still open in your browser."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Heimdall web interface is responding"
+  startingLabel: "Starting Heimdall"
+  failureLabel: "Heimdall is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: heimdall
+  composeProject: autark-os-heimdall
+  image: lscr.io/linuxserver/heimdall@sha256:4c2b77d7e391ac794ee7504839ed699a7f98309f853670ee45a7712a14c41001
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/heimdall
+  ports:
+    - 18010:80
+  volumes:
+    - /var/lib/autark-os/apps/heimdall/config:/config
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+    - ALLOW_INTERNAL_REQUESTS=false
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=heimdall
+    - autark-os.version=2.8.3
+  backupPaths:
+    - config
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

@@ -1,8 +1,215 @@
 {
   "apps": [
-    { "id": "freshrss", "label": "FreshRSS", "detail": "Read your news feeds" },
-    { "id": "homepage", "label": "Homepage", "detail": "Friendly app dashboard" },
-    { "id": "syncthing", "label": "Syncthing", "detail": "Sync files between your devices" }
+    {
+      "id": "freshrss",
+      "label": "FreshRSS",
+      "detail": "Follow blogs, news, and releases from one private reader.",
+      "starter": true
+    },
+    {
+      "id": "homepage",
+      "label": "Homepage",
+      "detail": "One clean start page for everything running in your home lab.",
+      "starter": true
+    },
+    {
+      "id": "syncthing",
+      "label": "Syncthing",
+      "detail": "Private file sync without a cloud storage account.",
+      "starter": true
+    },
+    {
+      "id": "actual-budget",
+      "label": "Actual Budget",
+      "detail": "Run a private budgeting app for household finances.",
+      "starter": false
+    },
+    {
+      "id": "gitea",
+      "label": "Gitea",
+      "detail": "A lightweight private GitHub-style home for your code.",
+      "starter": false
+    },
+    {
+      "id": "jellyfin",
+      "label": "Jellyfin",
+      "detail": "Your own Netflix-style media library with no subscription.",
+      "starter": false
+    },
+    {
+      "id": "memos",
+      "label": "Memos",
+      "detail": "A private notes app for thoughts, links, snippets, and logs.",
+      "starter": false
+    },
+    {
+      "id": "uptime-kuma",
+      "label": "Uptime Kuma",
+      "detail": "Know when a service is down before someone else notices.",
+      "starter": false
+    },
+    {
+      "id": "vaultwarden",
+      "label": "Vaultwarden",
+      "detail": "Store family or team passwords safely without relying on a cloud account.",
+      "starter": false
+    },
+    {
+      "id": "stirling-pdf",
+      "label": "Stirling PDF",
+      "detail": "Handle common PDF tasks without uploading files to random websites.",
+      "starter": false
+    },
+    {
+      "id": "prowlarr",
+      "label": "Prowlarr",
+      "detail": "Manage media indexers once and share them with compatible apps.",
+      "starter": false
+    },
+    {
+      "id": "radarr",
+      "label": "Radarr",
+      "detail": "Keep movie libraries organized and ready for your media server.",
+      "starter": false
+    },
+    {
+      "id": "sonarr",
+      "label": "Sonarr",
+      "detail": "Keep TV libraries organized and monitored from one dashboard.",
+      "starter": false
+    },
+    {
+      "id": "audiobookshelf",
+      "label": "Audiobookshelf",
+      "detail": "Listen to your audiobooks and podcasts from a personal library.",
+      "starter": false
+    },
+    {
+      "id": "navidrome",
+      "label": "Navidrome",
+      "detail": "Stream your personal music collection through a web player or compatible client.",
+      "starter": false
+    },
+    {
+      "id": "kavita",
+      "label": "Kavita",
+      "detail": "Organize and read your ebooks, comics, and manga in a browser.",
+      "starter": false
+    },
+    {
+      "id": "changedetection-io",
+      "label": "changedetection.io",
+      "detail": "Watch web pages for text changes and send alerts through your chosen notification service.",
+      "starter": false
+    },
+    {
+      "id": "grocy",
+      "label": "Grocy",
+      "detail": "Track household groceries, shopping lists, and chores.",
+      "starter": false
+    },
+    {
+      "id": "dokuwiki",
+      "label": "DokuWiki",
+      "detail": "Write a personal or household wiki with pages stored as files.",
+      "starter": false
+    },
+    {
+      "id": "gotify",
+      "label": "Gotify",
+      "detail": "Receive notifications from applications you connect to your own server.",
+      "starter": false
+    },
+    {
+      "id": "trilium",
+      "label": "Trilium Notes",
+      "detail": "Keep a personal knowledge base with linked notes and attachments.",
+      "starter": false
+    },
+    {
+      "id": "wikijs",
+      "label": "Wiki.js",
+      "detail": "Create a searchable wiki for household guides and shared knowledge.",
+      "starter": false
+    },
+    {
+      "id": "heimdall",
+      "label": "Heimdall",
+      "detail": "Organize links to your frequently used websites and services.",
+      "starter": false
+    },
+    {
+      "id": "mealie",
+      "label": "Mealie",
+      "detail": "Collect recipes and plan household meals.",
+      "starter": false
+    },
+    {
+      "id": "silverbullet",
+      "label": "SilverBullet",
+      "detail": "Write and link private Markdown notes.",
+      "starter": false
+    },
+    {
+      "id": "komga",
+      "label": "Komga",
+      "detail": "Read and organize your own comics and ebooks.",
+      "starter": false
+    },
+    {
+      "id": "gokapi",
+      "label": "Gokapi",
+      "detail": "Share files using expiring download links.",
+      "starter": false
+    },
+    {
+      "id": "sabnzbd",
+      "label": "SABnzbd",
+      "detail": "Download from your own Usenet provider.",
+      "starter": false
+    },
+    {
+      "id": "transmission",
+      "label": "Transmission",
+      "detail": "Download and share authorized torrents.",
+      "starter": false
+    },
+    {
+      "id": "nzbget",
+      "label": "NZBGet",
+      "detail": "Queue Usenet downloads on your server.",
+      "starter": false
+    },
+    {
+      "id": "grav",
+      "label": "Grav",
+      "detail": "Create a small private website without a database server.",
+      "starter": false
+    },
+    {
+      "id": "tautulli",
+      "label": "Tautulli",
+      "detail": "See viewing history for your existing Plex server.",
+      "starter": false
+    },
+    {
+      "id": "wallos",
+      "label": "Wallos",
+      "detail": "Track recurring subscriptions and household expenses.",
+      "starter": false
+    },
+    {
+      "id": "kanboard",
+      "label": "Kanboard",
+      "detail": "Organize projects on a Kanban board",
+      "starter": false
+    },
+    {
+      "id": "flatnotes",
+      "label": "Flatnotes",
+      "detail": "Simple private Markdown notes",
+      "starter": false
+    }
   ],
   "proInstallationAvailable": false,
   "automaticRepairDefault": false

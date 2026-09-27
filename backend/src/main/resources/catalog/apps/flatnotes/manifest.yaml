@@ -1,0 +1,96 @@
+id: flatnotes
+metadata:
+  name: Flatnotes
+  category: Productivity
+  description: Write and search notes stored as plain Markdown files.
+  shortValue: Simple private Markdown notes
+  image: /app-images/flatnotes.svg
+  version: Pinned release
+  maintainer: Flatnotes
+  source: GitHub
+  sourceUrl: https://github.com/dullage/flatnotes
+  documentationUrl: https://github.com/dullage/flatnotes/wiki/Environment-Variables
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18022
+  tags:
+    - Productivity
+    - Self-hosted
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: Write and search notes stored as plain Markdown files.
+  bestFor:
+    - Personal notes
+  highlights:
+    - Markdown files
+    - Full-text search
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements:
+    - 64-bit Docker host
+    - Local disk for persistent data
+  includes:
+    - Flatnotes
+    - Managed data folders
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Flatnotes
+  headline: Write your first note
+  summary: Private note editing without a separate app login.
+  setupSteps:
+    - Open Flatnotes through your private app link.
+    - Create a note; use tags and search to organize your notes.
+  notes:
+    - >-
+      There is no separate app login. Anyone allowed to reach this app through your tailnet can read, edit and
+      delete its notes. LAN dashboard access is disabled.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: flatnotes
+  composeProject: autark-os-flatnotes
+  image: dullage/flatnotes@sha256:ca4b40ee7491aabf6b52bbb20ab140145cb96981d4b3fe96ab1e797ac6cd93e5
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/flatnotes
+  ports:
+    - '18022:8080'
+  volumes:
+    - /var/lib/autark-os/apps/flatnotes/data:/data
+  environment:
+    - FLATNOTES_AUTH_TYPE=none
+    - PUID=1000
+    - PGID=1000
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=flatnotes
+  backupPaths:
+    - data
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

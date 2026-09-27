@@ -1,0 +1,80 @@
+id: kanboard
+metadata:
+  name: Kanboard
+  category: Productivity
+  description: Organize tasks and projects on a private Kanban board.
+  shortValue: Organize projects on a Kanban board.
+  image: /app-images/kanboard.svg
+  version: Pinned release
+  maintainer: Kanboard
+  source: GitHub
+  sourceUrl: https://github.com/kanboard/kanboard
+  documentationUrl: https://docs.kanboard.org/v1/admin/docker/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18021
+  tags: [Tasks, Projects, Kanban]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: Keep projects, tasks and attachments on your own server.
+  bestFor: [Personal projects, Team task boards]
+  highlights: [Kanban boards, Local SQLite database]
+technical:
+  summary: One container with managed SQLite data, attachments and plugin storage.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: [Kanboard, Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Default credentials require private access and an immediate password change.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Kanboard
+  headline: Create your first project
+  summary: Sign in, change the default password, then create a project and add tasks.
+  setupSteps:
+    - Sign in with admin and admin; immediately change your password in your profile.
+    - Create a project and add your first task.
+  notes:
+    - Email delivery is not configured. Web-based plugin installation remains disabled.
+health:
+  type: http
+  path: /healthcheck.php
+  startupGraceSeconds: 180
+  successLabel: Ready to open
+  startingLabel: Starting Kanboard
+  failureLabel: Kanboard is not responding
+  description: Checks the application database health endpoint.
+runtime:
+  containerName: kanboard
+  composeProject: autark-os-kanboard
+  image: kanboard/kanboard@sha256:8df6c4339134b6c196da9a262daa42ab8ce395f528a48d4a3dd7038c296f34c1
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/kanboard
+  ports: ["18021:80"]
+  volumes:
+    - /var/lib/autark-os/apps/kanboard/data:/var/www/app/data
+    - /var/lib/autark-os/apps/kanboard/plugins:/var/www/app/plugins
+    - /var/lib/autark-os/apps/kanboard/certs:/etc/nginx/ssl
+  environment: [PLUGIN_INSTALLER=false]
+  labels: [autark-os.managed=true, autark-os.app-id=kanboard]
+  backupPaths: [data, plugins, certs]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

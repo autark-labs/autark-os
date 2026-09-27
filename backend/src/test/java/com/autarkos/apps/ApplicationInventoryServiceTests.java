@@ -236,7 +236,7 @@ class ApplicationInventoryServiceTests {
         assertThat(view.cardTone()).isEqualTo("danger");
         assertThat(view.managed()).isFalse();
         assertThat(view.primaryAction()).isEqualTo(new ApplicationAction("review_existing", "Review existing service", "route", "/apps?review=jellyfin", null, false, ""));
-        assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("review_existing", "unavailable");
+        assertThat(view.availableActions()).extracting(ApplicationAction::id).containsExactly("review_existing", "install_copy");
         assertThat(view.evidence()).isNotNull();
         assertThat(view.evidence().resourceId()).isEqualTo("docker:jellyfin");
     }
@@ -327,7 +327,7 @@ class ApplicationInventoryServiceTests {
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
         assertThat(view.statusTone()).isEqualTo("danger");
         assertThat(view.primaryAction().id()).isEqualTo("review_existing");
-        assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("review_existing", "unavailable");
+        assertThat(view.availableActions()).extracting(ApplicationAction::id).containsExactly("review_existing", "install_copy");
         assertThat(view.evidence()).isNotNull();
         assertThat(view.evidence().ownershipState()).isEqualTo("failed_install");
         assertThat(view.evidence().statusLabel()).isEqualTo("Install failed");

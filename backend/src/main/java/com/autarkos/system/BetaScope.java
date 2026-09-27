@@ -42,7 +42,7 @@ public final class BetaScope {
         }
     }
 
-    public record App(String id, String label, String detail) {
+    public record App(String id, String label, String detail, boolean starter) {
     }
 
     public static final class UnavailableException extends ResponseStatusException {

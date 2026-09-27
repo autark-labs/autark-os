@@ -1,0 +1,98 @@
+id: changedetection-io
+metadata:
+  name: "changedetection.io"
+  category: Productivity
+  description: "Watch web pages for text changes and send alerts through your chosen notification service."
+  shortValue: "Watch web pages for text changes and send alerts through your chosen notification service."
+  image: /app-images/changedetection-io.svg
+  version: "0.60.7"
+  source: GitHub
+  sourceUrl: https://github.com/dgtlmoon/changedetection.io
+  documentationUrl: https://github.com/dgtlmoon/changedetection.io/wiki
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18004
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Watch web pages for text changes and send alerts through your chosen notification service."
+  bestFor: ["Monitor a web page"]
+technical:
+  summary: "Runs changedetection.io as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 512 MB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "changedetection.io web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open changedetection.io"
+  headline: "Monitor a web page"
+  summary: "Set a dashboard password, add a page, and choose the text changes you want to track."
+  setupSteps:
+    - "Open changedetection.io and set a password in Settings before adding private watches."
+    - "Add a publicly reachable page using the basic HTTP fetcher."
+    - "Run a check, review its result, and configure a notification destination if wanted."
+  notes:
+    - "This installation includes basic HTTP checks; browser automation and JavaScript rendering are not included."
+    - "Keep notification credentials private. Watch history and settings are included in backups."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "changedetection.io web interface is responding"
+  startingLabel: "Starting changedetection.io"
+  failureLabel: "changedetection.io is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: changedetection-io
+  composeProject: autark-os-changedetection-io
+  image: ghcr.io/dgtlmoon/changedetection.io@sha256:096dae27b5d677b89f0e810fff95a70403271aa3ff3b6437952d2db9be7e74c5
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/changedetection-io
+  ports:
+    - 18004:5000
+  volumes:
+    - /var/lib/autark-os/apps/changedetection-io/data:/datastore
+  environment:
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=changedetection-io
+    - autark-os.version=0.60.7
+  backupPaths:
+    - data
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

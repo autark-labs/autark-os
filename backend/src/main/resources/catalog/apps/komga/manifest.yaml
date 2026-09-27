@@ -1,0 +1,79 @@
+id: komga
+metadata:
+  name: "Komga"
+  category: Media
+  description: "Read and organize your own comics and ebooks."
+  shortValue: "Read and organize your own comics and ebooks."
+  image: /app-images/komga.svg
+  version: "1.27.1"
+  maintainer: "Upstream project"
+  source: GitHub
+  sourceUrl: https://github.com/gotson/komga
+  documentationUrl: https://komga.org/docs/installation/docker/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18013
+  tags: ["Media", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Read and organize your own comics and ebooks."
+  bestFor: ["Read and organize your own comics and ebooks."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Komga", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Komga"
+  headline: "Set up Komga"
+  summary: "Read and organize your own comics and ebooks."
+  setupSteps:
+    - "Create the first administrator account."
+    - "Copy your books into the managed data folder on the server, then add a library using /data."
+  notes:
+    - "No books are included. Managed library files and configuration are included in stopped-app backups."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: komga
+  composeProject: autark-os-komga
+  image: gotson/komga@sha256:9cf102f5fb78e2e020700c53eca757e4f4d4e347121b0a16380822760337cca9
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/komga
+  ports: ["18013:25600"]
+  volumes:
+    - "/var/lib/autark-os/apps/komga/config:/config"
+    - "/var/lib/autark-os/apps/komga/data:/data"
+  environment: ["TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=komga"]
+  backupPaths: ["config","data"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

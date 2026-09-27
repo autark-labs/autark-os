@@ -1,0 +1,78 @@
+id: silverbullet
+metadata:
+  name: "SilverBullet"
+  category: Productivity
+  description: "Write and link private Markdown notes."
+  shortValue: "Write and link private Markdown notes."
+  image: /app-images/silverbullet.svg
+  version: "2.11.1"
+  maintainer: "Upstream project"
+  source: GitHub
+  sourceUrl: https://github.com/silverbulletmd/silverbullet
+  documentationUrl: https://silverbullet.md/Install/Docker
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18012
+  tags: ["Productivity", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Write and link private Markdown notes."
+  bestFor: ["Write and link private Markdown notes."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["SilverBullet", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open SilverBullet"
+  headline: "Set up SilverBullet"
+  summary: "Write and link private Markdown notes."
+  setupSteps:
+    - "Complete the server setup in your browser."
+    - "Create a page and link it to another note."
+  notes:
+    - "Keep access private; scripting features execute inside the app container."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: silverbullet
+  composeProject: autark-os-silverbullet
+  image: ghcr.io/silverbulletmd/silverbullet@sha256:e36808c27717e6c1d97e2421d6da263a16f273db91768bec2c227f28a9759086
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/silverbullet
+  ports: ["18012:3000"]
+  volumes:
+    - "/var/lib/autark-os/apps/silverbullet/data:/data"
+  environment: []
+  labels: ["autark-os.managed=true", "autark-os.app-id=silverbullet"]
+  backupPaths: ["data"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

@@ -36,12 +36,10 @@ type StarterAppContext = {
 };
 
 /**
- * Discover's quiet first-run guidance must describe the same apps that the
- * backend permits a beta owner to install. The release-owned scope file is
- * deliberately shared with the browser instead of maintaining another list
- * in this page.
+ * Keep first-run suggestions small; eligibility and starter selection share
+ * the release-owned scope record with backend onboarding.
  */
-export const betaStarterAppIds = betaScope.apps.map((app) => app.id);
+export const betaStarterAppIds = betaScope.apps.filter((app) => app.starter).map((app) => app.id);
 export const defaultDiscoverAppId = betaStarterAppIds[0] ?? null;
 
 export function marketplaceVisibleApps({

@@ -37,7 +37,6 @@ public class CatalogSourceLayoutValidator {
         String id = directory.getFileName().toString();
         Path manifest = directory.resolve("manifest.yaml");
         requireNonEmptyFile(manifest, id + " is missing manifest.yaml", errors);
-        requireNonEmptyFile(directory.resolve("compose.yaml"), id + " is missing compose.yaml", errors);
         validateManifestSections(manifest, id, errors);
         validateProvisionedFiles(manifest, directory, id, errors);
     }

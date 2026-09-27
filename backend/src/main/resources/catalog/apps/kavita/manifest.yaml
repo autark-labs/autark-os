@@ -1,0 +1,102 @@
+id: kavita
+metadata:
+  name: "Kavita"
+  category: Media
+  description: "Organize and read your ebooks, comics, and manga in a browser."
+  shortValue: "Organize and read your ebooks, comics, and manga in a browser."
+  image: /app-images/kavita.svg
+  version: "0.9.1.4"
+  source: GitHub
+  sourceUrl: https://github.com/Kareadita/Kavita
+  documentationUrl: https://docs.linuxserver.io/images/docker-kavita/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18003
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Organize and read your ebooks, comics, and manga in a browser."
+  bestFor: ["Create your reading library"]
+technical:
+  summary: "Runs Kavita as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 1 GB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Kavita web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Kavita"
+  headline: "Create your reading library"
+  summary: "Create an administrator and point a library at the managed books folder."
+  setupSteps:
+    - "Open Kavita and complete the administrator setup wizard."
+    - "Copy books or comics into /var/lib/autark-os/apps/kavita/books on the server."
+    - "Add /data as a library folder in Kavita and scan it, then open a book."
+  notes:
+    - "Library files and Kavita configuration are included in backups."
+    - "Existing libraries elsewhere on the server are not imported automatically."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Kavita web interface is responding"
+  startingLabel: "Starting Kavita"
+  failureLabel: "Kavita is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: kavita
+  composeProject: autark-os-kavita
+  image: lscr.io/linuxserver/kavita@sha256:2842f1c0882b9d0ce3103420eea0a90b27e4537ff29f87b1471cdd752e936837
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/kavita
+  ports:
+    - 18003:5000
+  volumes:
+    - /var/lib/autark-os/apps/kavita/config:/config
+    - /var/lib/autark-os/apps/kavita/books:/data
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=kavita
+    - autark-os.version=0.9.1.4
+  backupPaths:
+    - config
+    - books
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

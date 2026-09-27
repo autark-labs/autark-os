@@ -35,7 +35,7 @@ public class DiscoverSetupService {
                 "choice",
                 "recommended",
                 true,
-                manifest.access().privateDashboard() ? "private_only" : manifest.access().privateAccessRecommended() ? "private_lan" : "lan_only",
+                manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired() ? "private_only" : manifest.access().privateAccessRecommended() ? "private_lan" : "lan_only",
                 "Choose where the app can be opened from. Private access means trusted Tailscale devices can open the app away from home.",
                 accessOptions(manifest),
                 Map.of()));
@@ -118,19 +118,8 @@ public class DiscoverSetupService {
                             "Jellyfin needs a folder where your movies, shows, music, or home videos live.",
                             List.of(
                                     option("create_new", "Create a new media folder", "Autark-OS prepares an empty folder for Jellyfin.", true, false),
-                                    option("existing_folder", "Use an existing folder", "Autark-OS validates the existing folder before install.", false, false),
                                     option("later", "Choose later", "Install Jellyfin first and add libraries later.", false, false)),
-                            Map.of()),
-                    new DiscoverSetupModels.DiscoverSetupInput(
-                            "jellyfinExistingMediaPath",
-                            "Existing media folder path",
-                            "path",
-                            "app_specific",
-                            true,
-                            "",
-                            "Use the host folder path that contains your media files.",
-                            List.of(),
-                            Map.of("jellyfinMediaFolder", "existing_folder")));
+                            Map.of()));
             case "pi-hole" -> List.of(
                     new DiscoverSetupModels.DiscoverSetupInput(
                             "piholeDnsProvider",
@@ -161,10 +150,13 @@ public class DiscoverSetupService {
     }
 
     private List<DiscoverSetupModels.DiscoverSetupOption> accessOptions(ApplicationManifest manifest) {
+        if (manifest.usage().privateHttpsRequired()) {
+            return List.of(option("private_only", "Private HTTPS", "This app requires a private HTTPS link through Tailscale.", true, false));
+        }
         if (manifest.access().privateDashboard()) {
             return List.of(
-                    option("private_only", "Private devices", "Dashboard access through Tailscale or on this server. Peer sync stays available on your home network.", true, false),
-                    option("local_only", "This server only", "Open the dashboard on this server. Peer sync stays available on your home network.", false, false));
+                    option("private_only", "Private devices", "Open the dashboard through Tailscale or on this server.", true, false),
+                    option("local_only", "This server only", "Open the dashboard only on this server.", false, false));
         }
         return List.of(
                 option("private_lan", "Private + home network", "Available on your home network and to trusted Tailscale devices.", true, false),
@@ -174,8 +166,7 @@ public class DiscoverSetupService {
 
     private List<DiscoverSetupModels.DiscoverSetupOption> storageOptions() {
         return List.of(
-                option("autark_os_default", "Autark-OS managed storage", "Use the default managed app folders.", true, false),
-                option("existing_folder", "Use an existing folder", "Review an existing folder before Autark-OS treats it as app data.", false, true));
+                option("autark_os_default", "Autark-OS managed storage", "Use the default managed app folders.", true, false));
     }
 
     private List<DiscoverSetupModels.DiscoverSetupOption> backupOptions() {

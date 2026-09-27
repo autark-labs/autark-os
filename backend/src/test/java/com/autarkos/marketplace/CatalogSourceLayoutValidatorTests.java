@@ -25,15 +25,13 @@ class CatalogSourceLayoutValidatorTests {
 
         assertThatThrownBy(() -> validator.validate(temporaryDirectory))
                 .isInstanceOf(ManifestValidationException.class)
-                .hasMessageContaining("portainer is missing manifest.yaml")
-                .hasMessageContaining("portainer is missing compose.yaml");
+                .hasMessageContaining("portainer is missing manifest.yaml");
     }
 
     @Test
     void rejectsAManifestThatOmitsRequiredReleaseSections() throws Exception {
         Path app = Files.createDirectories(temporaryDirectory.resolve("incomplete-app"));
         Files.writeString(app.resolve("manifest.yaml"), "id: incomplete-app\nmetadata: {}\n");
-        Files.writeString(app.resolve("compose.yaml"), "services: {}\n");
 
         assertThatThrownBy(() -> validator.validate(temporaryDirectory))
                 .isInstanceOf(ManifestValidationException.class)
@@ -58,7 +56,6 @@ class CatalogSourceLayoutValidatorTests {
                     - source: defaults/app.yml
                       target: config/app.yml
                 """);
-        Files.writeString(app.resolve("compose.yaml"), "services: {}\n");
 
         assertThatThrownBy(() -> validator.validate(temporaryDirectory))
                 .isInstanceOf(ManifestValidationException.class)

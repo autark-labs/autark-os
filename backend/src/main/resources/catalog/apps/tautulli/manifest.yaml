@@ -1,0 +1,78 @@
+id: tautulli
+metadata:
+  name: "Tautulli"
+  category: Monitoring
+  description: "See viewing history for your existing Plex server."
+  shortValue: "See viewing history for your existing Plex server."
+  image: /app-images/tautulli.svg
+  version: "v2.18.1-ls245"
+  maintainer: "LinuxServer.io"
+  source: GitHub
+  sourceUrl: https://github.com/Tautulli/Tautulli
+  documentationUrl: https://docs.linuxserver.io/images/docker-tautulli/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18019
+  tags: ["Monitoring", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "See viewing history for your existing Plex server."
+  bestFor: ["See viewing history for your existing Plex server."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Tautulli", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Tautulli"
+  headline: "Set up Tautulli"
+  summary: "See viewing history for your existing Plex server."
+  setupSteps:
+    - "Complete the wizard and sign in to your Plex account."
+    - "Select a reachable Plex server that you already manage."
+  notes:
+    - "Requires an existing Plex server; this installation does not install Plex or provide media."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: tautulli
+  composeProject: autark-os-tautulli
+  image: lscr.io/linuxserver/tautulli@sha256:c66d3afa8f7a701a48dd1b1f57b22eca0483d895d670fe11ecff783f6a9bbd73
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/tautulli
+  ports: ["18019:8181"]
+  volumes:
+    - "/var/lib/autark-os/apps/tautulli/config:/config"
+  environment: ["PUID=1000","PGID=1000","TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=tautulli"]
+  backupPaths: ["config"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

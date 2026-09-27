@@ -24,9 +24,9 @@ class BackupProtectionPolicyTests {
             assertThat(BackupProtectionPolicy.state(true, homepage, List.of(invalid))).isEqualTo("backup_enabled_no_restore_point");
             assertThat(BackupProtectionPolicy.state(true, homepage, List.of(invalid, valid))).isEqualTo("protected_by_restore_point");
         }
-        var unsupported = catalog.findById("vaultwarden").orElseThrow();
+        var unsupported = catalog.findById("immich").orElseThrow();
         assertThat(BackupProtectionPolicy.state(true, unsupported,
-                List.of(point("full", "vaultwarden", "a".repeat(64), "cold_file", 1, "verified"))))
+                List.of(point("full", "immich", "a".repeat(64), "cold_file", 1, "verified"))))
                 .isEqualTo("backup_enabled_no_restore_point");
         assertThat(BackupProtectionPolicy.state(false, homepage, List.of(valid))).isEqualTo("backup_disabled");
         assertThat(BackupProtectionPolicy.state(true, null, List.of(valid))).isEqualTo("backup_enabled_no_restore_point");

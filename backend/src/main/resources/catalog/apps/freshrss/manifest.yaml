@@ -4,21 +4,15 @@ metadata:
   category: Productivity
   description: Private RSS reader and feed aggregator.
   shortValue: Follow blogs, news, and releases from one private reader.
-  badge: Official
-  downloads: 760K
-  rating: '4.7'
   image: /app-images/freshrss.svg
   version: 1.29.1
-  lastUpdated: Recently
-  size: 160 MB
   maintainer: FreshRSS Community
   source: GitHub
   sourceUrl: https://github.com/FreshRSS/FreshRSS
   documentationUrl: https://freshrss.github.io/FreshRSS/
-  installTime: 2-4 minutes
   difficulty: Easy
-  supportLevel: Ready
-  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  supportLevel: Needs testing
+  supportSummary: Install, first-run setup, private access, and restore still need end-to-end validation.
   accessUrl: http://localhost:8086
   tags:
     - RSS
@@ -27,30 +21,18 @@ metadata:
     - Feeds
 testing:
   smokeTests:
-    - label: Install plan generated
+    - label: AMD64 container startup and restart
       status: Passed
-      detail: Manifest loads and produces an Autark-OS install plan.
-    - label: x86_64 image pull
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Install, setup, and private access
       status: Needs end-to-end test
-      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
-    - label: arm64 image pull
+      detail: Validate the owner workflow on a clean host, including first-run setup and private access.
+    - label: Raspberry Pi runtime
       status: Needs hardware test
-      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
-    - label: Container starts
+      detail: ARM64 image support does not establish Raspberry Pi startup or performance.
+    - label: Backup and restore
       status: Needs end-to-end test
-      detail: Needs clean-host install validation with Docker Compose.
-    - label: Local URL responds
-      status: Needs end-to-end test
-      detail: Needs browser smoke test after install.
-    - label: Tailscale link works
-      status: Needs end-to-end test
-      detail: Needs private-link validation on a tailnet.
-    - label: Backup path exists
-      status: Passed
-      detail: Manifest declares managed backup paths under the Autark-OS app folder.
-    - label: Uninstall safety checkpoint
-      status: Needs end-to-end test
-      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+      detail: Cold file copying stops the whole app; a populated backup and restore round trip is not yet qualified.
 
 user:
   bestFor:
@@ -83,7 +65,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/freshrss/data
     - label: Backup
-      value: Feed data daily
+      value: Stops the app to copy its managed data folders
     - label: Access
       value: Local and Tailscale
 access:
@@ -102,7 +84,7 @@ usage:
   summary: Autark-OS starts FreshRSS. Create an account and add feeds from the web setup.
   setupSteps:
     - Open FreshRSS.
-    - Create the first user.
+    - Choose SQLite in the installation wizard so the database stays in managed storage, then create the first user.
     - Add RSS feeds or import an OPML file.
   fields:
     - label: Reader URL
@@ -110,6 +92,7 @@ usage:
       sensitive: false
       qr: true
   notes:
+    - Backups stop the app and copy managed folders; restore round-trip validation is still pending.
     - FreshRSS can also work with compatible mobile RSS reader apps.
 health:
   type: http

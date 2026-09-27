@@ -1,0 +1,99 @@
+id: gotify
+metadata:
+  name: "Gotify"
+  category: Utilities
+  description: "Receive notifications from applications you connect to your own server."
+  shortValue: "Receive notifications from applications you connect to your own server."
+  image: /app-images/gotify.svg
+  version: "3.1.1"
+  source: GitHub
+  sourceUrl: https://github.com/gotify/server
+  documentationUrl: https://gotify.net/docs/install
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18007
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Receive notifications from applications you connect to your own server."
+  bestFor: ["Set up private notifications"]
+technical:
+  summary: "Runs Gotify as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 256 MB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Gotify web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Gotify"
+  headline: "Set up private notifications"
+  summary: "Change the initial password, then connect a sending application and a receiving client."
+  setupSteps:
+    - "Open Gotify and sign in with username admin and password admin."
+    - "Change the administrator password immediately, or create another administrator and remove the default account."
+    - "Create an application in Gotify and store its token in the service that will send messages."
+    - "Connect a receiving client and send a test message."
+  notes:
+    - "Autark-OS does not connect its Activity notifications to Gotify automatically."
+    - "Keep application tokens private. Messages, accounts, and application images are included in backups."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Gotify web interface is responding"
+  startingLabel: "Starting Gotify"
+  failureLabel: "Gotify is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: gotify
+  composeProject: autark-os-gotify
+  image: gotify/server@sha256:44fc5bbd1c0618878e33073d38c2c13126b48f245c3fe12236b1da48eb203b86
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/gotify
+  ports:
+    - 18007:80
+  volumes:
+    - /var/lib/autark-os/apps/gotify/data:/app/data
+  environment:
+    - TZ=UTC
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=gotify
+    - autark-os.version=3.1.1
+  backupPaths:
+    - data
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

@@ -1,0 +1,103 @@
+id: wikijs
+metadata:
+  name: "Wiki.js"
+  category: Productivity
+  description: "Create a searchable wiki for household guides and shared knowledge."
+  shortValue: "Create a searchable wiki for household guides and shared knowledge."
+  image: /app-images/wikijs.svg
+  version: "2.5.315"
+  source: GitHub
+  sourceUrl: https://github.com/requarks/wiki
+  documentationUrl: https://docs.linuxserver.io/images/docker-wikijs/
+  difficulty: Easy
+  supportLevel: Needs testing
+  supportSummary: Upstream image supports amd64 and arm64; the complete installation and restore workflow needs validation.
+  accessUrl: http://localhost:18009
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Registry index inspected on 2026-09-27; the pinned digest includes linux/amd64 and linux/arm64.
+    - label: Install, first setup, private access, backup and restore
+      status: Needs end-to-end test
+      detail: Container startup and restart passed locally; browser setup, private access, and restore still need validation.
+    - label: ARM64 runtime
+      status: Needs hardware test
+      detail: Image availability does not establish operation on ARM64 hardware.
+user:
+  plainLanguage: "Create a searchable wiki for household guides and shared knowledge."
+  bestFor: ["Set up your wiki"]
+technical:
+  summary: "Runs Wiki.js as one container with managed storage. Backups stop the app while copying all declared data folders."
+  requirements:
+    - 1 GB RAM
+    - Local persistent storage with space for your content
+  includes:
+    - "Wiki.js web interface"
+    - Managed data folders and cold backup contract
+access:
+  kind: web
+  privateDashboard: true
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Keep access private while completing account and permission setup.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Wiki.js"
+  headline: "Set up your wiki"
+  summary: "Create an administrator and choose access permissions before publishing your first page."
+  setupSteps:
+    - "Open Wiki.js and complete the setup form with an administrator email and strong password."
+    - "Use the address you opened as the site URL and disable public access for a private wiki."
+    - "Create a page, then check its reading and editing permissions."
+  notes:
+    - "This installation uses SQLite with configuration and content stored in managed folders."
+    - "Changing the access address may require updating the site URL in Wiki.js administration."
+  fields:
+    - label: Web interface
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+setup:
+  kind: basic
+  automation: manual
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: "Wiki.js web interface is responding"
+  startingLabel: "Starting Wiki.js"
+  failureLabel: "Wiki.js is not responding"
+  description: Checks the web interface; account setup and app configuration may still be required.
+runtime:
+  containerName: wikijs
+  composeProject: autark-os-wikijs
+  image: lscr.io/linuxserver/wikijs@sha256:1cbb7cd39f62b12025b6cb5fea4f95629833162c72bf0604c568090f343c8665
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/wikijs
+  ports:
+    - 18009:3000
+  volumes:
+    - /var/lib/autark-os/apps/wikijs/config:/config
+    - /var/lib/autark-os/apps/wikijs/data:/data
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+    - DB_TYPE=sqlite
+  labels:
+    - autark-os.managed=true
+    - autark-os.app-id=wikijs
+    - autark-os.version=2.5.315
+  backupPaths:
+    - config
+    - data
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false

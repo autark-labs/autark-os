@@ -1,0 +1,78 @@
+id: mealie
+metadata:
+  name: "Mealie"
+  category: Productivity
+  description: "Collect recipes and plan household meals."
+  shortValue: "Collect recipes and plan household meals."
+  image: /app-images/mealie.svg
+  version: "v3.28.0"
+  maintainer: "Upstream project"
+  source: GitHub
+  sourceUrl: https://github.com/mealie-recipes/mealie
+  documentationUrl: https://mealie.io/documentation/getting-started/installation/sqlite/
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: ARM64 image availability checked; full Pi lifecycle qualification is pending.
+  accessUrl: http://localhost:18011
+  tags: ["Productivity", "Self-hosted"]
+testing:
+  smokeTests:
+    - label: AMD64 container startup and restart
+      status: Passed
+      detail: Checked on 2026-09-27 using Autark-generated Compose with isolated loopback ports and temporary storage. This does not qualify setup, Tailscale, or restore.
+    - label: Image architectures
+      status: Passed
+      detail: Pinned registry index includes linux/amd64 and linux/arm64.
+    - label: Appliance lifecycle
+      status: Needs end-to-end test
+      detail: Install, first-run setup, private access, backup and restore require appliance testing.
+user:
+  plainLanguage: "Collect recipes and plan household meals."
+  bestFor: ["Collect recipes and plan household meals."]
+  highlights: [Managed local storage, Private browser access]
+technical:
+  summary: Single container with managed persistent folders and stopped-app file backups.
+  requirements: [64-bit Docker host, Local disk for persistent data]
+  includes: ["Mealie", Managed data folders]
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  privateDashboard: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access is limited to this server or trusted Tailscale devices.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: "Open Mealie"
+  headline: "Set up Mealie"
+  summary: "Collect recipes and plan household meals."
+  setupSteps:
+    - "Sign in with changeme@example.com and MyPassword, then immediately change both in your profile."
+    - "Import a recipe or create one in the editor."
+  notes:
+    - "SQLite data must stay on local disk. Email delivery and external authentication are not configured."
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Ready to open
+  startingLabel: Starting app
+  failureLabel: App is not responding
+  description: Checks the web endpoint; complete the upstream setup before using the app.
+runtime:
+  containerName: mealie
+  composeProject: autark-os-mealie
+  image: ghcr.io/mealie-recipes/mealie@sha256:8b02290f4d1806f02acac6f25f6d48a3c965612fda1f8e914d5af533276f8688
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/mealie
+  ports: ["18011:9000"]
+  volumes:
+    - "/var/lib/autark-os/apps/mealie/data:/app/data"
+  environment: ["ALLOW_SIGNUP=false","PUID=1000","PGID=1000","TZ=Etc/UTC"]
+  labels: ["autark-os.managed=true", "autark-os.app-id=mealie"]
+  backupPaths: ["data"]
+  backupStrategy: cold_file
+  backupContractVersion: 1
+  privileged: false
