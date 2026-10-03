@@ -1,4 +1,6 @@
 import { expect, test } from 'playwright/test';
+import betaScope from '../../backend/src/main/resources/beta-scope.json' with { type: 'json' };
+import type { DiscoverAppView } from '../src/types/discover';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage } from './support/mockApi';
 
 async function openDiscover(page: Parameters<typeof installMockApi>[0], viewport: { width: number; height: number }) {
@@ -58,3 +60,41 @@ test('narrow Discover opens the selected app in the full review sheet', async ({
   await expect(page.getByRole('dialog')).toContainText('Immich');
   await expectNoHorizontalOverflow(page);
 });
+
+for (const width of [1440, 1024, 390]) {
+  test(`${width}px expanded catalog scrolls to its last app`, async ({ page }) => {
+    await installMockApi(page, 'ready');
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/home');
+    const [template]: DiscoverAppView[] = await page.evaluate(async () => (await fetch('/api/discover/apps')).json());
+    const apps = betaScope.apps.map(({ id, label }) => ({
+      ...template,
+      app: { ...template.app, id, name: label },
+      application: { ...template.application, id, name: label },
+      setupSchema: { ...template.setupSchema, appId: id },
+    }));
+    await page.route('**/api/discover/apps', route => route.fulfill({ json: apps }));
+    await page.goto('/discover');
+    await page.getByRole('combobox', { name: 'Catalog', exact: true }).click();
+    await page.getByRole('option', { name: 'All apps', exact: true }).click();
+    const catalog = page.getByLabel('Discover app catalog', { exact: true });
+    const cards = catalog.getByRole('button', { name: /^Select / });
+    await expect(cards).toHaveCount(apps.length);
+    await expect(cards.last()).not.toBeInViewport();
+    await cards.first().hover();
+    await page.mouse.wheel(0, 10000);
+    await expect(cards.last()).toBeInViewport();
+    if (width >= 1024) {
+      await cards.last().focus();
+      await page.keyboard.press('Home');
+      await expect(cards.first()).toBeInViewport();
+      await page.keyboard.press('End');
+      await expect(cards.last()).toBeInViewport();
+      await expect(page.getByRole('searchbox', { name: 'Search Discover apps' })).toBeInViewport();
+    }
+    await cards.last().click();
+    const details = width >= 1280 ? page.getByLabel('Selected Discover app') : page.getByRole('dialog');
+    await expect(details).toContainText('Wiki.js');
+    await expectNoHorizontalOverflow(page);
+  });
+}

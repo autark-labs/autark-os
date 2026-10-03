@@ -106,7 +106,7 @@ export function MarketplaceAppList({ apps, installingAppId = null, onRestoreStar
     <section aria-label="Discover app catalog" className="flex min-h-0 flex-1 flex-col p-3">
       {starterGuidance ? <StarterGuidance {...starterGuidance} /> : onRestoreStarterGuidance ? <RestoreStarterGuidance onRestore={onRestoreStarterGuidance} /> : null}
       {apps.length ? (
-        <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-3 overflow-y-auto overscroll-contain pr-1">
+        <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-3 overflow-y-auto pr-1 lg:overscroll-contain">
           {apps.map((app) => (
             <DenseLauncherCard
               app={app}

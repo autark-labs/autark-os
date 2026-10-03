@@ -343,7 +343,7 @@ function MarketplacePage() {
     <PageShell
       className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
       contained
-      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+      contentClassName="gap-3 overscroll-auto lg:h-full lg:min-h-0 lg:!overflow-hidden lg:overscroll-contain"
     >
       <DiscoverGuidedHeader
         error={discoverError || (progressError ? 'Job progress could not refresh. This does not mean the operation failed.' : '')}
@@ -359,7 +359,7 @@ function MarketplacePage() {
       />
 
 
-      <ExtensionActionTarget actionId="review-app" className="min-h-0 flex-1" routeId="discover">
+      <ExtensionActionTarget actionId="review-app" className="flex min-h-0 flex-1 flex-col" routeId="discover">
         <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
           catalogScope={catalogScope}
