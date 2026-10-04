@@ -17,7 +17,7 @@ export function PageHeader({ children, description, icon: Icon, metrics = [], ti
       </div>
       <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-4">
         {metrics.length > 0 && <dl className="flex flex-wrap items-center gap-5">
-          {metrics.map(({ label, value }) => <div key={label} className="flex w-44 items-baseline gap-2"><dd className="text-base font-semibold tabular-nums text-foreground">{value ?? 'Unknown'}</dd><dt className="text-xs text-muted-foreground">{label}</dt></div>)}
+          {metrics.map(({ label, value }) => <div key={label} className="flex items-baseline gap-2 sm:w-44"><dd className="text-base font-semibold tabular-nums text-foreground">{value ?? 'Unknown'}</dd><dt className="text-xs text-muted-foreground">{label}</dt></div>)}
         </dl>}
         <div className="flex max-w-full flex-wrap items-center justify-end gap-2">{children}</div>
       </div>

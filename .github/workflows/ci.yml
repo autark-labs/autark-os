@@ -56,7 +56,12 @@ jobs:
         run: yarn test:e2e
 
       - name: Run release contracts
-        run: bash scripts/tests/release-contract-suite.sh
+        run: |
+          AUTARK_OS_BUILD_VERSION=0.0.0-ci \
+          AUTARK_OS_BUILD_SHA="${GITHUB_SHA}" \
+          AUTARK_OS_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            ./backend/gradlew -p backend bootJar --console=plain
+          bash scripts/tests/release-contract-suite.sh
 
       - name: Enforce public/private Pro boundary
         run: bash scripts/check-pro-public-boundary.sh
