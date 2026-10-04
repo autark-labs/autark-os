@@ -186,6 +186,10 @@ test('an immediately failed cleanup remains reviewable and retry requires fresh 
   await dialog.getByRole('button', { name: 'Archive and remove folder' }).click();
   await expect(dialog.getByRole('region', { name: /Storage cleanup.*succeeded/ })).toBeVisible();
   expect(submissions).toBe(2);
+  const popup = page.locator('[data-sonner-toast][data-type="success"]');
+  await expect(popup).toContainText('Storage cleanup completed');
+  await popup.getByRole('button', { name: 'Close toast', exact: true }).click();
+  await expect(popup).toBeHidden();
   await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
   await expect(page.getByRole('button', { name: 'Review', exact: true })).toBeFocused();
 });
