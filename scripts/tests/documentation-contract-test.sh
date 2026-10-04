@@ -25,11 +25,23 @@ grep -E -q -- 'autark-os update' docs/getting-started.md
 grep -E -q -- 'autark-os uninstall --plan' docs/getting-started.md
 grep -E -q -- 'New managed-app updates are deferred for the controlled beta' docs/getting-started.md
 grep -E -q -- 'Managed app changes during beta' docs/maintenance.md
-grep -E -q -- 'Existing release snapshots and rollback records remain available as recovery evidence' docs/maintenance.md
+grep -z -E -q -- 'Existing release snapshots and rollback records remain available as recovery[[:space:]]+evidence' docs/maintenance.md
 grep -E -q -- 'New managed-app updates are deferred during beta' README.md
 grep -E -q -- 'New managed-app updates are deferred during the controlled beta' scripts/build-release-bundle.sh
 grep -E -q -- 'Autark-OS does not claim that backups are encrypted' docs/getting-started.md
-grep -E -q -- 'personal and non-commercial use' docs/getting-started.md
+grep -F -q -- 'Personal and internal business use' docs/getting-started.md
+grep -F -q -- 'independent paid installation/support are permitted' docs/getting-started.md
+grep -F -q -- 'not OSI-approved open source' docs/getting-started.md
+grep -F -q -- '# Autark Community License (ACL) v2.0' LICENSE.md
+grep -F -q -- '## Commons Clause License Condition v1.0' LICENSE.md
+grep -F -q -- '## Apache License, Version 2.0' LICENSE.md
+grep -F -q -- '### 2. Community distribution and independent services' LICENSE.md
+grep -F -q -- '### 3. Reserved product-distribution and hosted-service rights' LICENSE.md
+grep -F -q -- 'Third-party applications and dependencies keep their own licenses' COMMERCIAL-LICENSE.md
+if grep -n -E -- 'personal and non-commercial use|ACL\) v1\.0|Commercial rights remain exclusively reserved' LICENSE.md COMMERCIAL-LICENSE.md README.md docs/getting-started.md scripts/build-release-artifacts.sh; then
+  printf 'Obsolete CE licensing language remains.\n' >&2
+  exit 1
+fi
 grep -E -q -- 'THIRD_PARTY_COMPONENTS.txt' docs/third-party-notices.md
 ! grep -R -n -E -- 'image-only catalog releases|eligible managed-app image updates|Review update' README.md docs SUPPORT.md scripts/build-release-bundle.sh backend/src/main/java
 ! grep -R -n -E -- 'autarklabs\.local' README.md docs SUPPORT.md SECURITY.md scripts/build-release-artifacts.sh

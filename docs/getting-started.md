@@ -65,8 +65,11 @@ For commercial licensing questions, contact <licensing@autarklabs.com>.
 
 ## License At A Glance
 
-Autark-OS is distributed under the Autark Community License. It permits
-personal and non-commercial use, study, modification, and self-hosting. Paid
-hosting, resale, commercial support, and commercial redistribution require a
-separate agreement with Autark Labs. Read `LICENSE.md` and
-`COMMERCIAL-LICENSE.md` in this directory for the complete terms.
+Autark-OS CE is source-available under the Autark Community License (ACL) v2.0,
+not OSI-approved open source. Personal and internal business use, modification,
+free community forks and independent paid installation/support are permitted.
+Using CE in a business does not require Pro. Product resale, paid derivatives,
+OEM bundles and paid hosted Autark management offerings require a separate
+agreement. Third-party applications retain their own licenses. Read
+`LICENSE.md`, `COMMERCIAL-LICENSE.md` and `TRADEMARKS.md` in this directory for
+the complete terms and branding policy.

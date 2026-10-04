@@ -4,6 +4,16 @@ Thanks for taking the time to contribute. Autark-OS is still early, and communit
 
 Autark-OS is tied closely to the Autark Labs brand and product direction, so maintainers keep final say over what ships. That does not mean contributions need to be perfect before you open them. It means changes should be easy to review, easy to test, and aligned with the product promise: a calm, guided runtime for self-hosted apps.
 
+## Contribution License
+
+CE is source-available under [ACL v2.0](LICENSE.md), not OSI-approved open
+source. Read its contribution terms before submitting code. You retain your
+copyright and grant Autark Labs the stated rights to use and sublicense your
+intentional contributions, including in commercial CE/Pro offerings. Submit
+only material you are authorized to contribute and identify separately
+licensed third-party material. This is not a copyright assignment or a claim
+of retroactive consent to new terms.
+
 ## How To Contribute
 
 ### 1. Start With The Right Path

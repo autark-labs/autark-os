@@ -139,6 +139,19 @@ scripts/       Installer, service helper, and release bundle tools
 docs/          Installation, operation, recovery, and technical-admin guides
 ```
 
+## License
+
+Autark-OS CE is **source-available**, not OSI-approved open source. The
+[Autark Community License (ACL) v2.0](LICENSE.md) combines Apache License 2.0,
+Commons Clause 1.0 and Autark-specific terms. Personal and internal business
+use, internal modifications, free community forks and independent paid
+installation/support are permitted. Businesses do not need Pro simply to use
+CE. Product resale, paid derivatives, OEM bundles and paid hosted Autark management
+offerings require a [separate agreement](COMMERCIAL-LICENSE.md).
+
+Third-party software retains its own licenses. Pro features and services have
+separate terms; purchasing Pro does not itself grant redistribution rights.
+
 ## Documentation
 
 - [Docs index](docs/README.md)

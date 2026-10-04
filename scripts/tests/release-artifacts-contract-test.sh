@@ -54,7 +54,7 @@ grep -q 'Version: 3.4.5' /tmp/autark-os-deb-info.txt
 grep -q 'Architecture: amd64' /tmp/autark-os-deb-info.txt
 grep -q 'Maintainer: Autark Labs <licensing@autarklabs.com>' /tmp/autark-os-deb-info.txt
 grep -q 'Homepage: https://github.com/autark-labs/autark-os' /tmp/autark-os-deb-info.txt
-grep -q 'License: Autark Community License (ACL) v1.0' /tmp/autark-os-deb-info.txt
+grep -Fq 'License: Autark Community License (ACL) v2.0 (source-available)' /tmp/autark-os-deb-info.txt
 dpkg-deb -c "${deb}" >/tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/backend/autark-os-backend.jar' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os' /tmp/autark-os-deb-contents.txt
@@ -68,7 +68,9 @@ dpkg-deb -x "${deb}" "${deb_data_dir}"
 grep -q '^AUTARK_OS_VERSION=3.4.5$' "${deb_data_dir}/usr/lib/autark-os/release/autark-os-release.env"
 grep -q '^AUTARK_OS_BUILD_SHA=artifacts-build-sha$' "${deb_data_dir}/usr/lib/autark-os/release/autark-os-release.env"
 grep -q '^# Autark-OS: Getting Started And Recovery$' "${deb_data_dir}/usr/share/doc/autark-os/GETTING_STARTED.md"
-grep -q '^# Autark Community License' "${deb_data_dir}/usr/share/doc/autark-os/LICENSE.md"
+cmp "${repo_root}/LICENSE.md" "${deb_data_dir}/usr/share/doc/autark-os/LICENSE.md"
+cmp "${repo_root}/COMMERCIAL-LICENSE.md" "${deb_data_dir}/usr/share/doc/autark-os/COMMERCIAL-LICENSE.md"
+cmp "${repo_root}/TRADEMARKS.md" "${deb_data_dir}/usr/share/doc/autark-os/TRADEMARKS.md"
 
 control_dir="${tmp_dir}/deb-control"
 mkdir -p "${control_dir}"
@@ -125,6 +127,8 @@ extract_dir="${tmp_dir}/run-extract"
 [[ -f "${extract_dir}/docs/GETTING_STARTED.md" ]]
 [[ -f "${extract_dir}/docs/RELEASE_NOTES.md" ]]
 [[ -f "${extract_dir}/docs/LICENSE.md" ]]
+cmp "${repo_root}/LICENSE.md" "${extract_dir}/docs/LICENSE.md"
+cmp "${repo_root}/TRADEMARKS.md" "${extract_dir}/docs/TRADEMARKS.md"
 grep -q 'install_release_docs' "${extract_dir}/scripts/install-autark-os-service.sh"
 grep -q '/usr/share/doc/autark-os' "${extract_dir}/scripts/install-autark-os-service.sh"
 grep -q '^AUTARK_OS_VERSION=3.4.5$' "${extract_dir}/autark-os-release.env"

@@ -40,6 +40,9 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/docs/RELEASE_NOTES.md" ]]
 [[ -f "${bundle_dir}/docs/LICENSE.md" ]]
 [[ -f "${bundle_dir}/docs/COMMERCIAL-LICENSE.md" ]]
+cmp "${repo_root}/LICENSE.md" "${bundle_dir}/docs/LICENSE.md"
+cmp "${repo_root}/COMMERCIAL-LICENSE.md" "${bundle_dir}/docs/COMMERCIAL-LICENSE.md"
+cmp "${repo_root}/TRADEMARKS.md" "${bundle_dir}/docs/TRADEMARKS.md"
 [[ -f "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md" ]]
 [[ -f "${bundle_dir}/docs/THIRD_PARTY_COMPONENTS.txt" ]]
 [[ -f "${bundle_dir}/docs/THIRD_PARTY_FRONTEND_LOCK.txt" ]]
@@ -123,6 +126,8 @@ assert "scripts/autark-os-update-helper" not in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]
 assert "docs/RELEASE_NOTES.md" in release["artifacts"]
 assert "docs/LICENSE.md" in release["artifacts"]
+assert "docs/COMMERCIAL-LICENSE.md" in release["artifacts"]
+assert "docs/TRADEMARKS.md" in release["artifacts"]
 assert "docs/RELEASE_SIGNING.md" in release["artifacts"]
 assert provenance["schemaVersion"] == 2
 assert provenance["buildSha"] == release["buildSha"]

@@ -239,7 +239,7 @@ Maintainer: Autark Labs <licensing@autarklabs.com>
 Depends: bash, sudo, systemd, curl, ca-certificates
 Installed-Size: ${size_kb}
 Homepage: https://github.com/autark-labs/autark-os
-License: Autark Community License (ACL) v1.0
+License: Autark Community License (ACL) v2.0 (source-available)
 Description: Calm local control center for self-hosted apps
  Autark-OS installs and manages supported self-hosted apps with Docker
  Compose, private access, backups, restore, and guided recovery.

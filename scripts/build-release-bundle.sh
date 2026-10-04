@@ -28,6 +28,7 @@ HOST_MATRIX_FILE="${SCRIPT_DIR}/supported-host-matrix.env"
 RELEASE_DOCS_SOURCE_DIR="${REPO_ROOT}/docs"
 LICENSE_SOURCE="${REPO_ROOT}/LICENSE.md"
 COMMERCIAL_LICENSE_SOURCE="${REPO_ROOT}/COMMERCIAL-LICENSE.md"
+TRADEMARKS_SOURCE="${REPO_ROOT}/TRADEMARKS.md"
 SUPPORT_SOURCE="${REPO_ROOT}/SUPPORT.md"
 SECURITY_SOURCE="${REPO_ROOT}/SECURITY.md"
 COSIGN_VERSION="3.1.2"
@@ -73,6 +74,8 @@ The bundle layout is:
   docs/GETTING_STARTED.md
   docs/RELEASE_NOTES.md
   docs/LICENSE.md
+  docs/COMMERCIAL-LICENSE.md
+  docs/TRADEMARKS.md
   docs/THIRD_PARTY_NOTICES.md
 USAGE
 }
@@ -579,6 +582,8 @@ write_release_json() {
     "docs/GETTING_STARTED.md",
     "docs/RELEASE_NOTES.md",
     "docs/LICENSE.md",
+    "docs/COMMERCIAL-LICENSE.md",
+    "docs/TRADEMARKS.md",
     "docs/THIRD_PARTY_NOTICES.md",
     "docs/THIRD_PARTY_COMPONENTS.txt",
     "docs/THIRD_PARTY_FRONTEND_LOCK.txt",
@@ -704,6 +709,7 @@ copy_release_docs() {
     "${RELEASE_DOCS_SOURCE_DIR}/third-party-notices.md" \
     "${LICENSE_SOURCE}" \
     "${COMMERCIAL_LICENSE_SOURCE}" \
+    "${TRADEMARKS_SOURCE}" \
     "${SUPPORT_SOURCE}" \
     "${SECURITY_SOURCE}" \
     "${REPO_ROOT}/docs/security/release-signing.md"; do
@@ -714,6 +720,7 @@ copy_release_docs() {
   run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/third-party-notices.md" "${docs_dir}/THIRD_PARTY_NOTICES.md"
   run_cmd cp "${LICENSE_SOURCE}" "${docs_dir}/LICENSE.md"
   run_cmd cp "${COMMERCIAL_LICENSE_SOURCE}" "${docs_dir}/COMMERCIAL-LICENSE.md"
+  run_cmd cp "${TRADEMARKS_SOURCE}" "${docs_dir}/TRADEMARKS.md"
   run_cmd cp "${SUPPORT_SOURCE}" "${docs_dir}/SUPPORT.md"
   run_cmd cp "${SECURITY_SOURCE}" "${docs_dir}/SECURITY.md"
   run_cmd cp "${REPO_ROOT}/docs/security/release-signing.md" "${docs_dir}/RELEASE_SIGNING.md"

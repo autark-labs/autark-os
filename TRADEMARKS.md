@@ -25,6 +25,7 @@ You may use these marks solely for:
 
 * Referring to the official project.
 * Describing compatibility with the Software.
+* Truthfully advertising independent installation, training or support for the Software.
 * Linking to official repositories or documentation.
 * Discussing the Software in reviews, articles, or educational materials.
 
@@ -48,7 +49,10 @@ Without written permission from Autark Labs, You may not:
 
 ## Forks
 
-Public forks are permitted under the Autark Community License.
+Free public forks are permitted subject to the [Autark Community License
+(ACL) v2.0](LICENSE.md). Permission to use a mark is not permission to sell
+the Software or a derivative. Preserve copyright and attribution notices
+when replacing product branding.
 
 However, forks must:
 
@@ -61,8 +65,8 @@ Examples:
 
 Permitted:
 
-* "My Custom Fork of Autark-OS"
-* "Autark-OS Community Mod"
+* "HomeHarbor — an unofficial fork of Autark-OS"
+* "Independent installation and support for Autark-OS; not affiliated with Autark Labs"
 
 Not Permitted:
 

@@ -60,6 +60,12 @@ depending on recovery.
 
 ## Prices, terms, and support
 
+CE permits personal and internal business use under its
+[source-available license](../../LICENSE.md); a business does not need Pro
+merely to use CE. A Pro purchase covers only its stated features and services,
+not resale, OEM distribution or paid hosted Autark management rights. Those require
+a [separate agreement](../../COMMERCIAL-LICENSE.md).
+
 The proposed commercial offer is $149 early access and $199 at full release
 for one appliance, with retained eligible local use, three years of Pro updates,
 and one year of Autark Online. Proposed Online renewal is $49/year or

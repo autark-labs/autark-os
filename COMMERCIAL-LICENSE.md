@@ -1,88 +1,58 @@
-# COMMERCIAL-LICENSE.md
+# Commercial Use And Distribution
 
-# Commercial Licensing
+Autark-OS Community Edition is source-available under the
+[Autark Community License (ACL) v2.0](LICENSE.md): Apache License 2.0 with
+Commons Clause 1.0 and Autark-specific terms. It is not OSI-approved open
+source or an unmodified standard license. `LICENSE.md` contains the binding
+terms; this page explains them and does not grant additional rights.
 
-Thank you for your interest in commercial use of software developed by Autark Labs.
+## No Separate Agreement Required
 
-The Autark Community License permits personal and non-commercial use. Commercial rights remain exclusively reserved by Autark Labs.
+- Personal, educational, nonprofit and internal business use of CE.
+- Internal modifications, including by businesses.
+- Running unrelated revenue-generating applications, websites or services.
+- Sharing free community forks with the required notices and distinct branding.
+- Paid independent installation, training, maintenance and support for a
+  customer's permitted use, with the customer retaining control of its
+  installation and data. See the explicit exception in `LICENSE.md`.
 
----
+A company does not need Pro merely because it uses CE for its business.
+Charging for independent assistance is different from selling an Autark-based
+product or hosted management platform.
 
-## Commercial Activities Requiring a License
+## Separate Written Agreement Required
 
-A commercial license is required for:
+- Selling CE or a modified/rebranded derivative as software, including as part
+  of a larger paid product or subscription.
+- Selling or leasing hardware with CE preinstalled or bundled (OEM/appliances).
+- Selling hosted or managed access to Autark's management functionality.
 
-* Hosted services
-* Managed services
-* SaaS offerings
-* Commercial redistribution
-* Hardware appliances containing the Software
-* Paid support offerings
-* Consulting offerings built around the Software
-* Enterprise distribution
-* White-label products
-* Commercial derivative works
+These rights are not included automatically in a Pro purchase. Adding features
+or calling a product sale an installation/support fee does not bypass the
+restrictions. Installing CE on customer-supplied hardware as an independent
+service remains permitted.
 
----
+## CE, Pro And Partners
 
-## Potential Licensing Models
+CE's license governs use and distribution of CE. Pro features, maintenance,
+support and Online services have their own availability and commercial terms.
+A reseller/OEM/hosting agreement governs rights to distribute an Autark-based
+offering; it is separate from an ordinary Pro entitlement. No such agreement
+is implied by the availability of source code.
 
-Autark Labs may offer commercial licenses including:
+Third-party applications and dependencies keep their own licenses. An Autark
+agreement cannot replace permissions required from their owners. Previously
+granted rights and existing written agreements are not revoked by this change.
 
-### Hosted Service License
+For a distribution agreement, contact
+[licensing@autarklabs.com](mailto:licensing@autarklabs.com) with the intended
+offering, whether it includes hardware or hosting, and expected deployment
+scale. Trademark questions use the same contact.
 
-For organizations offering hosted access to the Software.
+## Maintainer Publication Check
 
-### Hardware License
-
-For manufacturers bundling the Software with physical products.
-
-### Enterprise License
-
-For organizations requiring commercial deployment rights, support agreements, or custom terms.
-
-### OEM License
-
-For organizations integrating the Software into broader commercial solutions.
-
----
-
-## Commercial Benefits
-
-Commercial licensees may receive:
-
-* Commercial distribution rights
-* Branding permissions
-* Enterprise support agreements
-* Priority bug fixes
-* Long-term support releases
-* Additional deployment rights
-
-Availability and terms may vary.
-
----
-
-## Requesting a Commercial License
-
-To discuss commercial licensing opportunities, contact:
-
-[licensing@autarklabs.com](mailto:licensing@autarklabs.com)
-
-Please include:
-
-* Organization name
-* Intended use case
-* Estimated deployment scale
-* Whether hardware distribution is involved
-* Whether hosted services are involved
-
----
-
-## Mission
-
-Autark Labs exists to help people own, understand, and control the technology they rely on.
-
-Commercial licensing allows us to sustain development while preserving broad access for individual users and non-commercial communities.
-
-**Autark Labs**
-*Technology You Own.*
+These revised terms need qualified software-licensing counsel review before
+publication. Confirm contributor authority, dependency compatibility and the
+boundary between independent services and product resale. Repository checks
+verify wording and packaging consistency, not legal enforceability. Do not
+describe this revision as legally reviewed until that review is complete.
