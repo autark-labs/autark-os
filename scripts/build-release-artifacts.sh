@@ -236,7 +236,7 @@ Section: admin
 Priority: optional
 Architecture: ${ARCHITECTURE}
 Maintainer: Autark Labs <licensing@autarklabs.com>
-Depends: bash, sudo, systemd, curl, ca-certificates
+Depends: bash, sudo, systemd, curl, ca-certificates, python3
 Installed-Size: ${size_kb}
 Homepage: https://github.com/autark-labs/autark-os
 License: Autark Community License (ACL) v2.0 (source-available)

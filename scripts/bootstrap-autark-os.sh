@@ -610,6 +610,8 @@ plan_dependencies() {
   printf ','
   json_dependency "sudo" "${sudo_status}" true "Required to install Autark-OS as a system service."
   printf ','
+  json_dependency "Python 3" "$(dependency_status 'python3 --version')" true "Required for safe installation and removal path checks."
+  printf ','
   json_dependency "Docker" "${docker_status}" true "Required for Discover app installs."
   printf ','
   json_dependency "Docker Compose" "${compose_status}" true "Required to run managed app stacks."
@@ -1338,6 +1340,7 @@ print_install_plan() {
 print_dependency_plan() {
   log "Host: $(os_field PRETTY_NAME || true) ($(host_architecture))"
   log "Package manager: $(apt_support_label)"
+  log "Python 3: $(dependency_state python3 'python3 --version')"
   if bundled_java_available; then
     log "Java: bundled with this Autark-OS release"
   else
@@ -1501,7 +1504,7 @@ install_dependencies_apt() {
   log "Installing missing supported host dependencies with apt."
   local packages=()
   local package
-  for package in ca-certificates curl gnupg git; do
+  for package in ca-certificates curl gnupg git python3; do
     apt_package_installed "${package}" || packages+=("${package}")
   done
   if [[ ! -x "${RELEASE_BUNDLE_DIR:+${RELEASE_BUNDLE_DIR}/runtime/bin/java}" ]]; then
@@ -1546,6 +1549,9 @@ preflight() {
   fi
   if [[ "${AUTO_INSTALL_DEPS}" -eq 1 ]]; then
     install_dependencies_apt
+  fi
+  if ! has_command python3 && [[ "${DRY_RUN}" -eq 0 || "${AUTO_INSTALL_DEPS}" -eq 0 ]]; then
+    die "Python 3 is required for safe installation and removal. Install python3 or retry with --auto-install-deps."
   fi
   local bundled_java="${RELEASE_BUNDLE_DIR:+${RELEASE_BUNDLE_DIR}/runtime/bin/java}"
   if [[ -x "${bundled_java:-}" ]]; then

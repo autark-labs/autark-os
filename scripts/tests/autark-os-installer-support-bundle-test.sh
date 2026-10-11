@@ -75,6 +75,22 @@ Owner: person@example.com
 Home: /home/jackson/autark-os
 deviceName=raspberrypi
 LOG
+cat >>"${log_dir}/installer.log" <<'LOG'
+Authorization: Basic c3ludGhldGljOnNlY3JldA==
+authorization: bearer lowercase-bearer-secret
+PASSWORD="two secret words"
+PASSWORD='single quoted secret'
+PASSWORD="escaped \"quoted\" secret"
+{"accessToken":"json-access-secret","refresh_token":"json-refresh-secret","password":"json \"escaped\" secret","authorization":"Basic json-basic-secret","hostname":"json-private-host","status":"failed","attempts":3}
+Credential URL: https://synthetic-user:synthetic-password@example.invalid/path
+Private IPv6: http://[fd12::1]/private-ipv6-path
+Link-local IPv6: https://[fe80::1234%eth0]:443/link-local-path
+Loopback IPv6: http://[::1]:8082/loopback-path
+Oct 10 12:00:00 journal-private-host autark-os[123]: useful journal failure
+2026-10-10T12:00:00+00:00 iso-private-host autark-os[456]: useful ISO journal failure
+Public documentation: https://example.invalid/docs
+Ordinary context: status=failed attempts=3 backup completed
+LOG
 
 AUTARK_OS_CONFIG_FILE="${config_file}" \
 AUTARK_OS_BASE_URL="http://127.0.0.1:1" \
@@ -162,6 +178,29 @@ if grep -R -n -E -- 'plain-secret-token|secret-couchdb-password|tskey-secret-val
   exit 1
 fi
 
+python3 - "${bundle_root}/installer-stage.log" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+output = Path(sys.argv[1]).read_text()
+for secret in (
+    "c3ludGhldGljOnNlY3JldA==", "lowercase-bearer-secret", "two secret words",
+    "single quoted secret", "quoted", "json-access-secret", "json-refresh-secret",
+    "escaped", "json-basic-secret", "json-private-host", "synthetic-user",
+    "synthetic-password", "fd12::1", "private-ipv6-path", "fe80::1234",
+    "link-local-path", "::1", "loopback-path", "journal-private-host", "iso-private-host",
+):
+    assert secret not in output, f"Support export leaked synthetic value: {secret}"
+for context in ("useful journal failure", "useful ISO journal failure",
+                "https://example.invalid/docs", "status=failed attempts=3 backup completed"):
+    assert context in output, f"Support export damaged useful context: {context}"
+record = json.loads(next(line for line in output.splitlines() if line.startswith('{"accessToken"')))
+assert record == {"accessToken": "[redacted]", "refresh_token": "[redacted]",
+                  "password": "[redacted]", "authorization": "[redacted]",
+                  "hostname": "[redacted-host]", "status": "failed", "attempts": 3}
+PY
+
 gui_contract="$("${repo_root}/scripts/autark-os-gui-installer.sh" --preview --json --release-bundle "${bundle_dir}" --state-dir "${state_dir}")"
 AUTARK_OS_GUI_CONTRACT="${gui_contract}" python3 - <<'PY'
 import json
@@ -174,4 +213,33 @@ assert sources["save-support-report"].startswith("autark-os support-bundle")
 support_report = contract["screens"]["installProgress"]["supportReport"]
 assert support_report["command"].startswith("autark-os support-bundle")
 assert support_report["schema"] == "installer-support-bundle-v1"
+PY
+
+# Exercise error output through the same packaged command, before JSON encoding.
+cp "${repo_root}/scripts/autark-os" "${bundle_dir}/scripts/autark-os"
+cat >"${bundle_dir}/scripts/bootstrap-autark-os.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'Installer failed: PASSWORD="error quoted secret" Authorization: Basic error-basic-secret' >&2
+exit 1
+SH
+chmod +x "${bundle_dir}/scripts/bootstrap-autark-os.sh"
+AUTARK_OS_CONFIG_FILE="${config_file}" \
+AUTARK_OS_BASE_URL="http://127.0.0.1:1" \
+AUTARK_OS_SERVICE_FILE="${service_file}" \
+AUTARK_OS_CLI_LINK="${cli_link}" \
+  "${bundle_dir}/scripts/autark-os" support-bundle --output "${tmp_dir}/failed-support.tar.gz" >/dev/null
+mkdir "${tmp_dir}/failed-export"
+tar -xzf "${tmp_dir}/failed-support.tar.gz" -C "${tmp_dir}/failed-export"
+python3 - "${tmp_dir}/failed-export" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+for name in ("install-plan.json", "pre-install-doctor.json"):
+    value = json.loads(next(Path(sys.argv[1]).rglob(name)).read_text())
+    assert value["status"] == "unavailable"
+    assert "Installer failed" in value["message"]
+    assert "error quoted secret" not in value["message"]
+    assert "error-basic-secret" not in value["message"]
+    assert "[redacted]" in value["message"]
 PY

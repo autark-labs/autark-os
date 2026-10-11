@@ -68,6 +68,7 @@ The bundle layout is:
   scripts/bootstrap-autark-os.sh
   scripts/supported-host-matrix.env
   scripts/install-autark-os-service.sh
+  scripts/validate-install-layout.py
   scripts/install-autark-os.sh
   scripts/autark-os-gui-installer.sh
   scripts/autark-os
@@ -576,6 +577,7 @@ write_release_json() {
     "tools/cosign-LICENSE",
     "scripts/bootstrap-autark-os.sh",
     "scripts/install-autark-os-service.sh",
+    "scripts/validate-install-layout.py",
     "scripts/install-autark-os.sh",
     "scripts/autark-os-gui-installer.sh",
     "scripts/autark-os",
@@ -799,6 +801,7 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/supported-host-matrix.env" "${OUTPUT_DIR}/scripts/supported-host-matrix.env"
   run_cmd cp "${SCRIPT_DIR}/install-autark-os-service.sh" "${OUTPUT_DIR}/scripts/install-autark-os-service.sh"
+  run_cmd cp "${SCRIPT_DIR}/validate-install-layout.py" "${OUTPUT_DIR}/scripts/validate-install-layout.py"
   run_cmd cp "${SCRIPT_DIR}/install-autark-os.sh" "${OUTPUT_DIR}/scripts/install-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"

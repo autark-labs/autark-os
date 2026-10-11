@@ -43,10 +43,23 @@ or create an update job. Use **My Apps** to operate, back up, recover, or
 uninstall a supported managed app. Use `autark-os update` only to update
 Autark-OS itself.
 
-The normal uninstall preserves managed app data, backups, and the local
-database; permanent data deletion needs the explicit command shown by the
-uninstall plan. Password recovery signs out existing sessions but does not
-remove apps, backups, or data.
+Run `autark-os uninstall` in a terminal to review removal. Keeping app data,
+local backups, and the database is the default. You can choose to purge the
+runtime folder instead; this also deletes local recovery checkpoints, identity,
+config, and logs. The command requires you to type `DELETE-AUTARK-OS-DATA`
+before applying that choice. External Docker volumes and backup drives remain.
+Unfinished or failed app-removal jobs block the final purge.
+
+For automation, review `autark-os uninstall --plan --remove-data`, then apply
+with `--yes --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA`.
+The guided flow offers a redacted support report. Automated removal only creates
+one when you supply `--support-report /absolute/path/report.tar.gz`; that file
+must be outside every removed directory. A failed export stops removal.
+
+Unsafe overlapping directories or mounted filesystems inside removal paths
+block uninstall before deletion. Back up and manually correct the layout or
+unmount the affected drive before retrying. Password recovery signs out existing
+sessions but does not remove apps, backups, or data.
 
 ## Private Access And Backups
 

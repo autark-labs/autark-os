@@ -48,6 +48,7 @@ printf 'new backend jar\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new autark-os helper\n' >"${bundle_dir}/scripts/autark-os"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
+cp "${repo_root}/scripts/validate-install-layout.py" "${bundle_dir}/scripts/validate-install-layout.py"
 cp "$(command -v java)" "${bundle_dir}/runtime/bin/java"
 architecture="$(dpkg --print-architecture 2>/dev/null || uname -m)"
 [[ "${architecture}" != "x86_64" ]] || architecture=amd64
@@ -65,7 +66,7 @@ cat >"${bundle_dir}/autark-os-release.json" <<JSON
   "bundleUrl": "file://${bundle_dir}"
 }
 JSON
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/validate-install-layout.py autark-os-release.json > SHA256SUMS)
 
 check_json="$(AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update --check --metadata-url "file://${bundle_dir}/autark-os-release.json" --json)"
 AUTARK_OS_UPDATE_JSON="${check_json}" BUNDLE_DIR="${bundle_dir}" python3 - <<'PY'

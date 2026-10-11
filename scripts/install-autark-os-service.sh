@@ -580,6 +580,7 @@ ensure_directories() {
 
 install_setup_script() {
   run install -o root -g root -m 0750 "${SCRIPT_PATH}" "${INSTALLED_SETUP_SCRIPT}"
+  run install -o root -g root -m 0644 "${SCRIPT_DIR}/validate-install-layout.py" "${INSTALL_DIR}/bin/validate-install-layout.py"
   log "Installed setup script to ${INSTALLED_SETUP_SCRIPT}."
 }
 
@@ -832,6 +833,8 @@ main() {
     exit 0
   fi
 
+  python3 "${SCRIPT_DIR}/validate-install-layout.py" "${INSTALL_DIR}" "${RUNTIME_DIR}" "${CONFIG_DIR}" "${LOG_DIR}" \
+    --service-file "${SERVICE_FILE}" --cli-link "${CLI_LINK}" --remove "${INSTALL_DIR}/runtime"
   log "Installing Autark-OS root appliance runtime."
   preflight_host
   preflight_install_collision

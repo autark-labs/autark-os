@@ -177,7 +177,7 @@ api_get() {
       fi
       ;;
   esac
-  curl -fsS "${headers[@]}" "${base_url}${path}" || exit_code=$?
+  curl -fsS --max-time "${2:-0}" "${headers[@]}" "${base_url}${path}" || exit_code=$?
   [[ -z "${header_file}" ]] || rm -f "${header_file}"
   return "${exit_code}"
 }
@@ -301,7 +301,8 @@ ensure_admin_session() {
 
 api_post() {
   local path="$1"
-  local body="${2:-{}}"
+  local body="${2:-}"
+  [[ -n "${body}" ]] || body='{}'
   local base_url
   ensure_admin_session
   base_url="$(resolve_base_url)"
@@ -311,7 +312,7 @@ api_post() {
     header_file="$(admin_header_file)"
     headers+=(-H "@${header_file}")
   fi
-  printf '%s' "${body}" | curl -fsS -X POST "${headers[@]}" --data-binary @- "${base_url}${path}" || exit_code=$?
+  printf '%s' "${body}" | curl -fsS --max-time "${3:-0}" -X POST "${headers[@]}" --data-binary @- "${base_url}${path}" || exit_code=$?
   [[ -z "${header_file}" ]] || rm -f "${header_file}"
   return "${exit_code}"
 }
@@ -329,22 +330,6 @@ api_put() {
     headers+=(-H "@${header_file}")
   fi
   printf '%s' "${body}" | curl -fsS -X PUT "${headers[@]}" --data-binary @- "${base_url}${path}" || exit_code=$?
-  [[ -z "${header_file}" ]] || rm -f "${header_file}"
-  return "${exit_code}"
-}
-
-api_delete() {
-  local path="$1"
-  local base_url
-  ensure_admin_session
-  base_url="$(resolve_base_url)"
-  local headers=()
-  local header_file="" exit_code=0
-  if [[ -n "${ADMIN_TOKEN}" ]]; then
-    header_file="$(admin_header_file)"
-    headers+=(-H "@${header_file}")
-  fi
-  curl -fsS -X DELETE "${headers[@]}" "${base_url}${path}" || exit_code=$?
   [[ -z "${header_file}" ]] || rm -f "${header_file}"
   return "${exit_code}"
 }
@@ -1078,7 +1063,7 @@ verify_release_bundle() {
     autark-os-release.json SHA256SUMS \
     backend/autark-os-backend.jar runtime/bin/java \
     scripts/autark-os \
-    scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh; do
+    scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/validate-install-layout.py; do
     [[ -r "${bundle_dir}/${required_file}" ]] || die "Release bundle is incomplete: ${bundle_dir}/${required_file}"
   done
   has_command sha256sum || die "sha256sum is required to verify release bundle checksums."
@@ -1638,7 +1623,7 @@ install_release_bundle_files_only() {
   rm -rf "${UPDATE_INSTALL_DIR}/runtime"
   cp -a "${bundle_dir}/runtime" "${UPDATE_INSTALL_DIR}/runtime" || return 1
   local script_name
-  for script_name in autark-os bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
+  for script_name in autark-os bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env validate-install-layout.py; do
     [[ -f "${bundle_dir}/scripts/${script_name}" ]] || continue
     cp "${bundle_dir}/scripts/${script_name}" "${UPDATE_INSTALL_DIR}/bin/${script_name}" || return 1
     if [[ "${script_name}" == "supported-host-matrix.env" ]]; then
@@ -2048,18 +2033,25 @@ UPDATE_USAGE
 
 redact_stream() {
   sed -E \
+    -e 's/([A-Za-z0-9_]*(token|password|secret|session|cookie|setup_code|setupCode|auth_key|api_key|credential|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*")(\\.|[^"\\])*(")/\1[redacted]\4/Ig' \
+    -e 's/([A-Za-z0-9_]*(token|password|secret|session|cookie|setup_code|setupCode|auth_key|api_key|credential|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*\x27)[^\x27]*(\x27)/\1[redacted]\3/Ig' \
     -e 's/([A-Za-z0-9_]*(TOKEN|Token|token|PASSWORD|Password|password|SECRET|Secret|secret|SESSION|Session|session|COOKIE|Cookie|cookie|SETUP_CODE|setupCode|setup_code|AUTH_KEY|auth_key|API_KEY|api_key|CREDENTIAL|credential|PRIVATE_KEY|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*)[^[:space:]",}]+/\1[redacted]/g' \
-    -e 's/(Cookie:[[:space:]]*).*/\1[redacted]/g' \
-    -e 's/(Authorization:[[:space:]]*Bearer[[:space:]]+)[^[:space:]]+/\1[redacted]/g' \
-    -e 's/(Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1[redacted]/g' \
-    -e 's/("([^"]*(token|password|secret|session|cookie|setupCode|setup_code|authKey|auth_key|apiKey|api_key|credential|privateKey|private_key)[^"]*)"[[:space:]]*:[[:space:]]*")[^"]*(")/\1[redacted]\4/g' \
+    -e 's/(Cookie:[[:space:]]*).*/\1[redacted]/Ig' \
+    -e 's/(Authorization:[[:space:]]*(Bearer|Basic)[[:space:]]+)[^[:space:]",}]+/\1[redacted]/Ig' \
+    -e 's/(Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1[redacted]/Ig' \
+    -e 's/("([^"]*(token|password|secret|session|cookie|setupCode|setup_code|authKey|auth_key|apiKey|api_key|credential|privateKey|private_key|authorization)[^"]*)"[[:space:]]*:[[:space:]]*")(\\.|[^"\\])*(")/\1[redacted]\5/Ig' \
+    -e 's#https?://[^/[:space:]"<>]+@[^[:space:]"<>]+#[redacted-credential-url]#Ig' \
     -e 's/[A-Za-z0-9.-]+\.ts\.net\.?/[redacted-tailnet-host]/g' \
     -e 's/100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}/[redacted-tailnet-ip]/g' \
     -e 's#https?://(localhost|127\.[0-9.]+|10\.[0-9.]+|192\.168\.[0-9.]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9.]+|[A-Za-z0-9-]+\.local)(:[0-9]+)?(/[^[:space:]"]*)?#[redacted-private-url]#g' \
+    -e 's#https?://\[((f[cd]|fe[89ab])[0-9a-z:.%_-]*|::1)\](:[0-9]+)?(/[^[:space:]"<>]*)?#[redacted-private-url]#Ig' \
     -e 's#(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})#[redacted-lan-ip]#g' \
     -e 's#/(home|Users)/[^/[:space:]"]+#[redacted-home-path]#g' \
     -e 's/[A-Za-z0-9.!#$%&*+?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
-    -e 's/((host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)[[:space:]]*[=:][[:space:]]*)[^[:space:],;"]+/\1[redacted-host]/Ig'
+    -e 's/((host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)[[:space:]]*[=:][[:space:]]*)[^[:space:],;"]+/\1[redacted-host]/Ig' \
+    -e 's/("(host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)"[[:space:]]*:[[:space:]]*")(\\.|[^"\\])*(")/\1[redacted-host]\5/Ig' \
+    -e 's/^([[:space:]]*[A-Z][a-z]{2}[[:space:]]+[0-9]{1,2}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}[[:space:]]+)[^[:space:]]+/\1[redacted-host]/' \
+    -e 's/^([[:space:]]*[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+-]+Z?[[:space:]]+)[^[:space:]]+/\1[redacted-host]/'
 }
 
 redact_file_to() {
@@ -2076,6 +2068,8 @@ write_json_unavailable() {
   local target="$1"
   local source="$2"
   local message="$3"
+  source="$(printf '%s' "${source}" | redact_stream)"
+  message="$(printf '%s' "${message}" | redact_stream)"
   printf '{"schemaVersion":1,"status":"unavailable","source":' >"${target}"
   json_string "${source}" >>"${target}"
   printf ',"message":' >>"${target}"
@@ -2402,102 +2396,141 @@ SUPPORT_USAGE
   log "Support bundle written: ${archive_output}"
 }
 
+uninstall_response() {
+  # These responses authorize deletion. Parse the top-level contract, never grep
+  # nested job steps or accept an unavailable inventory as an empty installation.
+  python3 -c '
+import json, re, sys
+try:
+    data = json.load(sys.stdin)
+    kind, app_id, job_id = sys.argv[1:]
+    def identifier(value):
+        return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value)
+    if kind == "apps":
+        assert isinstance(data, list)
+        ids = [app["appId"] for app in data]
+        assert all(identifier(value) for value in ids) and len(ids) == len(set(ids))
+        print("\n".join(ids), end="")
+    elif kind == "idle":
+        assert isinstance(data, list)
+        assert all(job["status"] in ("succeeded", "failed", "cancelled", "canceled") for job in data)
+    elif kind == "plan":
+        assert data["appId"] == app_id
+        assert isinstance(data["needsConfirmation"], list)
+        assert isinstance(data["willKeep"], list) and isinstance(data["willStop"], list)
+        print(data["headline"])
+    else:
+        assert identifier(data["jobId"])
+        assert not job_id or data["jobId"] == job_id
+        assert data["type"] == "uninstall_app" and data["subjectId"] == app_id
+        assert data["status"] in ("queued", "running", "succeeded", "failed", "cancelled", "canceled")
+        print(data["jobId"], data["status"])
+except (ValueError, KeyError, TypeError, AssertionError):
+    sys.exit("Could not verify the uninstall response. Data deletion is blocked; review Activity and retry.")
+' "$1" "${2:-}" "${3:-}"
+}
+
 remove_managed_apps_before_data_deletion() {
-  local apps_file
-  apps_file="$(mktemp)"
-  if ! api_get /api/apps >"${apps_file}" 2>/dev/null; then
-    rm -f "${apps_file}"
-    die "Autark-OS could not safely remove managed containers before deleting data. Start or repair the service, remove each app from My Apps, and retry."
-  fi
+  local inventory app_id response job_id status expected_job deadline
+  local timeout="${AUTARK_OS_UNINSTALL_JOB_TIMEOUT:-600}"
+  [[ "${timeout}" =~ ^[1-9][0-9]*$ ]] || die "Uninstall job timeout must be a positive number of seconds."
+  api_get /api/jobs 30 | uninstall_response idle || die "Wait for active operations to finish before uninstalling. Runtime data is retained."
+  inventory="$(api_get /api/apps 30 | uninstall_response apps)" || die "Could not verify managed apps. Data deletion is blocked."
   local app_ids=()
-  mapfile -t app_ids < <(grep -oE '"appId"[[:space:]]*:[[:space:]]*"[^"]+"' "${apps_file}" | sed -E 's/^[^:]+:[[:space:]]*"([^"]+)"$/\1/' | sort -u)
-  rm -f "${apps_file}"
-  local app_id
+  [[ -z "${inventory}" ]] || mapfile -t app_ids <<<"${inventory}"
   for app_id in "${app_ids[@]}"; do
-    [[ "${app_id}" =~ ^[A-Za-z0-9._-]+$ ]] || die "Refusing an unsafe managed app identifier during uninstall: ${app_id}"
-    log "Removing managed app containers and private link for ${app_id}; app data remains until the final confirmed deletion step."
-    api_delete "/api/apps/${app_id}" >/dev/null || die "Could not safely remove ${app_id}. Review My Apps and retry the uninstall."
+    response="$(api_get "/api/apps/${app_id}/uninstall-plan" 30 | uninstall_response plan "${app_id}")" || die "Could not review removal of ${app_id}. Data deletion is blocked."
+    log "${app_id}: ${response}"
+    log "Removing managed containers and private links; waiting for the verified safety checkpoint and removal job."
+    response="$(api_post "/api/apps/${app_id}/uninstall" '{}' 30 | uninstall_response job "${app_id}")" || die "Could not start removal of ${app_id}. Data deletion is blocked."
+    read -r job_id status <<<"${response}"
+    expected_job="${job_id}"
+    deadline=$((SECONDS + timeout))
+    while [[ "${status}" != "succeeded" ]]; do
+      [[ "${status}" == queued || "${status}" == running ]] || die "Removal of ${app_id} ${status}. Runtime data is retained; review Activity."
+      (( SECONDS < deadline )) || die "Removal of ${app_id} is still unfinished. Runtime data is retained; review Activity before retrying."
+      sleep 2
+      response="$(api_get "/api/jobs/${expected_job}" 30 | uninstall_response job "${app_id}" "${expected_job}")" || die "Could not verify removal of ${app_id}. Runtime data is retained."
+      read -r job_id status <<<"${response}"
+    done
+    log "Removed managed app: ${app_id}"
   done
+  inventory="$(api_get /api/apps 30 | uninstall_response apps)" || die "Could not verify the final managed inventory. Runtime data is retained."
+  [[ -z "${inventory}" ]] || die "Managed apps remain or were added during removal. Runtime data is retained; review My Apps and retry."
+  api_get /api/jobs 30 | uninstall_response idle || die "Another operation is unfinished. Runtime data is retained; review Activity."
 }
 
 uninstall_command() {
-  local plan_only=0
-  local json_output=0
-  local dry_run=0
-  local yes=0
-  local remove_config=0
-  local remove_logs=0
-  local remove_data=0
-  local typed_confirmation=""
-
+  local original_args=("$@")
+  local plan_only=0 json_output=0 dry_run=0 yes=0 remove_config=0 remove_logs=0 remove_data=0
+  local typed_confirmation="" support_report="" offer_report=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --plan)
-        plan_only=1
-        ;;
-      --json)
-        json_output=1
-        ;;
-      --dry-run)
-        dry_run=1
-        ;;
-      --yes)
-        yes=1
-        ;;
-      --remove-config)
-        remove_config=1
-        ;;
-      --remove-logs)
-        remove_logs=1
-        ;;
-      --remove-data)
-        remove_data=1
-        remove_config=1
-        remove_logs=1
-        ;;
-      --confirm-delete-data)
+      --plan) plan_only=1 ;;
+      --json) json_output=1 ;;
+      --dry-run) dry_run=1 ;;
+      --yes) yes=1 ;;
+      --remove-config) remove_config=1 ;;
+      --remove-logs) remove_logs=1 ;;
+      --remove-data) remove_data=1; remove_config=1; remove_logs=1 ;;
+      --support-report|--confirm-delete-data)
+        local option="$1"
         shift
-        [[ $# -gt 0 ]] || die "--confirm-delete-data requires DELETE-AUTARK-OS-DATA."
-        typed_confirmation="$1"
+        [[ $# -gt 0 && -n "$1" ]] || die "${option} requires a value."
+        if [[ "${option}" == --support-report ]]; then support_report="$1"; else typed_confirmation="$1"; fi
         ;;
-      --confirm-delete-data=*)
-        typed_confirmation="${1#*=}"
-        ;;
+      --confirm-delete-data=*) typed_confirmation="${1#*=}" ;;
       -h|--help)
-        cat <<UNINSTALL_USAGE
+        cat <<'UNINSTALL_USAGE'
 Usage: autark-os uninstall [options]
 
-Safely remove Autark-OS service and binaries. Runtime data is preserved by
-default.
+Remove the appliance. Preserve app data by default, or choose permanent deletion
+in the guided terminal flow. External Docker volumes and backup drives remain.
 
-Options:
-  --plan                 Print what would be removed and preserved.
+  --plan                 Review removal and preservation paths without changes.
   --json                 With --plan, print machine-readable JSON.
-  --dry-run              Print removal actions without changing the host.
-  --yes                  Run non-interactively.
+  --dry-run              Review removal actions without changes.
+  --yes                  Run the selected plan non-interactively.
   --remove-config        Also remove Autark-OS config.
   --remove-logs          Also remove Autark-OS logs.
-  --remove-data          Also remove runtime data, apps, backups, and database.
+  --remove-data          Purge managed apps and the entire runtime folder,
+                         including app data, local backups, database, and identity.
+                         Also removes config and logs. This cannot be undone.
   --confirm-delete-data DELETE-AUTARK-OS-DATA
-                         Required with --remove-data.
-  -h, --help             Show this help.
+                         Required to apply --remove-data; not needed to review.
+  --support-report FILE  Save a redacted support bundle outside removed paths.
+                         Without this flag, --yes does not generate a report.
 UNINSTALL_USAGE
-        return 0
-        ;;
-      *)
-        log "Unknown uninstall option: $1"
-        return 1
-        ;;
+        return 0 ;;
+      *) die "Unknown uninstall option: $1" ;;
     esac
     shift
   done
 
-  if [[ "${remove_data}" -eq 1 && "${typed_confirmation}" != "DELETE-AUTARK-OS-DATA" ]]; then
-    log "Destructive uninstall requires: --confirm-delete-data DELETE-AUTARK-OS-DATA"
-    return 1
+  # Config and SQLite settings are private to root. Elevate before resolving the
+  # plan so an unprivileged caller cannot accidentally plan against defaults.
+  if [[ "$(id -u)" -ne 0 ]]; then
+    has_command sudo || die "Administrator access is required to review and uninstall Autark-OS."
+    [[ -z "${ADMIN_TOKEN}" ]] || save_cached_admin_token
+    sudo env AUTARK_OS_CONFIG_FILE="${CONFIG_FILE}" AUTARK_OS_PUBLIC_INSTALL_METADATA="${PUBLIC_INSTALL_METADATA}" \
+      AUTARK_OS_SERVICE_NAME="${SERVICE_NAME}" AUTARK_OS_SERVICE_FILE="${SERVICE_FILE}" AUTARK_OS_CLI_LINK="${CLI_LINK}" \
+      AUTARK_OS_BASE_URL="${BASE_URL_OVERRIDE}" AUTARK_OS_ADMIN_TOKEN_FILE="$(admin_token_cache_file)" \
+      "${SCRIPT_PATH}" uninstall "${original_args[@]}"
+    return
   fi
 
-  local install_dir runtime_dir config_dir log_dir mode
+  if [[ "${yes}" -eq 0 && "${plan_only}" -eq 0 && "${dry_run}" -eq 0 ]]; then
+    [[ -t 0 ]] || die "Use an interactive terminal to review removal, or --plan followed by --yes."
+    if [[ "${remove_data}" -eq 0 ]]; then
+      log "App data: keep it for reinstall or recovery (default), or permanently delete it."
+      if confirm_default_no "Purge all app data in the Autark-OS runtime folder, including local backups? External volumes and backup drives will remain."; then
+        remove_data=1; remove_config=1; remove_logs=1
+      fi
+    fi
+  fi
+  [[ "${yes}" -ne 0 || ! -t 0 || -n "${support_report}" ]] || offer_report=true
+
+  local install_dir runtime_dir config_dir log_dir mode path
   install_dir="$(configured_value AUTARK_OS_INSTALL_DIR)"
   runtime_dir="$(configured_value AUTARK_OS_RUNTIME_ROOT)"
   config_dir="$(configured_value AUTARK_OS_CONFIG_DIR)"
@@ -2506,159 +2539,115 @@ UNINSTALL_USAGE
   [[ -n "${runtime_dir}" ]] || runtime_dir="$(public_install_value AUTARK_OS_RUNTIME_ROOT)"
   [[ -n "${config_dir}" ]] || config_dir="$(public_install_value AUTARK_OS_CONFIG_DIR)"
   [[ -n "${log_dir}" ]] || log_dir="$(public_install_value AUTARK_OS_LOG_DIR)"
-  [[ -n "${install_dir}" ]] || install_dir="/opt/autark-os"
-  [[ -n "${runtime_dir}" ]] || runtime_dir="/var/lib/autark-os"
-  [[ -n "${config_dir}" ]] || config_dir="$(dirname "${CONFIG_FILE}")"
-  [[ -n "${log_dir}" ]] || log_dir="/var/log/autark-os"
+  install_dir="${install_dir:-/opt/autark-os}"
+  runtime_dir="${runtime_dir:-/var/lib/autark-os}"
+  config_dir="${config_dir:-$(dirname "${CONFIG_FILE}")}"
+  log_dir="${log_dir:-/var/log/autark-os}"
+  local layout_args=("${install_dir}" "${runtime_dir}" "${config_dir}" "${log_dir}" --service-file "${SERVICE_FILE}" --cli-link "${CLI_LINK}")
+  python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" || return 1
 
-  mode="preserve-runtime-data"
-  [[ "${remove_config}" -eq 1 || "${remove_logs}" -eq 1 ]] && mode="remove-config-and-logs"
-  [[ "${remove_data}" -eq 1 ]] && mode="remove-all-data"
-
-  local remove_paths=("${SERVICE_FILE}" "${CLI_LINK}" "${install_dir}")
-  local preserve_paths=()
-  if [[ "${remove_config}" -eq 1 ]]; then
-    remove_paths+=("${config_dir}")
-  else
-    preserve_paths+=("${config_dir}")
+  mode=preserve-runtime-data
+  [[ "${remove_config}" -eq 0 && "${remove_logs}" -eq 0 ]] || mode=remove-config-and-logs
+  [[ "${remove_data}" -eq 0 ]] || mode=remove-all-data
+  local remove_paths=("${SERVICE_FILE}" "${CLI_LINK}" "${install_dir}") preserve_paths=() report_args=()
+  if [[ "${remove_config}" -eq 1 ]]; then remove_paths+=("${config_dir}"); else preserve_paths+=("${config_dir}"); fi
+  if [[ "${remove_logs}" -eq 1 ]]; then remove_paths+=("${log_dir}"); else preserve_paths+=("${log_dir}"); fi
+  if [[ "${remove_data}" -eq 1 ]]; then remove_paths+=("${runtime_dir}"); else preserve_paths+=("${runtime_dir}"); fi
+  for path in "${remove_paths[@]}"; do report_args+=(--remove "${path}"); done
+  python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" "${report_args[@]}" || return 1
+  if [[ -n "${support_report}" ]]; then
+    python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" --report "${support_report}" "${report_args[@]}" || return 1
   fi
-  if [[ "${remove_logs}" -eq 1 ]]; then
-    remove_paths+=("${log_dir}")
-  else
-    preserve_paths+=("${log_dir}")
-  fi
-  if [[ "${remove_data}" -eq 1 ]]; then
-    remove_paths+=("${runtime_dir}")
-  else
-    preserve_paths+=("${runtime_dir}")
-  fi
-
-  local app_count=0
-  if [[ -d "${runtime_dir}/apps" ]]; then
-    app_count="$(find "${runtime_dir}/apps" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-  fi
-
+  local docker_warning="Managed app containers and Docker volumes are preserved with app data."
+  [[ "${remove_data}" -eq 0 ]] || docker_warning="Managed app removal jobs must succeed before deletion. External Docker volumes and backup drives are preserved; local safety checkpoints inside the runtime folder will be deleted."
   if [[ "${plan_only}" -eq 1 && "${json_output}" -eq 1 ]]; then
-    printf '{'
-    printf '"schemaVersion":1'
-    printf ',"mode":'
-    json_string "${mode}"
-    printf ',"serviceName":'
-    json_string "${SERVICE_NAME}.service"
-    printf ',"requiresTypedConfirmation":%s' "$([[ "${remove_data}" -eq 1 ]] && printf true || printf false)"
-    printf ',"typedConfirmation":'
-    json_string "${typed_confirmation}"
-    printf ',"removePaths":'
-    json_string_array "${remove_paths[@]}"
-    printf ',"preservePaths":'
-    json_string_array "${preserve_paths[@]}"
-    printf ',"dockerResources":{"installedAppsDetected":%s,"appCount":%s,"warning":' "$([[ "${app_count}" != "0" ]] && printf true || printf false)" "${app_count}"
-    if [[ "${remove_data}" -eq 1 ]]; then
-      json_string "Managed app containers and private links will be removed before data deletion. Docker volumes outside the Autark-OS runtime folder are preserved for manual review."
-    else
-      json_string "Managed app containers and Docker volumes are preserved with app data."
-    fi
-    printf '}'
-    printf ',"supportReport":{"offeredBeforeRemoval":true,"command":"autark-os doctor --json"}'
-    printf ',"actions":['
-    printf '{"id":"offer-support-report","label":"Offer support report before removal","mutatesHost":false},'
-    printf '{"id":"stop-service","label":"Stop Autark-OS service","mutatesHost":true},'
-    printf '{"id":"remove-binaries","label":"Remove Autark-OS binaries","mutatesHost":true}'
-    if [[ "${remove_config}" -eq 1 ]]; then
-      printf ',{"id":"remove-config","label":"Remove Autark-OS config","mutatesHost":true}'
-    fi
-    if [[ "${remove_logs}" -eq 1 ]]; then
-      printf ',{"id":"remove-logs","label":"Remove Autark-OS logs","mutatesHost":true}'
-    fi
-    if [[ "${remove_data}" -eq 1 ]]; then
-      printf ',{"id":"remove-managed-apps","label":"Remove managed app containers and private links","mutatesHost":true}'
-      printf ',{"id":"remove-runtime-data","label":"Remove runtime data, apps, backups, and database","mutatesHost":true}'
-    fi
-    printf ']'
-    printf '}\n'
+    printf '{"schemaVersion":1,"mode":'; json_string "${mode}"
+    printf ',"serviceName":'; json_string "${SERVICE_NAME}.service"
+    printf ',"requiresTypedConfirmation":%s,"typedConfirmation":' "$([[ "${remove_data}" -eq 1 ]] && printf true || printf false)"; json_string "${typed_confirmation}"
+    printf ',"removePaths":'; json_string_array "${remove_paths[@]}"
+    printf ',"preservePaths":'; json_string_array "${preserve_paths[@]}"
+    printf ',"dockerResources":{"warning":'; json_string "${docker_warning}"; printf '}'
+    printf ',"supportReport":{"offeredBeforeRemoval":%s,"requested":%s,"output":' "${offer_report}" "$([[ -n "${support_report}" ]] && printf true || printf false)"; json_string "${support_report}"
+    printf ',"command":"autark-os support-bundle --output FILE"},"actions":['
+    if [[ -n "${support_report}" ]]; then printf '{"id":"save-support-report","label":"Save redacted support report","mutatesHost":true},'; fi
+    if [[ "${offer_report}" == true ]]; then printf '{"id":"offer-support-report","label":"Offer redacted support report","mutatesHost":false},'; fi
+    if [[ "${remove_data}" -eq 1 ]]; then printf '{"id":"remove-managed-apps","label":"Complete managed app removal jobs","mutatesHost":true},'; fi
+    printf '{"id":"stop-service","label":"Stop Autark-OS service","mutatesHost":true},{"id":"remove-binaries","label":"Remove Autark-OS binaries","mutatesHost":true}'
+    if [[ "${remove_config}" -eq 1 ]]; then printf ',{"id":"remove-config","label":"Remove config","mutatesHost":true}'; fi
+    if [[ "${remove_logs}" -eq 1 ]]; then printf ',{"id":"remove-logs","label":"Remove logs","mutatesHost":true}'; fi
+    if [[ "${remove_data}" -eq 1 ]]; then printf ',{"id":"remove-runtime-data","label":"Purge runtime data and local backups","mutatesHost":true}'; fi
+    printf ']}\n'
     return 0
   fi
 
-  if [[ "${plan_only}" -eq 1 ]]; then
-    log "Uninstall mode: ${mode}"
-    log "Service to stop: ${SERVICE_NAME}.service"
-    for path in "${remove_paths[@]}"; do
-      log "Would remove: ${path}"
-    done
-    for path in "${preserve_paths[@]}"; do
-      log "Would preserve: ${path}"
-    done
-    log "Support report offered before removal: autark-os doctor --json"
-    if [[ "${app_count}" != "0" && "${remove_data}" -eq 1 ]]; then
-      log "Managed app folders detected: ${app_count}. Managed containers and private links will be removed before data deletion; external Docker volumes are preserved."
-    elif [[ "${app_count}" != "0" ]]; then
-      log "Managed app folders detected: ${app_count}. Their containers and Docker volumes will be preserved."
-    fi
-    return 0
+  log "Uninstall mode: ${mode}"
+  log "Would stop service: ${SERVICE_NAME}.service"
+  for path in "${remove_paths[@]}"; do log "Would remove: ${path}"; done
+  for path in "${preserve_paths[@]}"; do log "Would preserve: ${path}"; done
+  log "${docker_warning}"
+  if [[ -n "${support_report}" ]]; then
+    log "Save redacted support report before removal: ${support_report}"
+  elif [[ "${offer_report}" == true ]]; then
+    log "A redacted support report will be offered before removal."
+  else
+    log "No support report will be generated. Request one with --support-report FILE."
   fi
+  [[ "${plan_only}" -eq 0 && "${dry_run}" -eq 0 ]] || return 0
 
-  if [[ "${dry_run}" -eq 1 ]]; then
-    log "Would stop service: ${SERVICE_NAME}.service"
-    for path in "${remove_paths[@]}"; do
-      log "Would remove: ${path}"
-    done
-    for path in "${preserve_paths[@]}"; do
-      log "Would preserve: ${path}"
-    done
-    log "Would offer support report before removal: autark-os doctor --json"
-    return 0
-  fi
-
-  if [[ "${yes}" -ne 1 ]]; then
-    local confirmed=0
-    if [[ "${remove_data}" -eq 1 ]]; then
-      confirm_default_no "Permanently remove Autark-OS, managed app containers, runtime data, and backups?" && confirmed=1
-    else
-      confirm_default_yes "Remove Autark-OS service and binaries while preserving runtime data?" && confirmed=1
+  if [[ "${remove_data}" -eq 1 && "${typed_confirmation}" != DELETE-AUTARK-OS-DATA ]]; then
+    if [[ "${yes}" -eq 0 ]]; then
+      read -r -p "This permanently deletes the listed data and local backups. Type DELETE-AUTARK-OS-DATA: " typed_confirmation
     fi
-    if [[ "${confirmed}" -ne 1 ]]; then
-      log "Uninstall cancelled."
-      return 1
+    [[ "${typed_confirmation}" == DELETE-AUTARK-OS-DATA ]] || die "Data deletion not confirmed. Nothing removed."
+  fi
+  if [[ "${yes}" -eq 0 ]]; then
+    confirm_default_no "Apply this uninstall plan?" || { log "Uninstall cancelled."; return 1; }
+    if [[ "${offer_report}" == true ]] && confirm_default_no "Save a redacted support report before removal?"; then
+      support_report="$(pwd)/autark-os-uninstall-support-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+      python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" --report "${support_report}" "${report_args[@]}" || return 1
     fi
   fi
 
-  if [[ "$(id -u)" -ne 0 ]]; then
-    has_command sudo || die "Administrator access is required to uninstall Autark-OS."
-    local elevated_args=(uninstall --yes)
-    [[ "${remove_config}" -eq 0 ]] || elevated_args+=(--remove-config)
-    [[ "${remove_logs}" -eq 0 ]] || elevated_args+=(--remove-logs)
-    if [[ "${remove_data}" -eq 1 ]]; then
-      elevated_args+=(--remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA)
-    fi
-    sudo "${SCRIPT_PATH}" "${elevated_args[@]}"
-    return
-  fi
 
-  if [[ "${remove_data}" -eq 1 ]]; then
-    remove_managed_apps_before_data_deletion
+  if [[ -n "${support_report}" ]]; then
+    "${SCRIPT_PATH}" support-bundle --output "${support_report}" || die "Support export failed. Uninstall stopped before removing anything."
+    [[ -s "${support_report}" ]] || die "Support report was not written. Uninstall stopped."
   fi
-
+  if [[ "${remove_data}" -eq 1 ]]; then remove_managed_apps_before_data_deletion; fi
+  # Recheck after potentially long jobs and before the first filesystem mutation.
+  python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" "${report_args[@]}" || return 1
+  local existing_preserved=()
+  for path in "${preserve_paths[@]}"; do [[ ! -e "${path}" ]] || existing_preserved+=("${path}"); done
   log "Stopping ${SERVICE_NAME}.service if present."
-  if has_command systemctl; then
-    systemctl disable --now "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
+  has_command systemctl || die "Cannot verify the service is stopped without systemctl. Files are retained."
+  if [[ -e "${SERVICE_FILE}" ]] || systemctl is-active --quiet "${SERVICE_NAME}.service"; then
+    systemctl disable --now "${SERVICE_NAME}.service" || die "Service could not be stopped. Files and runtime data are retained."
   fi
+  local service_state
+  service_state="$(systemctl show "${SERVICE_NAME}.service" -p ActiveState --value)" || die "Service state is unavailable. Files and runtime data are retained."
+  case "${service_state}" in
+    inactive|failed) ;;
+    *) die "Service stop could not be verified. Files and runtime data are retained." ;;
+  esac
+  # The stopped database closes the gap between the final API read and shutdown:
+  # a concurrently submitted install must not escape the empty-inventory check.
+  [[ "${remove_data}" -eq 0 ]] || layout_args+=(--require-idle-runtime)
+  python3 "${SCRIPT_DIR}/validate-install-layout.py" "${layout_args[@]}" "${report_args[@]}" || return 1
   local method
   method="$(installed_method)"
-  if [[ "${method}" == "package" ]] && has_command dpkg-query && dpkg-query -W -f='${Status}' autark-os 2>/dev/null | grep -q 'install ok installed'; then
-    log "Removing the package-owned Autark-OS release through apt."
+  if [[ "${method}" == package ]] && has_command dpkg-query && dpkg-query -W -f='${Status}' autark-os 2>/dev/null | grep -q 'install ok installed'; then
     DEBIAN_FRONTEND=noninteractive apt-get remove -y autark-os
   fi
   for path in "${remove_paths[@]}"; do
-    [[ -n "${path}" && "${path}" != "/" ]] || die "Refusing to remove unsafe path: ${path}"
     log "Removing ${path}"
-    rm -rf "${path}"
+    rm -rf -- "${path}"
+    [[ ! -e "${path}" && ! -L "${path}" ]] || die "Removal did not complete: ${path}"
   done
-  for path in "${preserve_paths[@]}"; do
+  for path in "${existing_preserved[@]}"; do
+    [[ -e "${path}" ]] || die "Preservation could not be verified: ${path}"
     log "Preserved ${path}"
   done
-  if has_command systemctl; then
-    systemctl daemon-reload
-  fi
+  if has_command systemctl; then systemctl daemon-reload; fi
 }
 
 print_where_line() {

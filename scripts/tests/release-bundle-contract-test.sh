@@ -31,6 +31,7 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/autark-os-provenance.json" ]]
 [[ -f "${bundle_dir}/SHA256SUMS" ]]
 [[ -x "${bundle_dir}/scripts/install-autark-os.sh" ]]
+cmp "${repo_root}/scripts/validate-install-layout.py" "${bundle_dir}/scripts/validate-install-layout.py"
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ ! -e "${bundle_dir}/scripts/autark-os-update-helper" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]

@@ -137,6 +137,7 @@ printf 'new backend\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new runtime\n' >"${bundle_dir}/runtime/bin/java"
 printf 'new cli\n' >"${bundle_dir}/scripts/autark-os"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
+cp "${repo_root}/scripts/validate-install-layout.py" "${bundle_dir}/scripts/validate-install-layout.py"
 cat >"${bundle_dir}/scripts/install-autark-os-service.sh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -171,7 +172,7 @@ cat >"${bundle_dir}/autark-os-release.json" <<JSON
 JSON
 (cd "${bundle_dir}" && sha256sum \
   backend/autark-os-backend.jar runtime/bin/java \
-  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
+  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/validate-install-layout.py \
   autark-os-release.json >SHA256SUMS)
 
 rollback_output="${tmp_dir}/rollback.out"
@@ -385,7 +386,7 @@ printf 'regressed backend\n' >"${health_expected}"
 printf 'regressed backend\n' >"${inventory_regressed_backend}"
 (cd "${bundle_dir}" && sha256sum \
   backend/autark-os-backend.jar runtime/bin/java \
-  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
+  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/validate-install-layout.py \
   autark-os-release.json >SHA256SUMS)
 inventory_failure_output="${tmp_dir}/inventory-failure.out"
 if PATH="${fake_bin}:/usr/bin:/bin" \
