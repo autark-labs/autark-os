@@ -13,7 +13,9 @@ import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
 import { appRoutes, specialRoutes } from './appRouteManifest';
-import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionActive, type AdminSessionEndReason } from './lib/adminSecuritySession';
+import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionActive, notifyAdminSessionExpired, type AdminSessionEndReason } from './lib/adminSecuritySession';
+import { queryClient } from './repositories/queryClient';
+import { dismissActionPopup } from './lib/actionNotifications';
 import { RouteLoadErrorBoundary } from './components/autark-os/RouteLoadErrorBoundary';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
@@ -160,6 +162,9 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
 
   useEffect(() => {
     const handleExpiredSession = (event: Event) => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      dismissActionPopup();
       setAuthenticated(false);
       setSessionEndedReason((event as CustomEvent<AdminSessionEndReason>).detail || 'expired');
     };
@@ -168,10 +173,43 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
   }, []);
 
   useEffect(() => {
-    if (authenticated) {
-      markAdminSessionActive();
+    if (!authenticated || !bootstrap.securityStatus.authRequired || bootstrap.securityStatus.devMode) return;
+    markAdminSessionActive();
+    let mounted = true;
+    let pending = false;
+    let lastRenewal = -Infinity;
+    async function checkSession(renew: boolean) {
+      if (pending || document.visibilityState !== 'visible') return;
+      pending = true;
+      try {
+        const authorized = await (renew ? AdminSecurityAPIClient.renewSession() : AdminSecurityAPIClient.session());
+        if (mounted && !authorized) notifyAdminSessionExpired();
+      } catch {
+        // A connection failure is not proof of expiry. Existing page refresh
+        // feedback owns that condition; the next interaction can retry.
+      } finally {
+        pending = false;
+      }
     }
-  }, [authenticated]);
+    const activity = (event: Event) => {
+      if (!event.isTrusted || document.visibilityState !== 'visible' || pending || performance.now() - lastRenewal < 30_000) return;
+      lastRenewal = performance.now();
+      void checkSession(true);
+    };
+    const revalidate = () => { void checkSession(false); };
+    const activityEvents = ['pointerdown', 'keydown', 'wheel'] as const;
+    activityEvents.forEach((name) => window.addEventListener(name, activity, { capture: true, passive: true }));
+    window.addEventListener('focus', revalidate);
+    window.addEventListener('pageshow', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    return () => {
+      mounted = false;
+      activityEvents.forEach((name) => window.removeEventListener(name, activity, true));
+      window.removeEventListener('focus', revalidate);
+      window.removeEventListener('pageshow', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+    };
+  }, [authenticated, bootstrap.securityStatus.authRequired, bootstrap.securityStatus.devMode]);
 
   if (bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated) {
     return <AdminSecurityGate onAuthenticated={onRebootstrap} sessionEndedReason={sessionEndedReason} status={bootstrap.securityStatus} />;

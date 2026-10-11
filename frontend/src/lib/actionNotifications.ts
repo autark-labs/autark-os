@@ -4,6 +4,7 @@ import type { AutarkOsAction } from '@/types/app';
 import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic';
 import { setAutarkOsJobCache, terminalJob } from '@/repositories/jobRepository';
 import { queryClient } from '@/repositories/queryClient';
+import { adminSessionEnded } from './adminSecuritySession';
 
 export type ActionNotificationResult = {
   persist?: boolean;
@@ -38,6 +39,7 @@ export function showActionErrorNotification(error: unknown, fallbackTitle = 'Act
 }
 
 export function showJobNotification(job: AutarkOsJob) {
+  if (adminSessionEnded()) return actionNotificationFromJob(job);
   setAutarkOsJobCache(queryClient, job);
   return showNotification(actionNotificationFromJob(job), job.jobId, !terminalJob(job));
 }
@@ -56,6 +58,9 @@ export function createNotificationReceipt(notification: ActionNotification, jobI
 }
 
 function showNotification(notification: ActionNotification, jobId?: string, activeJob = false) {
+  // Late completions from the previous session must not expose app details on
+  // the login screen. Session feedback itself explicitly opts out of history.
+  if (adminSessionEnded() && notification.persist !== false) return notification;
   const method = notificationToastMethod(notification.severity);
   toast[method](notification.title, {
     id: resultToastId,

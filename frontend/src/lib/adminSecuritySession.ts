@@ -4,6 +4,16 @@ export type AdminSessionEndReason = 'expired' | 'logout';
 
 type TokenStorage = Pick<Storage, 'removeItem'>;
 let expirationNotified = false;
+const sessionChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('autark-os-admin-session') : null;
+
+if (sessionChannel) {
+  sessionChannel.onmessage = ({ data }: MessageEvent<unknown>) => {
+    if (data === 'logout' || data === 'expired') endSession(data, false);
+  };
+}
+
+export function adminSessionEnded() { return expirationNotified; }
 
 export function clearLegacyAdminToken(storage: TokenStorage | undefined = globalThis.localStorage) {
   try {
@@ -18,14 +28,18 @@ export function markAdminSessionActive() {
 }
 
 export function notifyAdminSessionExpired() {
-  if (expirationNotified) {
-    return;
-  }
-  expirationNotified = true;
-  globalThis.dispatchEvent?.(new CustomEvent<AdminSessionEndReason>(ADMIN_SESSION_EXPIRED_EVENT, { detail: 'expired' }));
+  endSession('expired');
 }
 
 export function notifyAdminLogout() {
+  endSession('logout');
+}
+
+function endSession(reason: AdminSessionEndReason, broadcast = true) {
+  if (expirationNotified && reason !== 'logout') {
+    return;
+  }
   expirationNotified = true;
-  globalThis.dispatchEvent?.(new CustomEvent<AdminSessionEndReason>(ADMIN_SESSION_EXPIRED_EVENT, { detail: 'logout' }));
+  globalThis.dispatchEvent?.(new CustomEvent<AdminSessionEndReason>(ADMIN_SESSION_EXPIRED_EVENT, { detail: reason }));
+  if (broadcast) sessionChannel?.postMessage(reason);
 }

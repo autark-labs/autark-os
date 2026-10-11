@@ -204,6 +204,14 @@ public class AdminSecurityService {
     }
 
     public AdminSecuritySession session(String token) {
+        return session(token, false);
+    }
+
+    public AdminSecuritySession renewSession(String token) {
+        return session(token, true);
+    }
+
+    private AdminSecuritySession session(String token, boolean userActivity) {
         if (devMode) {
             return new AdminSecuritySession(true, "", "Dev mode session is active.", now().plus(absoluteLifetime).toString(), 0);
         }
@@ -216,7 +224,7 @@ public class AdminSecurityService {
             if (existing.expiredAt(current, idleTimeout)) {
                 return null;
             }
-            return existing.usedAt(current);
+            return userActivity ? existing.usedAt(current) : existing;
         });
         if (record == null) {
             return AdminSecuritySession.denied("Administrator session has expired. Log in again.");

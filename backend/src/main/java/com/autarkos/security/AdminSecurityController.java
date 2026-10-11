@@ -47,7 +47,15 @@ public class AdminSecurityController {
 
     @GetMapping("/session")
     public ResponseEntity<AdminSecuritySession> session(HttpServletRequest request) {
-        AdminSecuritySession session = service.session(AdminSessionTokenResolver.resolve(request));
+        return sessionStatusResponse(service.session(AdminSessionTokenResolver.resolve(request)));
+    }
+
+    @PostMapping("/session")
+    public ResponseEntity<AdminSecuritySession> renewSession(HttpServletRequest request) {
+        return sessionStatusResponse(service.renewSession(AdminSessionTokenResolver.resolve(request)));
+    }
+
+    private ResponseEntity<AdminSecuritySession> sessionStatusResponse(AdminSecuritySession session) {
         return session.authorized()
                 ? ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(session.withoutToken())
                 : ResponseEntity.status(HttpStatus.UNAUTHORIZED).header(HttpHeaders.CACHE_CONTROL, "no-store").body(session);

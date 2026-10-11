@@ -74,23 +74,52 @@ class AdminSecurityServiceTests {
     }
 
     @Test
-    void expiresSessionsAtIdleAndAbsoluteLimits() throws Exception {
+    void pollingAndSessionChecksDoNotExtendIdleExpiry() throws Exception {
         MutableClock clock = new MutableClock(Instant.parse("2026-07-16T12:00:00Z"));
         TestService fixture = service(false, clock, Duration.ofMinutes(30), Duration.ofHours(2), 5);
         AdminSecuritySession claimed = fixture.service().claim(new AdminClaimRequest(fixture.setupCode(), "correct horse battery staple"), "client");
 
-        clock.advance(Duration.ofMinutes(29));
-        assertThat(fixture.service().session(claimed.token()).authorized()).isTrue();
-        clock.advance(Duration.ofMinutes(31));
+        for (int minute = 1; minute < 30; minute++) {
+            clock.advance(Duration.ofMinutes(1));
+            assertThat(fixture.service().authenticate(claimed.token())).isTrue();
+            assertThat(fixture.service().session(claimed.token()).expiresAt()).isEqualTo(claimed.expiresAt());
+        }
+        clock.advance(Duration.ofMinutes(1));
+        assertThat(fixture.service().authenticate(claimed.token())).isFalse();
         assertThat(fixture.service().session(claimed.token()).authorized()).isFalse();
+        assertThat(fixture.service().renewSession(claimed.token()).authorized()).isFalse();
+    }
 
+    @Test
+    void intentionalActivityRenewsIdleExpiryButNeverTheAbsoluteLifetime() throws Exception {
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-16T12:00:00Z"));
+        TestService fixture = service(false, clock, Duration.ofMinutes(30), Duration.ofHours(2), 5);
+        fixture.service().claim(new AdminClaimRequest(fixture.setupCode(), "correct horse battery staple"), "client");
         AdminSecuritySession loggedIn = fixture.service().login(new AdminLoginRequest("correct horse battery staple"), "client");
+
+        for (int minute = 20; minute <= 100; minute += 20) {
+            clock.advance(Duration.ofMinutes(20));
+            AdminSecuritySession renewed = fixture.service().renewSession(loggedIn.token());
+            assertThat(renewed.authorized()).isTrue();
+            assertThat(renewed.token()).isEmpty();
+            assertThat(renewed.expiresAt()).isEqualTo(Instant.parse("2026-07-16T12:00:00Z")
+                    .plus(Duration.ofMinutes(Math.min(minute + 30, 120))).toString());
+        }
         clock.advance(Duration.ofMinutes(20));
-        assertThat(fixture.service().session(loggedIn.token()).authorized()).isTrue();
-        clock.advance(Duration.ofMinutes(20));
-        assertThat(fixture.service().session(loggedIn.token()).authorized()).isTrue();
-        clock.advance(Duration.ofMinutes(81));
+        assertThat(fixture.service().renewSession(loggedIn.token()).authorized()).isFalse();
         assertThat(fixture.service().session(loggedIn.token()).authorized()).isFalse();
+    }
+
+    @Test
+    void activityCannotReviveAnIdleExpiredSession() throws Exception {
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-16T12:00:00Z"));
+        TestService fixture = service(false, clock, Duration.ofMinutes(30), Duration.ofHours(2), 5);
+        AdminSecuritySession claimed = fixture.service().claim(new AdminClaimRequest(fixture.setupCode(), "correct horse battery staple"), "client");
+
+        clock.advance(Duration.ofMinutes(30));
+
+        assertThat(fixture.service().renewSession(claimed.token()).authorized()).isFalse();
+        assertThat(fixture.service().authenticate(claimed.token())).isFalse();
     }
 
     @Test
@@ -116,6 +145,7 @@ class AdminSecurityServiceTests {
 
         assertThat(result.ok()).isTrue();
         assertThat(fixture.service().authenticate(original.token())).isFalse();
+        assertThat(fixture.service().renewSession(original.token()).authorized()).isFalse();
         assertThat(fixture.service().status().claimed()).isTrue();
         assertThat(fixture.service().login(new AdminLoginRequest("correct horse battery staple"), "client").authorized()).isFalse();
         assertThat(fixture.service().login(new AdminLoginRequest("a different secure password"), "client").authorized()).isTrue();
@@ -131,6 +161,7 @@ class AdminSecurityServiceTests {
         fixture.service().logout(first.token());
 
         assertThat(fixture.service().session(first.token()).authorized()).isFalse();
+        assertThat(fixture.service().renewSession(first.token()).authorized()).isFalse();
         assertThat(fixture.service().session(second.token()).authorized()).isTrue();
     }
 

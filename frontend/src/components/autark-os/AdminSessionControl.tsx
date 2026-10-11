@@ -23,12 +23,18 @@ export function AdminSessionControl({ className, compact = false }: AdminSession
   async function logout() {
     setBusy(true);
     try {
-      await AdminSecurityAPIClient.logout();
+      try {
+        await AdminSecurityAPIClient.logout();
+      } catch {
+        // The response may have been lost after the server revoked the cookie.
+        // Only an authoritative denial can reconcile that outcome as signed out.
+        if (await AdminSecurityAPIClient.session()) throw new Error('Session is still active.');
+      }
+      notifyAdminLogout();
       showActionNotification({ ok: true, severity: 'success', title: 'Logged out of Autark-OS', persist: false });
     } catch {
-      showActionNotification({ ok: true, severity: 'info', title: 'Browser session ended', persist: false });
+      showActionNotification({ ok: false, severity: 'error', title: 'Log out was not confirmed', message: 'You may still be signed in. Check the connection and select Log out again.', persist: false });
     } finally {
-      notifyAdminLogout();
       setBusy(false);
     }
   }

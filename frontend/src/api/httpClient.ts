@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { notifyAdminSessionExpired } from '@/lib/adminSecuritySession';
+import { ADMIN_SESSION_EXPIRED_EVENT, adminSessionEnded, notifyAdminSessionExpired } from '@/lib/adminSecuritySession';
 
 export const httpClient = axios.create({
   withCredentials: true,
@@ -8,10 +8,23 @@ export const httpClient = axios.create({
   },
 });
 
+let sessionRequests = new AbortController();
+globalThis.addEventListener?.(ADMIN_SESSION_EXPIRED_EVENT, () => {
+  sessionRequests.abort();
+  sessionRequests = new AbortController();
+});
+httpClient.interceptors.request.use((config) => {
+  if (!isLoginRequest(config.url)) {
+    if (adminSessionEnded()) throw new axios.CanceledError('Administrator session ended.');
+    config.signal ??= sessionRequests.signal;
+  }
+  return config;
+});
+
 httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401 && !isLoginRequest(error.config?.url)) {
+    if (axios.isAxiosError(error) && !error.config?.signal?.aborted && error.response?.status === 401 && !isLoginRequest(error.config?.url)) {
       notifyAdminSessionExpired();
     }
     return Promise.reject(error);
@@ -23,6 +36,8 @@ function isLoginRequest(url: string | undefined) {
     url?.includes('/api/admin/security/status')
     || url?.includes('/api/admin/security/session')
     || url?.includes('/api/admin/security/login')
+    // Logout handles 401 through its own authoritative session reconciliation.
+    || url?.includes('/api/admin/security/logout')
     || url?.includes('/api/admin/security/claim'),
   );
 }

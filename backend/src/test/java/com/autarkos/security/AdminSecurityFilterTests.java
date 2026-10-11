@@ -2,6 +2,8 @@ package com.autarkos.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -39,6 +41,8 @@ class AdminSecurityFilterTests {
         assertRejected(filter, "GET", "/api/system/support/bundle", 401, "admin_auth_required");
         assertRejected(filter, "POST", "/api/discover/apps/vaultwarden/install", 401, "admin_auth_required");
         assertRejected(filter, "GET", "/api/admin/security/session", 401, "admin_auth_required");
+        assertRejected(filter, "POST", "/api/admin/security/session", 401, "admin_auth_required");
+        assertRejected(filter, "POST", "/api/admin/security/logout", 401, "admin_auth_required");
     }
 
     @Test
@@ -63,6 +67,24 @@ class AdminSecurityFilterTests {
         MockHttpServletRequest cookieRequest = new MockHttpServletRequest("GET", "/api/apps");
         cookieRequest.setCookies(new Cookie(AdminSessionTokenResolver.COOKIE_NAME, "valid"));
         assertAllowed(filter, cookieRequest);
+
+        verify(service, never()).renewSession("valid");
+    }
+
+    @Test
+    void sessionActivityRequiresAnExistingSessionAndCannotUseTheLocalRecoverySecret() throws Exception {
+        AdminSecurityService service = mock(AdminSecurityService.class);
+        when(service.authenticate("valid")).thenReturn(true);
+        when(service.authenticateLocalRequest("127.0.0.1", "local-secret")).thenReturn(true);
+        AdminSecurityFilter filter = filter(service);
+        MockHttpServletRequest authenticated = new MockHttpServletRequest("POST", "/api/admin/security/session");
+        authenticated.setCookies(new Cookie(AdminSessionTokenResolver.COOKIE_NAME, "valid"));
+        assertAllowed(filter, authenticated);
+
+        MockHttpServletRequest recoveryOnly = new MockHttpServletRequest("POST", "/api/admin/security/session");
+        recoveryOnly.setRemoteAddr("127.0.0.1");
+        recoveryOnly.addHeader(AdminSecurityFilter.LOCAL_SECRET_HEADER, "local-secret");
+        assertRejected(filter, recoveryOnly, 401, "admin_auth_required");
     }
 
     @Test
