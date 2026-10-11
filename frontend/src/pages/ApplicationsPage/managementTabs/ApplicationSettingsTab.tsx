@@ -1,3 +1,4 @@
+import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { AlertTriangle, CheckCircle2, Container, HelpCircle, KeyRound, Loader2, RotateCcw, Save, ShieldCheck } from 'lucide-react';
@@ -23,14 +24,6 @@ import {
   FieldSet,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
@@ -48,21 +41,19 @@ type ApplicationSettingsTabProps = {
   loadingAction: ApplicationSettingsAction | null;
 };
 
-const backupFrequencies = ['daily', 'weekly', 'monthly'] as const;
-
 export function ApplicationSettingsTab({ actions, item, loadingAction }: ApplicationSettingsTabProps) {
+  const { settings: projectSettings } = useProjectSettings();
   const settingsRestriction = applicationActionRestriction(item, 'settings');
   const editable = item.settings.canEdit && !settingsRestriction.disabled;
-  const { autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort } = item.settings;
+  const { autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort } = item.settings;
   // Parent dirty-state updates and runtime polling replace the item object.
   // Reconcile changed persisted values through RHF without replacing dirty fields.
   const initialValues = useMemo(() => ({
     autoRepairEnabled,
     backupEnabled,
-    backupFrequency: normalizeBackupFrequency(backupFrequency),
     backupRetention,
     localPort: expectedLocalPort,
-  }), [autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort]);
+  }), [autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingImpact, setPendingImpact] = useState<ApplicationSettingsImpact | null>(null);
   const [pendingValues, setPendingValues] = useState<ApplicationSettingsFormValues | null>(null);
@@ -227,24 +218,21 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         </FieldSet>
 
         <FieldSet className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-          <SettingsSectionHeader icon={ShieldCheck} status={values.backupEnabled ? 'Backups on' : 'Backups off'} title="Backups" />
+          <SettingsSectionHeader icon={ShieldCheck} status={values.backupEnabled ? 'Routine participation on' : 'Routine participation off'} title="Backups" />
 
           <div className="grid gap-3 xl:grid-cols-3">
             <SwitchField
               control={control}
               disabled={!editable || busy}
               explanation="Scheduled backups temporarily stop this app while copying data, then resume it if it was running."
-              label="Include in backups"
+              label="Include in routine backups"
               name="backupEnabled"
             />
-            <SelectField
-              control={control}
-              disabled={!editable || busy || !values.backupEnabled}
-              explanation="How often Autark-OS should create routine restore points for this app."
-              label="Backup frequency"
-              name="backupFrequency"
-              options={backupFrequencies}
-            />
+            <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2">
+              <p className="text-sm font-medium">Routine schedule</p>
+              <p className="text-sm text-muted-foreground">{projectSettings ? `${titleCase(projectSettings.backupFrequency)} · ${projectSettings.automaticBackupsEnabled ? 'Automation on' : 'Automation off'}` : 'Schedule unavailable'}</p>
+              <p className="text-xs text-muted-foreground">Shared by all apps. Change it in Settings → Backups. Manual backups remain available when this app is excluded.</p>
+            </Field>
             <NumberField
               control={control}
               disabled={!editable || busy || !values.backupEnabled}
@@ -434,50 +422,6 @@ function NumberField({
   );
 }
 
-function SelectField({
-  control,
-  disabled,
-  explanation,
-  label,
-  name,
-  options,
-}: {
-  control: ReturnType<typeof useForm<ApplicationSettingsFormValues>>['control'];
-  disabled: boolean;
-  explanation: string;
-  label: string;
-  name: 'backupFrequency';
-  options: readonly string[];
-}) {
-  const inputId = useId();
-
-  return (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={disabled}>
-          <SettingLabel explanation={explanation} inputId={inputId} label={label} />
-          <Select disabled={disabled} onValueChange={field.onChange} value={String(field.value)}>
-            <SelectTrigger className="w-full border-sky-400/30 bg-slate-800 text-white" id={inputId}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {options.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {titleCase(option)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-    />
-  );
-}
-
 function SettingsImpactAlert({ impact }: { impact: ApplicationSettingsImpact }) {
   const tone = impact.saveAllowed === false || impact.restartRequired || impact.redeployRequired
     ? 'border-orange-400 bg-orange-200 text-orange-950'
@@ -535,13 +479,6 @@ function privateNetworkStatus(item: ApplicationSurfaceItem, accessChanging: bool
     description: 'Private network access is enabled, but the route needs attention.',
     status: 'Needs repair',
   };
-}
-
-function normalizeBackupFrequency(frequency: string): ApplicationSettingsFormValues['backupFrequency'] {
-  if (frequency === 'weekly' || frequency === 'monthly') {
-    return frequency;
-  }
-  return 'daily';
 }
 
 function titleCase(value: string) {

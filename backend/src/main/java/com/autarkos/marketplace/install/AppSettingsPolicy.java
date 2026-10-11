@@ -66,6 +66,9 @@ class AppSettingsPolicy {
             changes.add(requested.tailscaleEnabled() ? "Private access preference will be enabled." : "Private access preference will be disabled.");
             warnings.add("Private access is safest to manage from Network, where Autark-OS can repair and verify Tailscale links.");
         }
+        if (!same(current.backup().frequency(), requested.backup().frequency())) {
+            blocked.add("Routine backup frequency is shared by all apps. Change it in Settings > Backups.");
+        }
         if (!same(current.backup(), requested.backup())) {
             changes.add("Backup preference will be saved for this app.");
         }

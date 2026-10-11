@@ -1,5 +1,6 @@
 package com.autarkos.marketplace.install;
 
+import com.autarkos.system.ProjectSettingsService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -16,12 +17,12 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 @Component
 public class InstallCustomizationResolver {
 
-    private static final List<String> BACKUP_FREQUENCIES = List.of("hourly", "daily", "weekly");
-
     private final PortAllocator portAllocator;
+    private final ProjectSettingsService projectSettings;
 
-    public InstallCustomizationResolver(PortAllocator portAllocator) {
+    public InstallCustomizationResolver(PortAllocator portAllocator, ProjectSettingsService projectSettings) {
         this.portAllocator = portAllocator;
+        this.projectSettings = projectSettings;
     }
 
     public RuntimeModels.ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest, InstallOptionsRequest request) {
@@ -46,7 +47,8 @@ public class InstallCustomizationResolver {
     }
 
     /** Keep the running app's peer bindings when changing its dashboard port. */
-    public RuntimeModels.ResolvedRuntimeConfiguration resolveSettings(ApplicationManifest manifest, InstallOptionsRequest options, String compose) {
+    public static RuntimeModels.ResolvedRuntimeConfiguration resolveSettings(ApplicationManifest manifest, InstallOptionsRequest options, String compose) {
+        PortAllocator portAllocator = new PortAllocator();
         var yaml = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
         Object document = yaml.load(compose);
         if (!(document instanceof Map<?, ?> root) || !(root.get("services") instanceof Map<?, ?> services)) {
@@ -90,7 +92,8 @@ public class InstallCustomizationResolver {
         if (mode.equals("network") || mode.equals("local-and-private")) url = com.autarkos.network.HostAddress.withHost(url, com.autarkos.network.HostAddress.lanAddress());
         return new RuntimeModels.ResolvedRuntimeConfiguration(ports, updated, url, null,
                 storageSubfolders(options.storage()), storageHostPaths(options.storage()),
-                mode.equals("private") || mode.equals("local-and-private"), backupPolicy(options.backup()), mode);
+                mode.equals("private") || mode.equals("local-and-private"),
+                options.backup() == null ? InstallModels.BackupPolicy.defaults() : new InstallModels.BackupPolicy(options.backup().enabled(), options.backup().frequency(), options.backup().retention()), mode);
     }
 
     public static String accessMode(ApplicationManifest manifest, InstallOptionsRequest.AccessOptions access) {
@@ -112,7 +115,7 @@ public class InstallCustomizationResolver {
         return mode;
     }
 
-    private Map<String, String> storageSubfolders(InstallOptionsRequest.StorageOptions storage) {
+    private static Map<String, String> storageSubfolders(InstallOptionsRequest.StorageOptions storage) {
         if (storage == null || storage.subfolders() == null || storage.subfolders().isEmpty()) {
             return Map.of();
         }
@@ -125,7 +128,7 @@ public class InstallCustomizationResolver {
         return safeSubfolders;
     }
 
-    private Map<String, String> storageHostPaths(InstallOptionsRequest.StorageOptions storage) {
+    private static Map<String, String> storageHostPaths(InstallOptionsRequest.StorageOptions storage) {
         if (storage == null || storage.hostPaths() == null || storage.hostPaths().isEmpty()) {
             return Map.of();
         }
@@ -139,22 +142,17 @@ public class InstallCustomizationResolver {
     }
 
     private InstallModels.BackupPolicy backupPolicy(InstallOptionsRequest.BackupOptions backup) {
-        if (backup == null) {
-            return InstallModels.BackupPolicy.defaults();
-        }
-        boolean enabled = backup.enabled() == null || backup.enabled();
-        String frequency = backup.frequency() == null || backup.frequency().isBlank() ? "daily" : backup.frequency().trim().toLowerCase();
-        if (!BACKUP_FREQUENCIES.contains(frequency)) {
-            throw new InstallationException("Backup frequency must be hourly, daily, or weekly.");
-        }
-        int retention = backup.retention() == null ? 7 : backup.retention();
+        var defaults = projectSettings.current();
+        boolean enabled = backup == null || backup.enabled() == null ? defaults.automaticBackupsEnabled() : backup.enabled();
+        String frequency = defaults.backupFrequency();
+        int retention = backup == null || backup.retention() == null ? defaults.backupRetentionDays() : backup.retention();
         if (retention < 1 || retention > 90) {
             throw new InstallationException("Backup retention must be between 1 and 90.");
         }
         return new InstallModels.BackupPolicy(enabled, frequency, retention);
     }
 
-    private String safeName(String value, String label) {
+    private static String safeName(String value, String label) {
         if (value == null || value.isBlank()) {
             throw new InstallationException("A " + label + " cannot be blank.");
         }
@@ -165,7 +163,7 @@ public class InstallCustomizationResolver {
         return normalized;
     }
 
-    private String hostPath(String value) {
+    private static String hostPath(String value) {
         if (value == null || value.isBlank()) {
             throw new InstallationException("A storage host path cannot be blank.");
         }

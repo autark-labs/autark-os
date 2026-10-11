@@ -1,5 +1,6 @@
 package com.autarkos.apps.recovery;
 
+import com.autarkos.system.ProjectSettingsService;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -69,6 +70,7 @@ public class AppRecoveryService {
     private final AppRuntimeMetadataWriter runtimeMetadataWriter;
     private final ManagedStorageContractService storageContracts;
     private final RuntimeLayout runtimeLayout;
+    private final ProjectSettingsService projectSettings;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AppRecoveryService(
@@ -83,7 +85,7 @@ public class AppRecoveryService {
             DockerInventoryService dockerInventory,
             AppRuntimeMetadataWriter runtimeMetadataWriter,
             ManagedStorageContractService storageContracts,
-            RuntimeLayout runtimeLayout) {
+            RuntimeLayout runtimeLayout, ProjectSettingsService projectSettings) {
         this.observedServices = observedServices;
         this.installedApps = installedApps;
         this.catalog = catalog;
@@ -96,6 +98,7 @@ public class AppRecoveryService {
         this.runtimeMetadataWriter = runtimeMetadataWriter;
         this.storageContracts = storageContracts;
         this.runtimeLayout = runtimeLayout;
+        this.projectSettings = projectSettings;
     }
 
     public AppRecoveryModels.RecoveryPlan plan(String appId) {
@@ -326,9 +329,9 @@ public class AppRecoveryService {
         String mode = privateAccess ? "private" : loopback(accessUrl) ? "local" : "network";
         return Optional.of(new InstallModels.InstallSettings(
                 accessUrl.isBlank() ? null : accessUrl, null, privateAccess, storage.orElseThrow(),
-                InstallModels.BackupPolicy.defaults(), mode,
+                new InstallModels.BackupPolicy(projectSettings.current().automaticBackupsEnabled(), projectSettings.current().backupFrequency(), projectSettings.current().backupRetentionDays()), mode,
                 manifest.usage().privateHttpsRequired() ? "required" : "optional", localPort,
-                protocol(accessUrl), null, null, null, null, true));
+                protocol(accessUrl), null, null, null, null, projectSettings.current().automaticRepairEnabled()));
     }
 
     private List<ObservedService> strictDockerEvidence(String appId, List<ObservedService> evidence) {

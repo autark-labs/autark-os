@@ -60,6 +60,40 @@ import com.autarkos.testsupport.JpaTestRepositories;
 class BackupDockerRehearsalTests {
     @TempDir Path root;
 
+    @Test
+    void scheduledWindowCreatesOneColdVerifiedBackupAndPolicyOffStillAllowsManualBackup() throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.startWriter();
+            var settings = com.autarkos.system.ProjectSettings.defaults("test");
+            JpaTestRepositories.projectSettingsRepository(fixture.layout).save(new com.autarkos.system.ProjectSettings(
+                    settings.deviceName(), "UTC", settings.language(), settings.temperatureUnit(), settings.dateFormat(), settings.timeFormat(),
+                    settings.startOnBoot(), settings.telemetryEnabled(), settings.defaultInstallAccess(), settings.automaticRepairEnabled(),
+                    true, "hourly", 7, "00:00", Instant.now()));
+            var scheduler = new BackupSchedulerService(fixture.backups, new ActivityLogService(mock(ActivityLogRepository.class)), fixture.jobs, true);
+            scheduler.runDueRoutineBackup();
+            scheduler.runDueRoutineBackup();
+            assertThat(fixture.jobs.activeJobs()).hasSize(1);
+            var queued = fixture.jobs.activeJobs().getFirst();
+            fixture.jobs.runQueuedJobsNow();
+            var completed = fixture.jobs.findById(queued.jobId()).orElseThrow();
+            assertThat(completed.status()).isEqualTo("succeeded");
+            assertThat(completed.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::id)
+                    .contains("wait_for_recovery", "prepare_backup", "stop_apps", "copy_data", "verify_backup", "resume_apps");
+            assertThat(completed.steps()).allMatch(step -> "succeeded".equals(step.status()));
+            var point = fixture.points.recent(1).stream().map(RestorePoints::toDomain).findFirst().orElseThrow();
+            assertThat(point.verificationStatus()).isEqualTo("verified");
+            assertThat(archiveRecords(point)).isEqualTo(fixture.compose.lastStoppedRecords);
+            fixture.assertWriterRunning();
+            scheduler.runDueRoutineBackup();
+            assertThat(fixture.jobs.list()).hasSize(1);
+            fixture.register(false);
+            assertThat(fixture.backups.run("homepage").status()).isEqualTo("completed");
+            assertThat(fixture.backups.report().apps()).singleElement().satisfies(app -> assertThat(app.protectedByBackups()).isTrue());
+            assertThat(fixture.installed.settingsFor("homepage").orElseThrow().backup().enabled()).isFalse();
+            fixture.assertWriterRunning();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void stalePausedRegistrationStillProducesColdVerifiedRestorableData(boolean full) throws Exception {
@@ -156,6 +190,7 @@ class BackupDockerRehearsalTests {
         final ObservedCompose compose;
         final AppLifecycleService lifecycle;
         final BackupService backups;
+        final AutarkOsJobService jobs;
         final AutarkOsIdentity identity;
 
         Fixture() throws Exception {
@@ -211,16 +246,19 @@ class BackupDockerRehearsalTests {
                     new ManagedStorageContractService(new ManifestYamlReader(), new ManifestValidator(), inventory, metadata));
             var activity = new ActivityLogService(mock(ActivityLogRepository.class));
             var settings = JpaTestRepositories.projectSettingsRepository(layout);
-            var projectSettings = new ProjectSettingsService(settings, activity, installed, managed);
+            var projectSettings = new ProjectSettingsService(settings,
+                activity);
             var files = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations());
             var destination = new BackupDestinationService(layout, settings);
             var coordinator = new RecoveryOperationCoordinator();
+            jobs = new AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
             lifecycle = new AppLifecycleService(installed, compose, catalog, layout, new PostInstallGuideBuilder(),
                     new TailscaleService(), activity, points, new AppTelemetryService(compose), destination, coordinator,
                     files, managed, new AppAccessChecker(), inventory,
-                    new AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false));
+                    jobs);
             backups = new BackupService(layout, installed, points, activity, settings, projectSettings, lifecycle,
-                    catalog, managed, new RuntimeFileOperations(), files, destination, coordinator);
+                    catalog, managed, new RuntimeFileOperations(), files, destination, coordinator,
+                    jobs);
         }
 
         InstalledApp app(String status) {

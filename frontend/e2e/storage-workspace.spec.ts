@@ -94,7 +94,7 @@ test(`cleanup ${fails ? 'failure' : 'success'} survives closing and reload, bloc
   await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
   await page.locator('a[href="/backups"]').first().click();
   await expect(page.getByRole('button', { name: 'Cleanup in progress', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Back up all', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Review full backup', exact: true })).toBeDisabled();
   await page.locator('a[href="/home"]').first().click();
   await expect(page.getByRole('heading', { level: 1, name: /Fixture/ })).toBeVisible();
   finished = true;

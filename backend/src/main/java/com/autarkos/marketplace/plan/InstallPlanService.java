@@ -38,7 +38,7 @@ public class InstallPlanService {
                 plannedContainers(manifest).stream().map(PlannedContainer::image).toList(),
                 runtimeConfiguration.ports().isEmpty() ? List.of("No public ports declared") : List.of(runtimeConfiguration.accessUrl(), "Local ports: " + String.join(", ", runtimeConfiguration.ports())),
                 List.of("Autark-OS labels", runtimeConfiguration.tailscaleEnabled() ? "Tailscale access requested" : "Local browser access", "Health check metadata"),
-                runtimeConfiguration.backup().enabled() ? List.of(runtimeConfiguration.backup().label()) : List.of("Backups disabled"));
+                runtimeConfiguration.backup().enabled() ? List.of(runtimeConfiguration.backup().frequency() + " routine schedule, keep " + runtimeConfiguration.backup().retention()) : List.of("Excluded from routine backups; manual backups remain available"));
 
         TechnicalInstallPlan technical = new TechnicalInstallPlan(
                 runtimeLayout.appRoot(manifest.id()).toString(),
@@ -122,7 +122,7 @@ public class InstallPlanService {
             warnings.add("Autark-OS will attempt to create a private Tailscale HTTPS link during install.");
         }
         if (!runtimeConfiguration.backup().enabled()) {
-            warnings.add("Backups are disabled for this install.");
+            warnings.add("This app is excluded from routine backups. Manual backups and required safety checkpoints remain available.");
         }
         return warnings;
     }

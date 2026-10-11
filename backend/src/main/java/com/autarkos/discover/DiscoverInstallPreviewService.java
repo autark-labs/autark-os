@@ -29,7 +29,7 @@ public class DiscoverInstallPreviewService {
         List<DiscoverInstallModels.DiscoverInstallIssue> blockingIssues = issues.stream().filter(issue -> "error".equals(issue.severity())).toList();
         List<DiscoverInstallModels.DiscoverInstallIssue> warnings = new ArrayList<>(issues.stream().filter(issue -> !"error".equals(issue.severity())).toList());
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
-            warnings.add(new DiscoverInstallModels.DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will not be included in Autark-OS backups until you enable it."));
+            warnings.add(new DiscoverInstallModels.DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will be excluded from routine backups. Manual backups remain available."));
         }
         InstallOptionsRequest options = installOptions(manifest, answers);
         InstallPlan technicalPlan = installPlanService.generatePlan(manifest, blockingIssues.isEmpty() ? options : InstallOptionsRequest.defaults());
@@ -57,7 +57,7 @@ public class DiscoverInstallPreviewService {
                 new InstallOptionsRequest.PortOptions(hostPort),
                 new InstallOptionsRequest.AccessOptions(tailscale, mode),
                 new InstallOptionsRequest.StorageOptions(storageSubfolders(manifest, answers), Map.of()),
-                new InstallOptionsRequest.BackupOptions(backupEnabled, "daily", 7));
+                new InstallOptionsRequest.BackupOptions(backupEnabled, setupService.settings().backupFrequency(), setupService.settings().backupRetentionDays()));
     }
 
     public List<DiscoverInstallModels.DiscoverInstallIssue> validate(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
@@ -120,12 +120,13 @@ public class DiscoverInstallPreviewService {
 
     private List<DiscoverInstallModels.DiscoverInstallPreviewItem> protectItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
-            return List.of(item("Do not include " + manifest.name() + " in Autark-OS backups yet.", "You can enable backups later.", "warning"));
+            return List.of(item("Exclude " + manifest.name() + " from routine backups.", "Manual backups and required safety checkpoints remain available.", "warning"));
         }
-        if ("enabled_no_checkpoint".equals(answers.stringValue("backupPolicy"))) {
-            return List.of(item("Include " + manifest.name() + " in routine Autark-OS backups.", null, "success"));
-        }
-        return List.of(item("Include " + manifest.name() + " in backups and recommend a first restore point.", null, "success"));
+        var settings = setupService.settings();
+        String schedule = settings.automaticBackupsEnabled()
+                ? "Use the shared " + settings.backupFrequency() + " schedule. Running apps temporarily stop while data is copied, then resume."
+                : "Routine automation is off in Settings. Participation is saved; manual backups remain available.";
+        return List.of(item("Include " + manifest.name() + " in routine backups.", schedule, "default"));
     }
 
     private List<DiscoverInstallModels.DiscoverInstallPreviewItem> checkItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {

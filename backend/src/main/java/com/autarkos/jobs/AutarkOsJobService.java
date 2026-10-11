@@ -90,6 +90,52 @@ public class AutarkOsJobService {
         return job;
     }
 
+    /** One persisted attempt per calendar window, including failed and interrupted attempts. */
+    public AutarkOsJob startOnce(String key, String type, String subjectId, List<AutarkOsJobStep> steps, Supplier<AutarkOsJobOutcome> operation) {
+        return startScheduledId(onceJobId(key), type, subjectId, steps, operation);
+    }
+
+    public static String onceJobId(String key) {
+        return "job_once_" + UUID.nameUUIDFromBytes(key.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().replace("-", "");
+    }
+
+    /** Queued or coordinator-waiting work has not touched app data and can safely resume. */
+    public void resumeInterruptedScheduledJobs(String type, String subjectId, List<AutarkOsJobStep> steps, Supplier<AutarkOsJobOutcome> operation) {
+        for (var entity : repository.interruptedScheduledJobs(type, subjectId)) {
+            var job = toDomain(entity);
+            if (interruptedBeforeExecution(job)) startScheduledId(job.jobId(), type, subjectId, steps, operation);
+        }
+    }
+
+    private AutarkOsJob startScheduledId(String jobId, String type, String subjectId, List<AutarkOsJobStep> steps, Supplier<AutarkOsJobOutcome> operation) {
+        AutarkOsJob job;
+        synchronized (jobStartTransition) {
+            var existing = findById(jobId);
+            if (existing.isPresent() && !interruptedBeforeExecution(existing.get())) return existing.get();
+            // Scheduled work persists while another mutation is busy. Its worker must
+            // acquire the recovery coordinator before touching any app or archive.
+            if (existing.isPresent()) {
+                var entity = repository.findById(jobId).orElseThrow();
+                entity.update("queued", steps.getFirst().id(), AutarkOsJobs.stepsJson(steps, objectMapper), null, null, "{}", clock.get().toString());
+                job = toDomain(repository.save(entity));
+            } else {
+                job = create(jobId, type, subjectId, steps);
+            }
+            queuedTasks.put(jobId, () -> run(job, ignored -> operation.get()));
+        }
+        if (autoRun) schedule(job);
+        return job;
+    }
+
+    private boolean interruptedBeforeExecution(AutarkOsJob job) {
+        if (job.error() == null || !"job_interrupted".equals(job.error().code())) return false;
+        String previousStatus = job.error().advancedDetails().get("previousStatus");
+        return "queued".equals(previousStatus) || ("running".equals(previousStatus)
+                && job.steps().size() == 1 && "wait_for_recovery".equals(job.steps().getFirst().id())
+                && "failed".equals(job.steps().getFirst().status())
+                && job.steps().getFirst().recovery() == null);
+    }
+
     /** Preflight before validation/persistence; startWithJob checks again atomically. */
     public Optional<AutarkOsJob> existingForRequest(String type, String subjectId, List<AutarkOsJobStep> steps, Object parameters) {
         synchronized (jobStartTransition) {
@@ -120,6 +166,10 @@ public class AutarkOsJobService {
 
     public Optional<AutarkOsJob> findById(String jobId) {
         return repository.findById(jobId).map(this::toDomain);
+    }
+
+    public Optional<AutarkOsJob> latestScheduledJob(String type, String subjectId) {
+        return repository.latestScheduledJob(type, subjectId).map(this::toDomain);
     }
 
     public String executingJobId() {
@@ -369,9 +419,12 @@ public class AutarkOsJobService {
     }
 
     private AutarkOsJob create(String type, String subjectId, List<AutarkOsJobStep> steps) {
+        return create("job_" + UUID.randomUUID().toString().replace("-", ""), type, subjectId, steps);
+    }
+
+    private AutarkOsJob create(String jobId, String type, String subjectId, List<AutarkOsJobStep> steps) {
         Instant now = clock.get();
         List<AutarkOsJobStep> safeSteps = steps == null ? List.of() : steps;
-        String jobId = "job_" + UUID.randomUUID().toString().replace("-", "");
         String currentStep = safeSteps.isEmpty() ? "" : safeSteps.getFirst().id();
         AutarkOsJobEntity saved = repository.save(new AutarkOsJobEntity(
                 jobId,
@@ -399,7 +452,8 @@ public class AutarkOsJobService {
     }
 
     private AutarkOsJob fail(String jobId, String code, String message, Map<String, String> details) {
-        return update(jobId, "failed", currentStep(jobId), markRunningStepFailed(jobId, message), AutarkOsJobs.clean(code, "job_failed"), AutarkOsJobs.clean(message, "Job failed."), details == null ? Map.of() : details);
+        var steps = markRunningStepFailed(jobId, message);
+        return update(jobId, "failed", failedStepId(steps), steps, AutarkOsJobs.clean(code, "job_failed"), AutarkOsJobs.clean(message, "Job failed."), details == null ? Map.of() : details);
     }
 
     private AutarkOsJob fail(String jobId, String code, String message, Map<String, String> details, List<AutarkOsJobStep> steps) {

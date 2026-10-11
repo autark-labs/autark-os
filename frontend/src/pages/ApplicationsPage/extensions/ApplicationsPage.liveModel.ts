@@ -148,7 +148,7 @@ function backupLabel(application: ApplicationView): ApplicationSurfaceItem['back
     return 'Protected';
   }
   if (application.runtime?.backupProtection === 'backup_disabled') {
-    return 'Not managed';
+    return 'Routine off';
   }
   return 'Needs backup';
 }
@@ -184,7 +184,6 @@ function appSettings(app: AppRuntimeView): ApplicationSurfaceItem['settings'] {
   return {
     autoRepairEnabled: app.settings?.autoRepairEnabled ?? true,
     backupEnabled: app.settings?.backup?.enabled ?? true,
-    backupFrequency: app.settings?.backup?.frequency ?? 'daily',
     backupRetention: app.settings?.backup?.retention ?? 7,
     canEdit: true,
     containerDetail: app.healthSnapshot?.detail || app.healthSnapshot?.message || 'No container detail reported.',

@@ -31,16 +31,18 @@ public class ApplicationInventoryService {
     private final InstalledAppRepository installedAppRepository;
     private final ManagedAppAttestationService managedApps;
     private final AppRecoveryService recovery;
+    private final com.autarkos.backups.BackupService backups;
 
     public ApplicationInventoryService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
             ManagedAppAttestationService managedApps,
-            AppRecoveryService recovery) {
+            AppRecoveryService recovery, com.autarkos.backups.BackupService backups) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
         this.managedApps = managedApps;
         this.recovery = recovery;
+        this.backups = backups;
     }
 
     public List<ApplicationView> apps(
@@ -197,8 +199,8 @@ public class ApplicationInventoryService {
                     : action);
             actions.add(new ApplicationAction("settings", "Settings", "action", "/api/apps/" + runtime.appId() + "/settings", "PUT", true, missingCompose));
         }
-        actions.add(post("backup", "Create backup", "/api/backups/apps/" + runtime.appId() + "/run", !composeAvailable,
-                composeAvailable ? "" : "A normal app backup is unavailable because its runtime folder is missing. Use archive-first uninstall to preserve the container writable layer."));
+        String backupReason = backups.backupUnavailableReason(installed);
+        actions.add(post("backup", "Create backup", "/api/backups/apps/" + runtime.appId() + "/run", !backupReason.isBlank(), backupReason));
         if (runtime.state() == ApplicationRuntimeState.DEGRADED || runtime.state() == ApplicationRuntimeState.MISSING) {
             actions.add(post("repair", "Repair", "/api/apps/" + runtime.appId() + "/repair", !composeAvailable, composeAvailable ? "" : missingCompose));
         }

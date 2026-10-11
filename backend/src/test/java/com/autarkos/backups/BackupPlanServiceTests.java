@@ -48,12 +48,13 @@ class BackupPlanServiceTests {
         app = new InstalledApp("homepage", "Homepage", "Running", root.toString(), "homepage-project", "", Instant.now());
         Files.writeString(root.resolve("compose.yaml"), "services: {}\n");
         when(managed.managedApps()).thenReturn(List.of(app));
-        when(backups.backupEligibleApps()).thenReturn(List.of(app));
+        when(backups.backupEligibleApps(org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(List.of(app));
         when(installed.ownershipFor(app.appId())).thenReturn(Optional.of(ownership("instance-one")));
         when(installed.settingsFor(app.appId())).thenReturn(Optional.of(InstallModels.InstallSettings.defaults("")));
         when(managed.durableStorage(app, true)).thenReturn(new ManagedStorageContractService.Contract(app, Map.of("data", root.resolve("data"))));
         when(settings.current()).thenReturn(ProjectSettings.defaults("test"));
         when(backups.destination()).thenReturn(destination("disk-one"));
+        when(backups.backupUnavailableReason(org.mockito.ArgumentMatchers.any())).thenReturn("");
         plans = new BackupPlanService(backups, installed, managed, settings,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()), operations);
     }
@@ -86,7 +87,7 @@ class BackupPlanServiceTests {
             case "ownership" -> when(installed.ownershipFor("homepage")).thenReturn(Optional.of(ownership("replacement-instance")));
             case "destination" -> when(backups.destination()).thenReturn(destination("replacement-disk"));
             case "storage" -> when(managed.durableStorage(app, true)).thenReturn(new ManagedStorageContractService.Contract(app, Map.of("data", root.resolve("new-data"))));
-            case "scope" -> when(backups.backupEligibleApps()).thenReturn(List.of());
+            case "scope" -> when(backups.backupEligibleApps(org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(List.of());
             case "policy" -> when(installed.settingsFor("homepage")).thenReturn(Optional.of(new InstallModels.InstallSettings("", null, false, Map.of(), new InstallModels.BackupPolicy(false, "daily", 7))));
         }
         assertThatThrownBy(() -> plans.runReviewed("full", null, reviewed)).isInstanceOf(InstallationException.class);

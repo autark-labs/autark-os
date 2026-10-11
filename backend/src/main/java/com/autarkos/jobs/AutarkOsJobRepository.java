@@ -31,6 +31,21 @@ public interface AutarkOsJobRepository extends JpaRepository<AutarkOsJobEntity, 
             """, nativeQuery = true)
     List<AutarkOsJobEntity> activeJobs();
 
+    @Query(value = """
+            select * from autark_os_jobs
+            where job_type = :type and subject_id = :subjectId
+              and job_id like 'job_once_%' and error_code = 'job_interrupted'
+            order by created_at asc
+            """, nativeQuery = true)
+    List<AutarkOsJobEntity> interruptedScheduledJobs(@Param("type") String type, @Param("subjectId") String subjectId);
+
+    @Query(value = """
+            select * from autark_os_jobs
+            where job_type = :type and subject_id = :subjectId and job_id like 'job_once_%'
+            order by created_at desc limit 1
+            """, nativeQuery = true)
+    Optional<AutarkOsJobEntity> latestScheduledJob(@Param("type") String type, @Param("subjectId") String subjectId);
+
     @Modifying
     @Transactional
     @Query(value = "delete from autark_os_jobs where status in ('succeeded', 'cancelled', 'canceled') and updated_at < :cutoff", nativeQuery = true)

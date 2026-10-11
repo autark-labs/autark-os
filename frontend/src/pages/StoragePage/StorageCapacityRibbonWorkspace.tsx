@@ -324,7 +324,7 @@ function SpaceDriverRow({ app, iconUrl, onClick }: { app: AppStorageUsage; iconU
       <StorageAppIcon appName={app.appName} iconUrl={iconUrl} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-white">{app.appName}</span>
-        <span className="block truncate text-[0.68rem] text-slate-400">{app.backupEnabled ? `${app.backupFrequency} backup` : 'Backup off'}</span>
+        <span className="block truncate text-[0.68rem] text-slate-400">{app.backupEnabled ? `${app.backupFrequency} routine` : 'Routine off'}</span>
       </span>
       <span className="text-right">
         <span className="block text-xs font-semibold text-white">{formatStorageBytes(app.usedBytes)}</span>
@@ -393,11 +393,11 @@ function AppDataWorkspace({
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
               <DetailFact label="Current use" value={formatStorageBytes(selectedApp.usedBytes)} />
               <DetailFact label="7-day change" value={storageGrowthLabel(selectedApp)} />
-              <DetailFact label="Backups" value={selectedApp.backupEnabled ? selectedApp.backupFrequency : 'Off'} />
+              <DetailFact label="Routine schedule" value={selectedApp.backupEnabled ? selectedApp.backupFrequency : 'Off'} />
             </div>
             <StorageTrendChart emphasizeChanges trend={selectedApp.trend} />
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <DetailFact label="Restore protection" value={selectedApp.backupState === 'protected_by_restore_point' ? 'Verified restore point' : selectedApp.backupState === 'backup_disabled' ? 'Backups off — review retained points in Backups' : 'No compatible verified restore point'} />
+              <DetailFact label="Restore protection" value={selectedApp.backupState === 'protected_by_restore_point' ? 'Verified restore point' : selectedApp.backupState === 'backup_disabled' ? 'Excluded from routines — review retained points in Backups' : 'No compatible verified restore point'} />
               <DetailFact label="Storage status" value={selectedApp.status} />
             </div>
             <details className="mt-3"><summary className="cursor-pointer text-sm text-muted-foreground">Technical details</summary><div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={selectedApp.path}>{selectedApp.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(selectedApp.path, selectedApp.appId)} size="sm" type="button">{copiedPathId === selectedApp.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === selectedApp.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div></details>
@@ -409,7 +409,7 @@ function AppDataWorkspace({
 }
 
 function StorageAppSelectorRow({ active, app, iconUrl, onClick }: { active: boolean; app: AppStorageUsage; iconUrl: string | null; onClick: () => void }) {
-  return <button aria-pressed={active} className={cn('flex w-full min-w-0 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60', active ? 'border-cyan-300/40 bg-cyan-400/10' : 'border-sky-300/15 bg-slate-950/25 hover:border-cyan-300/30 hover:bg-slate-800')} onClick={onClick} type="button"><StorageAppIcon appName={app.appName} iconUrl={iconUrl} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white">{app.appName}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{app.backupEnabled ? `${app.backupFrequency} backup` : 'Backup off'}</span></span><span className="shrink-0 text-right"><span className="block text-xs font-semibold text-white">{formatStorageBytes(app.usedBytes)}</span><span className={cn('block text-[0.68rem]', app.sevenDayGrowthBytes > 0 ? 'text-amber-200' : 'text-sky-100/60')}>{storageGrowthLabel(app)}</span></span></button>;
+  return <button aria-pressed={active} className={cn('flex w-full min-w-0 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60', active ? 'border-cyan-300/40 bg-cyan-400/10' : 'border-sky-300/15 bg-slate-950/25 hover:border-cyan-300/30 hover:bg-slate-800')} onClick={onClick} type="button"><StorageAppIcon appName={app.appName} iconUrl={iconUrl} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white">{app.appName}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{app.backupEnabled ? `${app.backupFrequency} routine` : 'Routine off'}</span></span><span className="shrink-0 text-right"><span className="block text-xs font-semibold text-white">{formatStorageBytes(app.usedBytes)}</span><span className={cn('block text-[0.68rem]', app.sevenDayGrowthBytes > 0 ? 'text-amber-200' : 'text-sky-100/60')}>{storageGrowthLabel(app)}</span></span></button>;
 }
 
 function BackupWorkspace({ appsWithBackupsOn, report }: { appsWithBackupsOn: number; report: StorageReport }) {

@@ -28,10 +28,9 @@ public final class BackupProtectionPolicy {
     }
 
     public static String state(boolean enabled, ApplicationManifest manifest, List<RestorePoint> points) {
-        if (!enabled) return AutarkOsStates.BackupState.DISABLED;
         return points.stream().anyMatch(point -> isProtected(point) && isCompatible(point, manifest))
                 ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT
-                : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
+                : enabled ? AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT : AutarkOsStates.BackupState.DISABLED;
     }
 
     public static boolean isProtected(RestorePoint restorePoint) {

@@ -33,6 +33,42 @@ import com.autarkos.system.StorageService;
 class RecoveryOperationCoordinatorTests {
 
     @Test
+    void scheduledWorkWaitsForExclusiveRecoveryWithoutLosingItsAttempt() throws Exception {
+        var coordinator = new RecoveryOperationCoordinator();
+        var active = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var waiting = new CountDownLatch(1);
+        var executed = new AtomicBoolean();
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var restore = workers.submit(() -> coordinator.runExclusive(RecoveryOperationCoordinator.Operation.RESTORE, () -> {
+                active.countDown();
+                await(release);
+                return "restored";
+            }));
+            assertThat(active.await(2, TimeUnit.SECONDS)).isTrue();
+            var scheduled = workers.submit(() -> {
+                waiting.countDown();
+                return coordinator.runExclusiveWaiting(RecoveryOperationCoordinator.Operation.ROUTINE_BACKUP, () -> {
+                    executed.set(true);
+                    return "backed up";
+                });
+            });
+            try {
+                assertThat(waiting.await(2, TimeUnit.SECONDS)).isTrue();
+                assertThat(executed).isFalse();
+                assertThat(coordinator.activeOperation()).contains(RecoveryOperationCoordinator.Operation.RESTORE);
+            } finally {
+                release.countDown();
+            }
+            assertThat(restore.get(2, TimeUnit.SECONDS)).isEqualTo("restored");
+            assertThat(scheduled.get(2, TimeUnit.SECONDS)).isEqualTo("backed up");
+            assertThat(executed).isTrue();
+            assertThat(coordinator.activeOperation()).isEmpty();
+        }
+    }
+
+
+    @Test
     void rejectsASecondRecoveryOperationUntilTheFirstOneFinishes() throws Exception {
         RecoveryOperationCoordinator coordinator = new RecoveryOperationCoordinator();
         CountDownLatch started = new CountDownLatch(1);
@@ -145,7 +181,6 @@ class RecoveryOperationCoordinatorTests {
             assertRecoveryConflict(() -> backupService.verify(42L));
             assertRecoveryConflict(() -> backupService.restore(42L, "vaultwarden"));
             assertRecoveryConflict(() -> storageService.cleanupOrphan("old-app", archive -> {}));
-            assertThat(backupService.runAutomaticIfDue()).isEmpty();
             assertThat(backupService.pruneRoutineRetention()).isZero();
 
             release.countDown();
@@ -193,14 +228,13 @@ class RecoveryOperationCoordinatorTests {
                 mock(RuntimeFileOperations.class),
                 mock(AutarkOsFileOpsService.class),
                 mock(BackupDestinationService.class),
-                coordinator);
+                coordinator, mock(com.autarkos.jobs.AutarkOsJobService.class));
     }
 
     private StorageService storageService(RecoveryOperationCoordinator coordinator) {
         InstalledAppRepository installedApps = mock(InstalledAppRepository.class);
         StorageSampleRepository samples = mock(StorageSampleRepository.class);
-        return new StorageService(
-                mock(RuntimeLayout.class),
+        return new StorageService(mock(RuntimeLayout.class),
                 installedApps,
                 mock(ActivityLogService.class),
                 samples,
@@ -211,7 +245,8 @@ class RecoveryOperationCoordinatorTests {
                 mock(BackupDestinationService.class),
                 coordinator,
                 mock(com.autarkos.marketplace.install.ManagedStorageContractService.class),
-                mock(AutarkOsFileOpsService.class));
+                mock(AutarkOsFileOpsService.class),
+                com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
     }
 
     private void assertRecoveryConflict(Runnable action) {

@@ -1,6 +1,7 @@
 package com.autarkos.backups;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,19 @@ public interface BackupRepository extends JpaRepository<RestorePointEntity, Long
 
     @Query(value = "select * from app_backups order by created_at desc, id desc limit :limit", nativeQuery = true)
     List<RestorePointEntity> recent(@Param("limit") int limit);
+
+    @Query(value = """
+            select * from app_backups
+            where backup_source = 'automatic' and (:successfulOnly = false or status = 'completed')
+            order by created_at desc, id desc limit 1
+            """, nativeQuery = true)
+    Optional<RestorePointEntity> latestRoutine(@Param("successfulOnly") boolean successfulOnly);
+
+    @Query(value = """
+            select * from app_backups where verification_status = 'verified'
+            order by verified_at desc, created_at desc, id desc limit 1
+            """, nativeQuery = true)
+    Optional<RestorePointEntity> latestSuccessfulVerification();
 
     @Query(value = "select * from app_backups where app_id = :appId order by created_at desc, id desc limit :limit", nativeQuery = true)
     List<RestorePointEntity> forApp(@Param("appId") String appId, @Param("limit") int limit);

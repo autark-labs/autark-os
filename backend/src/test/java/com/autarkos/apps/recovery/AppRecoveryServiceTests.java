@@ -73,8 +73,7 @@ class AppRecoveryServiceTests {
         AutarkOsRuntimeProperties runtimeProperties = new AutarkOsRuntimeProperties();
         runtimeProperties.setRuntimeRoot(runtimeRoot.toString());
         RuntimeLayout runtimeLayout = new RuntimeLayout(runtimeProperties);
-        service = new AppRecoveryService(
-                observedServices,
+        service = new AppRecoveryService(observedServices,
                 installedApps,
                 catalog,
                 metadataReader,
@@ -88,7 +87,8 @@ class AppRecoveryServiceTests {
                         () -> Instant.parse("2026-06-20T12:00:00Z")),
                 new ManagedStorageContractService(
                         new ManifestYamlReader(), new ManifestValidator(), dockerInventory, metadataReader),
-                runtimeLayout);
+                runtimeLayout,
+                com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
     }
 
     @Test

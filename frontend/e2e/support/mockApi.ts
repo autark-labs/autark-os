@@ -399,7 +399,7 @@ const systemSummary = {
 };
 
 const onboardingComplete = {
-  status: 'complete', currentStep: 4, deviceName: systemSummary.deviceName, runtimePath: '/var/lib/autark-os', backupDestination: '/var/lib/autark-os/backups', tailscaleConnected: true, privateAccessChoice: 'already-connected', automaticBackupsEnabled: true, recommendedApps: ['vaultwarden'], completedSteps: ['welcome', 'host_check', 'tailscale', 'starter_apps', 'done'], doctor, updatedAt: fixedAt,
+  status: 'complete', currentStep: 4, deviceName: systemSummary.deviceName, runtimePath: '/var/lib/autark-os', backupDestination: '/var/lib/autark-os/backups', tailscaleConnected: true, privateAccessChoice: 'already-connected', automaticBackupsEnabled: true, backupFrequency: 'daily', recommendedApps: ['vaultwarden'], completedSteps: ['welcome', 'host_check', 'tailscale', 'starter_apps', 'done'], doctor, updatedAt: fixedAt,
 };
 
 const onboardingIncomplete = { ...onboardingComplete, status: 'in_progress', currentStep: 1, completedSteps: ['welcome'] };

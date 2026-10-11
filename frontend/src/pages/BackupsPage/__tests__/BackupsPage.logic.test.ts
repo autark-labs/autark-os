@@ -3,7 +3,7 @@ import { test } from 'vitest';
 import { activeBackupJobs, backupJobRunningId, backupOperationAvailability, backupOperationForJob, backupStatusLabel, formatBackupDate, selectActiveBackupJob } from '../BackupsPage.logic';
 
 test('backup status labels distinguish backups on from recoverable restore points', () => {
-  assert.equal(backupStatusLabel('unprotected'), 'Backups off');
+  assert.equal(backupStatusLabel('unprotected'), 'Excluded from routines');
   assert.equal(backupStatusLabel('not_backed_up'), 'No restore point yet');
   assert.equal(backupStatusLabel('recovery_limited'), 'Recovery limited');
   assert.equal(backupStatusLabel('protected'), 'Protected by restore point');

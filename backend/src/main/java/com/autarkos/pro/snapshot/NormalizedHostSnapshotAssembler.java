@@ -712,7 +712,7 @@ public final class NormalizedHostSnapshotAssembler {
                 values.add(configuration(
                         "backup.frequency",
                         ref,
-                        tokenOrUnknown(policy.frequency())));
+                        tokenOrUnknown(settings == null ? null : settings.backupFrequency())));
                 values.add(configuration(
                         "backup.retention",
                         ref,

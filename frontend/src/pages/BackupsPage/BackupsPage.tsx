@@ -94,19 +94,11 @@ function BackupsPage() {
   const destinationUnavailableReason = report && report.destination.status !== 'ready'
     ? `${report.destination.message} Update the backup destination in Settings before creating a new backup.`
     : '';
-  const recoveryLimitedApps = report?.apps.filter((app) => !app.backupAvailable) ?? [];
-  const batchBackupUnavailableReason = recoveryLimitedApps.length
-    ? `Review ${recoveryLimitedApps.map((app) => app.appName).join(', ')} in My Apps before running a full or routine backup because the original Compose configuration is missing.`
-    : '';
   const fullBackupAvailability = destinationUnavailableReason
     ? { disabled: true, reason: destinationUnavailableReason }
-    : batchBackupUnavailableReason
-    ? { disabled: true, reason: batchBackupUnavailableReason }
     : fullBackupOperationAvailability;
   const routineBackupAvailability = destinationUnavailableReason
     ? { disabled: true, reason: destinationUnavailableReason }
-    : batchBackupUnavailableReason
-    ? { disabled: true, reason: batchBackupUnavailableReason }
     : routineBackupOperationAvailability;
   const pageError = backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null;
   const refreshBackupReport = backupReport.refresh;

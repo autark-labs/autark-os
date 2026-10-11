@@ -253,8 +253,8 @@ test('an immediately failed backup response leaves the action available to retry
     error: { code: 'fixture', message: 'Backup destination is unavailable.', details: {} },
   } }));
   await page.goto('/backups');
-  await page.getByRole('button', { name: 'Back up all', exact: true }).click();
+  await page.getByRole('button', { name: 'Review full backup', exact: true }).click();
     await page.getByRole('dialog', { name: 'Review backup' }).getByRole('button', { name: 'Start backup', exact: true }).click();
   await expect(page.locator('[data-sonner-toast]')).toContainText('Backup destination is unavailable.');
-  await expect(page.getByRole('button', { name: 'Back up all', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Review full backup', exact: true })).toBeEnabled();
 });

@@ -55,6 +55,7 @@ public class OnboardingService {
                 tailscaleService.status().connected(),
                 value(values, "privateAccessChoice", tailscaleService.status().connected() ? "already-connected" : "local-only"),
                 settings.automaticBackupsEnabled(),
+                settings.backupFrequency(),
                 listValue(values, "onboardingRecommendedApps", DEFAULT_RECOMMENDED_APPS).stream().filter(DEFAULT_RECOMMENDED_APPS::contains).toList(),
                 listValue(values, "onboardingCompletedSteps", List.of()),
                 doctorService.status(),

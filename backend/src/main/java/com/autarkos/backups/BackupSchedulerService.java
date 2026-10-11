@@ -11,7 +11,6 @@ import com.autarkos.api.AutarkOsStates;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
-import com.autarkos.jobs.JobConflictException;
 
 @Service
 public class BackupSchedulerService {
@@ -41,30 +40,29 @@ public class BackupSchedulerService {
             return;
         }
         try {
-            if (!backupService.automaticBackupDue()) return;
-            // Use the same durable execution lane as manual backups. Recheck due state
-            // under the recovery coordinator once the worker actually starts.
-            jobs.start(AutarkOsStates.JobType.BACKUP, "__routine__", BackupJobs.steps(), () -> {
-                var result = backupService.runAutomaticIfDue();
-                if (result.isEmpty()) {
-                    String message = "No backup was created because the routine is no longer due or another recovery operation is active. The scheduler will check again.";
-                    return AutarkOsJobOutcome.succeeded(message, java.util.List.of(
-                            AutarkOsJobStep.succeeded("check_schedule", "Checking routine schedule", message)));
-                }
-                var run = result.orElseThrow();
-                if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(run.status())) {
-                    activityLogService.success("backup", "scheduled_backup_completed", "Routine backup completed", run.message(), null);
-                } else if ("not_applicable".equals(run.status())) {
-                    activityLogService.info("backup", "scheduled_backup_not_applicable", "Routine backup not needed", run.message(), null);
-                } else {
-                    activityLogService.error("backup", "scheduled_backup_failed", "Routine backup failed", run.message(), null, null);
-                }
-                return BackupJobs.outcome(run);
-            });
-        } catch (JobConflictException conflict) {
-            // Another durable job owns the app-data lane. The existing schedule retries.
+            var steps = java.util.List.of(AutarkOsJobStep.pending("wait_for_recovery", "Waiting for other app recovery work"));
+            jobs.resumeInterruptedScheduledJobs(AutarkOsStates.JobType.BACKUP, "__routine__", steps, this::runWindow);
+            backupService.automaticBackupWindow().ifPresent(window ->
+                    jobs.startOnce(window.key(), AutarkOsStates.JobType.BACKUP, "__routine__", steps, this::runWindow));
         } finally {
             running.set(false);
         }
+    }
+
+    private AutarkOsJobOutcome runWindow() {
+        var result = backupService.runScheduledWindow();
+        if (result.isEmpty()) {
+            String message = "Automatic backups were turned off before the scheduled window could run. No archive was created.";
+            return AutarkOsJobOutcome.succeeded(message, new BackupJobs(jobs).current());
+        }
+        var run = result.orElseThrow();
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(run.status())) {
+            activityLogService.success("backup", "scheduled_backup_completed", "Routine backup completed", run.message(), null);
+        } else if ("not_applicable".equals(run.status())) {
+            activityLogService.info("backup", "scheduled_backup_not_applicable", "Routine backup not needed", run.message(), null);
+        } else {
+            activityLogService.error("backup", "scheduled_backup_failed", "Routine backup failed", run.message(), null, null);
+        }
+        return BackupJobs.outcome(run, jobs);
     }
 }

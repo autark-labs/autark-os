@@ -50,7 +50,7 @@ class BackupControllerTests {
         assertThat(job.subjectId()).isEqualTo("vaultwarden");
         assertThat(job.status()).isEqualTo("queued");
         assertThat(job.steps()).extracting(AutarkOsJobStep::id)
-                .containsExactly("prepare_backup", "copy_data", "verify_backup", "finish");
+                .containsExactly("prepare_backup");
         verify(backupService, never()).run("vaultwarden");
         verify(applicationStateService, times(1)).invalidate();
 
@@ -88,8 +88,8 @@ class BackupControllerTests {
         assertThat(completed.status()).isEqualTo("failed");
         assertThat(completed.error().message()).contains("Vaultwarden could not restart");
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
-                .containsExactly("succeeded", "succeeded", "succeeded", "failed");
-        assertThat(completed.steps().get(2).message()).isEqualTo("Archive checksum matched.");
+                .containsExactly("failed");
+        assertThat(completed.steps()).noneMatch(step -> step.id().equals("verify_backup"));
     }
 
     @Test
@@ -153,7 +153,7 @@ class BackupControllerTests {
         assertThat(job.subjectId()).isEqualTo("42");
         assertThat(job.status()).isEqualTo("queued");
         assertThat(job.steps()).extracting(AutarkOsJobStep::id)
-                .containsExactly("load_restore_point", "verify_archive", "record_result", "finish");
+                .containsExactly("load_restore_point");
         verify(backupService, never()).verify(42L);
 
         jobService.runQueuedJobsNow();
@@ -161,7 +161,7 @@ class BackupControllerTests {
         AutarkOsJob completed = jobService.findById(job.jobId()).orElseThrow();
         assertThat(completed.status()).isEqualTo("succeeded");
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
-                .containsExactly("succeeded", "succeeded", "succeeded", "succeeded");
+                .containsExactly("succeeded");
         verify(backupService).verify(42L);
     }
 
@@ -208,7 +208,7 @@ class BackupControllerTests {
         assertThat(job.subjectId()).isEqualTo("42:vaultwarden");
         assertThat(job.status()).isEqualTo("queued");
         assertThat(job.steps()).extracting(AutarkOsJobStep::id)
-                .containsExactly("validate_restore_point", "stop_apps", "create_safety_backup", "restore_data", "start_apps", "finish");
+                .containsExactly("validate_restore_point");
         verify(backupService, never()).restore(42L, "vaultwarden");
         verify(applicationStateService, times(1)).invalidate();
 
@@ -217,7 +217,7 @@ class BackupControllerTests {
         AutarkOsJob completed = jobService.findById(job.jobId()).orElseThrow();
         assertThat(completed.status()).isEqualTo("succeeded");
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
-                .containsExactly("succeeded", "succeeded", "succeeded", "succeeded", "succeeded", "succeeded");
+                .containsExactly("succeeded");
         verify(backupService).restore(42L, "vaultwarden");
         verify(applicationStateService, times(2)).invalidate();
     }
@@ -246,8 +246,8 @@ class BackupControllerTests {
         assertThat(completed.status()).isEqualTo("failed");
         assertThat(completed.error().message()).contains("could not restart");
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
-                .containsExactly("succeeded", "succeeded", "succeeded", "succeeded", "failed", "pending");
-        assertThat(completed.steps().get(4).message()).contains("could not restart");
+                .containsExactly("failed");
+        assertThat(completed.steps().getFirst().message()).contains("could not restart");
     }
 
     private BackupModels.BackupRunRequest reviewed() {

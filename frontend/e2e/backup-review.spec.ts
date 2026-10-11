@@ -12,7 +12,7 @@ for (const width of [390, 1440]) {
       return route.fulfill({ json: { jobId: 'reviewed', type: 'backup', status: 'running', subjectId: '__full__', steps: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } });
     });
     await page.goto('/backups');
-    const trigger = page.getByRole('button', { name: 'Back up all', exact: true });
+    const trigger = page.getByRole('button', { name: 'Review full backup', exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: 'Review backup' });
     await expect(dialog).toContainText('Vaultwarden');
@@ -43,7 +43,7 @@ test('backup review fails closed, retries scope, and requires renewed review aft
   });
   await page.route('**/api/backups/full/run', route => { runs++; return route.fulfill({ status: 409, json: { message: 'Backup scope changed. Review again.' } }); });
   await page.goto('/backups');
-  await page.getByRole('button', { name: 'Back up all', exact: true }).click();
+  await page.getByRole('button', { name: 'Review full backup', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Review backup' });
   const start = dialog.getByRole('button', { name: 'Start backup', exact: true });
   await expect(dialog).toContainText('Backup scope unavailable.');
@@ -176,3 +176,69 @@ for (const resumeAllowed of [true, false]) {
     }
   });
 }
+
+for (const width of [390, 1440]) {
+  test(`${width}px excluded app manual backup and mixed full scope use reviewed eligibility`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await installMockApi(page, 'idle');
+    await page.goto('/backups');
+    const report = await page.evaluate(async () => (await fetch('/api/backups')).json());
+    report.apps[0].status = 'unprotected';
+    report.apps[0].backupAvailable = true;
+    report.apps[0].backupUnavailableReason = '';
+    report.settings.automaticBackupsEnabled = false;
+    report.apps.push({ ...report.apps[0], appId: 'unsupported', appName: 'Unsupported app', backupAvailable: false, backupUnavailableReason: 'This app needs a supported backup contract.', restorePoints: [], latestRestorePoint: null });
+    await page.route('**/api/backups', route => route.fulfill({ json: report }));
+    let started = '';
+    await page.route('**/api/backups/plan?*', route => {
+      const scope = new URL(route.request().url()).searchParams.get('scope');
+      return route.fulfill({ json: { scope, appId: scope === 'app' ? 'vaultwarden' : null, planId: 'mixed-policy', executable: true, apps: [{appId: 'vaultwarden', appName: 'Vaultwarden'}], warnings: scope === 'full' ? ['Unsupported app is excluded: This app needs a supported backup contract.'] : ['Routine participation is off; this manual backup is still available.'], blockedReasons: [], checkedAt: new Date().toISOString() } });
+    });
+    await page.route('**/api/backups/apps/vaultwarden/run', route => {
+      started = route.request().postDataJSON().planId;
+      return route.fulfill({ json: {jobId: 'policy-manual', type: 'backup', subjectId: 'vaultwarden', status: 'running', currentStep: 'copy_data', steps: [{ id: 'prepare_backup', label: 'Check backup requirements', status: 'succeeded' }, { id: 'stop_apps', label: 'Stop app writers', status: 'succeeded' }, { id: 'copy_data', label: 'Copy app data', status: 'running' }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } });
+    });
+    await page.goto('/backups?app=vaultwarden');
+    await expect(page.getByRole('button', { name: 'Run scheduled backup now', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Review full backup', exact: true }).click();
+    const review = page.getByRole('dialog', { name: 'Review backup' });
+    await expect(review).toContainText('Unsupported app is excluded:');
+    await expect(review.getByRole('button', { name: 'Start backup' })).toBeEnabled();
+    await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Back up this app', exact: true }).click();
+    await expect(review).toContainText('Routine participation is off');
+    await review.getByRole('button', { name: 'Start backup' }).click();
+    await expect.poll(() => started).toBe('mixed-policy');
+  });
+}
+
+test('backup copy phase survives reload and failed copy retains completed steps in Activity', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  const job = {
+    jobId: 'actual-copy-phase', type: 'backup', subjectId: '__routine__', status: 'running', currentStep: 'copy_data',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), error: null as null | { code: string; message: string; advancedDetails: Record<string, string> },
+    steps: [
+      { id: 'prepare_backup', label: 'Check backup requirements', status: 'succeeded', message: 'Requirements checked.' },
+      { id: 'stop_apps', label: 'Stop app writers', status: 'succeeded', message: 'App writers stopped.' },
+      { id: 'copy_data', label: 'Copy app data', status: 'running', message: 'Copying app data.' },
+    ],
+  };
+  await page.route('**/api/jobs', route => route.fulfill({ json: [job] }));
+  await page.route('**/api/jobs/actual-copy-phase', route => route.fulfill({ json: job }));
+  await page.goto('/backups');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await expect(page.getByRole('dialog', {name: 'Activity', exact: true})).toContainText('Copying app data.');
+  await page.reload();
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await expect(page.getByRole('dialog', {name: 'Activity', exact: true})).toContainText('Copying app data.');
+  job.status = 'failed';
+  job.steps[2].status = 'failed';
+  job.steps[2].message = 'Copy failed. The app was resumed.';
+  job.error = {code: 'copy_failed', message: 'Copy failed. The app was resumed.', advancedDetails: {}};
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Backup failed');
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await page.locator('summary').filter({hasText: 'Backup failed'}).click();
+  await expect(page.getByRole('dialog', {name: 'Activity', exact: true})).toContainText('Copy failed. The app was resumed.');
+  const saved = await page.evaluate(async () => (await fetch('/api/jobs/actual-copy-phase')).json());
+  expect(saved.steps.map((step: {status:string}) => step.status)).toEqual(['succeeded', 'succeeded', 'failed']);
+});

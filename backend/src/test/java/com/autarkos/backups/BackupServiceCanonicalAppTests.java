@@ -119,7 +119,7 @@ class BackupServiceCanonicalAppTests {
                 new RuntimeFileOperations(),
                 fileOps,
                 backupDestination(runtimeLayout, fileOps),
-                new RecoveryOperationCoordinator());
+                new RecoveryOperationCoordinator(), new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
 
         BackupModels.BackupReport report = service.report();
 
@@ -656,6 +656,144 @@ class BackupServiceCanonicalAppTests {
                 .hasMessageContaining("Running containers could not be confirmed").hasMessageContaining("could not resume");
     }
 
+    @Test
+    void emptyRoutineAndFailedVerificationNeverClaimVerificationSucceeded() throws Exception {
+        var layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var points = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        var app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        installed.saveSettings("homepage", new InstallModels.InstallSettings("", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(false, "weekly", 3)));
+        var jobs = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
+        var service = backupService(layout, installed, points, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), new NoopDockerComposeExecutor(), "homepage", jobs);
+        var empty = jobs.start("backup", "__routine__", BackupJobs.steps(), () -> BackupJobs.outcome(service.runAutomatic(), jobs));
+        jobs.runQueuedJobsNow();
+        var completed = jobs.findById(empty.jobId()).orElseThrow();
+        assertThat(completed.status()).isEqualTo("succeeded");
+        assertThat(completed.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::id).containsExactly("prepare_backup");
+        assertThat(completed.steps().getFirst().message()).contains("No archive", "Homepage", "excluded from the routine");
+        var point = service.run("homepage").restorePoint();
+        Files.writeString(Path.of(point.path()), "tampered", java.nio.file.StandardOpenOption.APPEND);
+        var verify = jobs.start("backup_verify", String.valueOf(point.id()),
+                java.util.List.of(com.autarkos.jobs.AutarkOsJobStep.pending("load_restore_point", "Loading restore point")), () -> {
+                    var result = service.verify(point.id());
+                    return BackupJobs.outcome(result.status(), result.message(), jobs);
+                });
+        jobs.runQueuedJobsNow();
+        var failed = jobs.findById(verify.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.currentStep()).isEqualTo("verify_archive");
+        assertThat(failed.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::status).containsExactly("succeeded", "failed");
+    }
+
+    @Test
+    void excludedAppCanBeBackedUpManuallyAndCopyFailurePreservesRealProgress() throws Exception {
+        var layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var points = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        var app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        installed.saveSettings("homepage", new InstallModels.InstallSettings("", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(false, "monthly", 3)));
+        var jobs = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
+        var compose = new ObservedWriterDockerComposeExecutor();
+        var files = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()) {
+            @Override
+            public long createManagedArchive(String appId, java.util.Map<String, Path> paths, Path destination, Path root) throws java.io.IOException {
+                var running = jobs.findById(jobs.executingJobId()).orElseThrow();
+                assertThat(running.currentStep()).isEqualTo("copy_data");
+                assertThat(running.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::status)
+                        .containsExactly("succeeded", "succeeded", "running");
+                // A fresh reader sees persisted progress while the copy is still executing.
+                var reloaded = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
+                assertThat(reloaded.findById(running.jobId()).orElseThrow().currentStep()).isEqualTo("copy_data");
+                throw new java.io.IOException("Injected copy failure");
+            }
+        };
+        var service = backupService(layout, installed, points, catalog, files, compose, "homepage", jobs);
+        assertThat(service.backupUnavailableReason(app)).isEmpty();
+        assertThat(service.backupEligibleApps(false)).containsExactly(app);
+        assertThat(service.backupEligibleApps(true)).isEmpty();
+        var job = jobs.start("backup", "homepage", BackupJobs.steps(), () -> BackupJobs.outcome(service.run("homepage"), jobs));
+        jobs.runQueuedJobsNow();
+        var failed = jobs.findById(job.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.currentStep()).isEqualTo("copy_data");
+        assertThat(failed.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::id)
+                .containsExactly("prepare_backup", "stop_apps", "copy_data", "resume_apps");
+        assertThat(failed.steps()).extracting(com.autarkos.jobs.AutarkOsJobStep::status)
+                .containsExactly("succeeded", "succeeded", "failed", "succeeded");
+        assertThat(compose.running).isTrue();
+    }
+
+    @Test
+    void restoreCopyFailureRetainsCompletedSafetyCheckpointAndShowsRollback() throws Exception {
+        var layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var points = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        var app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var copying = new java.util.concurrent.CountDownLatch(1);
+        var releaseCopy = new java.util.concurrent.CountDownLatch(1);
+        var finished = new java.util.concurrent.CountDownLatch(1);
+        var jobs = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(layout), command ->
+                Thread.ofVirtual().start(() -> {
+                    try { command.run(); } finally { finished.countDown(); }
+                }), false);
+        var files = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()) {
+            int restores;
+            @Override
+            public void restoreAppData(Path archive, String scope, String appId, Path approvedRoot) throws java.io.IOException {
+                if (++restores == 1) {
+                    var current = jobs.findById(jobs.executingJobId()).orElseThrow();
+                    assertThat(current.currentStep()).isEqualTo("restore_data:homepage");
+                    assertThat(current.steps()).filteredOn(step -> step.id().equals("create_safety_backup:homepage"))
+                            .extracting(com.autarkos.jobs.AutarkOsJobStep::status).containsExactly("succeeded");
+                    copying.countDown();
+                    try {
+                        if (!releaseCopy.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new java.io.IOException("Copy test was not released");
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new java.io.IOException(interrupted);
+                    }
+                    throw new java.io.IOException("Injected restore write failure");
+                }
+                super.restoreAppData(archive, scope, appId, approvedRoot);
+            }
+        };
+        var service = backupService(layout, installed, points, catalog, files, new NoopDockerComposeExecutor(), "homepage", jobs);
+        var point = service.run("homepage").restorePoint();
+        var job = jobs.start("backup_restore", point.id() + ":homepage",
+                java.util.List.of(com.autarkos.jobs.AutarkOsJobStep.pending("validate_restore_point", "Validating restore point")), () -> {
+                    var result = service.restore(point.id(), "homepage");
+                    return BackupJobs.outcome(result.status(), result.message(), jobs);
+                });
+        jobs.runQueuedJobsNow();
+        try {
+            assertThat(copying.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var reloaded = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
+            var running = reloaded.findById(job.jobId()).orElseThrow();
+            assertThat(running.status()).isEqualTo("running");
+            assertThat(running.currentStep()).isEqualTo("restore_data:homepage");
+        } finally {
+            releaseCopy.countDown();
+        }
+        assertThat(finished.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        var failed = jobs.findById(job.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.steps()).filteredOn(step -> step.id().equals("restore_data:homepage"))
+                .extracting(com.autarkos.jobs.AutarkOsJobStep::status).containsExactly("failed");
+        assertThat(failed.steps()).filteredOn(step -> step.id().equals("rollback:homepage"))
+                .extracting(com.autarkos.jobs.AutarkOsJobStep::status).containsExactly("succeeded");
+        assertThat(failed.error().message()).contains("rolled back");
+    }
+
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService) {
         return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
     }
@@ -669,6 +807,11 @@ class BackupServiceCanonicalAppTests {
     }
 
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, AutarkOsFileOpsService fileOpsService, DockerComposeExecutor composeExecutor, String managedAppId) {
+        return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService, composeExecutor, managedAppId,
+                new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
+    }
+
+    private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, AutarkOsFileOpsService fileOpsService, DockerComposeExecutor composeExecutor, String managedAppId, com.autarkos.jobs.AutarkOsJobService jobs) {
         return new BackupService(
                 runtimeLayout,
                 installedRepository,
@@ -683,7 +826,7 @@ class BackupServiceCanonicalAppTests {
                 new RuntimeFileOperations(),
                 fileOpsService,
                 backupDestination(runtimeLayout, fileOpsService),
-                new RecoveryOperationCoordinator());
+                new RecoveryOperationCoordinator(), jobs);
     }
 
     private BackupDestinationService backupDestination(RuntimeLayout layout, AutarkOsFileOpsService fileOps) {
@@ -724,11 +867,8 @@ class BackupServiceCanonicalAppTests {
     }
 
     private ProjectSettingsService projectSettingsService(RuntimeLayout layout, InstalledAppRepository repository) {
-        return new ProjectSettingsService(
-                JpaTestRepositories.projectSettingsRepository(layout),
-                new ActivityLogService(mock(ActivityLogRepository.class)),
-                repository,
-                managedApps(repository, layout));
+        return new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(layout),
+                new ActivityLogService(mock(ActivityLogRepository.class)));
     }
 
     private void writeZip(Path archive, String entryName, String content) throws Exception {

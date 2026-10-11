@@ -69,7 +69,7 @@ class SimpleCatalogContractTests {
             }
             assertThat(Files.isRegularFile(Path.of("../frontend/public" + manifest.image()))).as(app.id()).isTrue();
 
-            var access = new DiscoverSetupService(null).schema(manifest).inputs().stream()
+            var access = new DiscoverSetupService(null, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings()).schema(manifest).inputs().stream()
                     .filter(input -> input.id().equals("accessMode")).findFirst().orElseThrow();
             if (manifest.usage().privateHttpsRequired()) {
                 assertThat(access.options()).extracting(option -> option.value())

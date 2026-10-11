@@ -56,12 +56,12 @@ const settingHelp: Record<string, SettingHelp> = {
     title: 'Automatic fixes',
     body: 'Lets Autark-OS attempt safe repairs such as restarting unhealthy apps or rebuilding missing private links.',
     usedFor: ['App guardian loop', 'Application stability', 'Private link repair'],
-    tip: 'This updates installed apps now. Individual app overrides still live in Applications.',
+    tip: 'This governs automation and initializes new apps. Existing app preferences are preserved.',
   },
   automaticBackupsEnabled: {
     title: 'Automatic backups',
-    body: 'Turns routine backup protection on or off for managed apps and updates their default backup policy.',
-    usedFor: ['Installed app backup policy', 'Routine backup scheduler', 'Restore point planning'],
+    body: 'Turns the shared routine schedule on or off and initializes participation for new apps. Existing participation choices are preserved.',
+    usedFor: ['New app defaults', 'Routine backup scheduler', 'Restore point planning'],
     tip: 'Manual backups will remain available even when automatic backups are off.',
   },
 };
@@ -197,16 +197,16 @@ function BackupsPanel({ apps, draft, runtimeRoot, onUpdate }: PanelProps & { app
 
   return (
     <SettingsGroup description="Schedule changes apply with Save changes. Backup location uses its own Apply location action." title="Backups">
-      <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Scheduled backups temporarily stop participating apps while copying data, then resume apps that were running.">
+      <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Scheduled backups temporarily stop participating apps while copying data, then resume apps that were running. Existing participation choices stay unchanged; manual backups remain available.">
         <Switch checked={draft.automaticBackupsEnabled} id="settings-automatic-backups" onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
       </SettingRow>
-      <SettingRow controlId="settings-backup-frequency" helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Autark-OS should create automatic backups.">
+      <SettingRow controlId="settings-backup-frequency" helpId="automaticBackupsEnabled" label="Backup frequency" note="One shared cadence for every participating app.">
         <SettingsSelect id="settings-backup-frequency" value={draft.backupFrequency} onChange={(value) => onUpdate({ backupFrequency: value })} options={[['hourly', 'Hourly'], ['daily', 'Daily'], ['weekly', 'Weekly']]} />
       </SettingRow>
-      <SettingRow controlId="settings-backup-time" helpId="automaticBackupsEnabled" label="Backup time" note="Preferred time for scheduled backups.">
+      <SettingRow controlId="settings-backup-time" helpId="automaticBackupsEnabled" label="Backup time" note={draft.backupFrequency === 'hourly' ? 'Hourly backups use the minute from this time each hour.' : draft.backupFrequency === 'weekly' ? 'Weekly backups run on Monday at this local time.' : 'Daily backups run at this local time.'}>
         <Input className="max-w-40 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-time" onChange={(event) => onUpdate({ backupTime: event.target.value })} type="time" value={draft.backupTime} />
       </SettingRow>
-      <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
+      <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="Days to keep routine full backups; initializes retention for new apps. Existing app preferences stay unchanged.">
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-retention" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
       <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={backupSchedule ? <LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule.nextRoutineRun }} /> : backups.isLoading ? 'Checking schedule…' : 'Schedule unavailable'} />
@@ -247,7 +247,7 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
   const autoRepairApps = apps?.filter((app) => settingsForApp(app).autoRepairEnabled ?? true).length;
   return (
     <SettingsGroup description="Configure app defaults and automatic management." title="Applications">
-      <SettingRow controlId="settings-automatic-repair" helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Autark-OS to try safe repairs when apps become unhealthy.">
+      <SettingRow controlId="settings-automatic-repair" helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow safe automatic repairs and initialize this preference for new apps. Existing app preferences stay unchanged.">
         <Switch checked={draft.automaticRepairEnabled} id="settings-automatic-repair" onCheckedChange={(checked) => onUpdate({ automaticRepairEnabled: checked })} />
       </SettingRow>
       <ReadOnlyRow label="Repair coverage" note="Installed apps currently allowing automatic fixes." value={apps ? `${autoRepairApps}/${apps.length}` : 'App information unavailable'} />

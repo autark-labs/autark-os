@@ -19,6 +19,7 @@ public final class OnboardingModels {
             boolean tailscaleConnected,
             String privateAccessChoice,
             boolean automaticBackupsEnabled,
+            String backupFrequency,
             List<String> recommendedApps,
             List<String> completedSteps,
             SystemDoctorStatus doctor,

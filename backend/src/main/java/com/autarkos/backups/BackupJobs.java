@@ -1,48 +1,69 @@
 package com.autarkos.backups;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
-import com.autarkos.api.AutarkOsStates;
 import com.autarkos.jobs.AutarkOsJobOutcome;
+import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 
-/** Shared job presentation for manual and scheduled backups. */
+/** Records actual execution phases in the existing durable job, including recovery. */
 final class BackupJobs {
+    private final AutarkOsJobService jobs;
 
-    private BackupJobs() {
+    BackupJobs(AutarkOsJobService jobs) {
+        this.jobs = jobs;
     }
 
     static List<AutarkOsJobStep> steps() {
-        return List.of(
-                AutarkOsJobStep.pending("prepare_backup", "Preparing restore point"),
-                AutarkOsJobStep.pending("copy_data", "Copying app data"),
-                AutarkOsJobStep.pending("verify_backup", "Verifying restore point"),
-                AutarkOsJobStep.pending("finish", "Finishing backup"));
+        return List.of(AutarkOsJobStep.pending("prepare_backup", "Validating backup scope and storage"));
     }
 
-    static AutarkOsJobOutcome outcome(BackupModels.BackupRunResult result) {
-        if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
-            List<AutarkOsJobStep> steps = List.of(
-                    AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                    AutarkOsJobStep.failed("copy_data", "Copying app data", result.message()),
-                    AutarkOsJobStep.pending("verify_backup", "Verifying restore point"),
-                    AutarkOsJobStep.pending("finish", "Finishing backup"));
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        if (AutarkOsStates.Tone.WARNING.equals(result.status())) {
-            List<AutarkOsJobStep> steps = List.of(
-                    AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                    AutarkOsJobStep.succeeded("copy_data", "Copying app data", "Restore point created."),
-                    AutarkOsJobStep.succeeded("verify_backup", "Verifying restore point", result.restorePoint() == null ? "" : result.restorePoint().verificationMessage()),
-                    AutarkOsJobStep.failed("finish", "Finishing backup", result.message()));
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        List<AutarkOsJobStep> steps = List.of(
-                AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                AutarkOsJobStep.succeeded("copy_data", "Copying app data", result.message()),
-                AutarkOsJobStep.succeeded("verify_backup", "Verifying restore point", result.restorePoint() == null ? "" : result.restorePoint().verificationMessage()),
-                AutarkOsJobStep.succeeded("finish", "Finishing backup", result.message()));
-        return AutarkOsJobOutcome.succeeded(result.message(), steps);
+    void start(String id, String label) {
+        write(id, label, "running", "");
     }
 
+    void complete(String id, String message) {
+        write(id, null, "succeeded", message);
+    }
+
+    void fail(String message) {
+        current().stream().filter(step -> "running".equals(step.status()) && step.recovery() == null)
+                .forEach(step -> write(step.id(), step.label(), "failed", message));
+    }
+
+    private void write(String id, String label, String status, String message) {
+        String jobId = jobs.executingJobId();
+        if (jobId == null) return; // Internal checkpoints have no separate owner-facing job.
+        var steps = new ArrayList<>(current());
+        var previous = steps.stream().filter(step -> step.id().equals(id)).findFirst().orElse(null);
+        Instant now = Instant.now();
+        var updated = new AutarkOsJobStep(id, label == null && previous != null ? previous.label() : label,
+                status, message, previous == null || previous.startedAt() == null ? now : previous.startedAt(),
+                "running".equals(status) ? null : now);
+        if (previous == null) steps.add(updated);
+        else steps.set(steps.indexOf(previous), updated);
+        jobs.recordProgress(jobId, steps);
+    }
+
+    List<AutarkOsJobStep> current() {
+        String jobId = jobs.executingJobId();
+        return jobId == null ? List.of() : jobs.findById(jobId).orElseThrow().steps();
+    }
+
+    static AutarkOsJobOutcome outcome(BackupModels.BackupRunResult result, AutarkOsJobService jobs) {
+        return outcome(result.status(), result.message(), jobs);
+    }
+
+    static AutarkOsJobOutcome outcome(String status, String message, AutarkOsJobService jobs) {
+        BackupJobs progress = new BackupJobs(jobs);
+        boolean failed = "failed".equals(status) || "warning".equals(status) || "legacy_unverified".equals(status);
+        if (failed) progress.fail(message);
+        else progress.current().stream().filter(step -> "running".equals(step.status()) && step.recovery() == null)
+                .forEach(step -> progress.complete(step.id(), message));
+        // Never manufacture successful copy/verification steps from a terminal result.
+        return failed ? AutarkOsJobOutcome.failed(message, progress.current())
+                : AutarkOsJobOutcome.succeeded(message, progress.current());
+    }
 }

@@ -33,7 +33,7 @@ describe('My Apps presentation helpers', () => {
       accessUrl: 'http://vaultwarden.local:8080',
       settings: {
         autoRepairEnabled: true,
-        backup: { enabled: true, frequency: 'daily', retention: 7 },
+        backup: { enabled: true, frequency: 'hourly', retention: 7 },
         desiredAccessMode: 'local',
         expectedLocalPort: 8080,
         expectedProtocol: 'http',
@@ -45,13 +45,12 @@ describe('My Apps presentation helpers', () => {
     expect(settingsFromFormValues(app, {
       autoRepairEnabled: false,
       backupEnabled: false,
-      backupFrequency: 'weekly',
       backupRetention: 14,
       localPort: 8443,
     })).toMatchObject({
       accessUrl: 'http://vaultwarden.local:8443',
       autoRepairEnabled: false,
-      backup: { enabled: false, frequency: 'weekly', retention: 14 },
+      backup: { enabled: false, frequency: 'hourly', retention: 14 },
       storageSubfolders: { data: 'data' },
     });
   });

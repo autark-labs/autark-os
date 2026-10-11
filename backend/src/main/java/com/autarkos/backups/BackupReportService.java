@@ -2,6 +2,7 @@ package com.autarkos.backups;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -13,8 +14,9 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.jobs.AutarkOsJob;
+import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -33,6 +35,8 @@ class BackupReportService {
     private final BackupContractService backupContractService;
     private final Supplier<Path> backupRoot;
     private final BackupDestinationService destinationService;
+    private final AutarkOsJobService jobs;
+    private final java.util.function.Function<InstalledApp, String> backupUnavailableReason;
 
     BackupReportService(
             InstalledAppRepository installedAppRepository,
@@ -42,7 +46,8 @@ class BackupReportService {
             RuntimeFileOperations fileOperations,
             BackupContractService backupContractService,
             Supplier<Path> backupRoot,
-            BackupDestinationService destinationService) {
+            BackupDestinationService destinationService, java.util.function.Function<InstalledApp, String> backupUnavailableReason,
+            AutarkOsJobService jobs) {
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
         this.projectSettingsService = projectSettingsService;
@@ -51,6 +56,8 @@ class BackupReportService {
         this.backupContractService = backupContractService;
         this.backupRoot = backupRoot;
         this.destinationService = destinationService;
+        this.jobs = jobs;
+        this.backupUnavailableReason = backupUnavailableReason;
     }
 
     BackupModels.BackupReport report(List<InstalledApp> installedApps) {
@@ -72,18 +79,11 @@ class BackupReportService {
         long backupStorage = destination.ready() ? fileOperations.measuredDirectorySize(Path.of(destination.configuredPath())) : -1;
         String status = destination.ready() ? status(apps, failedBackups) : "warning";
         ProjectSettings settings = projectSettingsService.current();
-        RestorePoint lastRoutine = recent.stream()
-                .filter(point -> "automatic".equals(point.source()))
-                .findFirst()
-                .orElse(null);
-        RestorePoint lastSuccessfulRoutine = recent.stream()
-                .filter(point -> "automatic".equals(point.source()) && AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status()))
-                .findFirst()
-                .orElse(null);
-        RestorePoint lastSuccessfulVerification = recent.stream()
-                .filter(point -> AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus()))
-                .findFirst()
-                .orElse(null);
+        RestorePoint lastRoutine = backupRepository.latestRoutine(false).map(RestorePoints::toDomain).orElse(null);
+        RestorePoint lastSuccessfulRoutine = backupRepository.latestRoutine(true).map(RestorePoints::toDomain).orElse(null);
+        RestorePoint lastSuccessfulVerification = backupRepository.latestSuccessfulVerification().map(RestorePoints::toDomain).orElse(null);
+
+        AutarkOsJob lastScheduledJob = jobs.latestScheduledJob(AutarkOsStates.JobType.BACKUP, "__routine__").orElse(null);
 
         return new BackupModels.BackupReport(
                 status,
@@ -96,12 +96,12 @@ class BackupReportService {
                         settings.backupTime(),
                         settings.timeZone(),
                         nextRunLabel(settings),
-                        schedulerHealth(settings, lastRoutine, destination),
-                        schedulerMessage(settings, lastRoutine, destination),
+                        schedulerHealth(settings, lastScheduledJob, destination),
+                        schedulerMessage(settings, lastScheduledJob, destination),
                         lastRoutine,
                         lastSuccessfulRoutine,
                         lastSuccessfulVerification,
-                        nextRoutineRun(settings, lastRoutine)),
+                        nextRoutineRun(settings, Instant.now())),
                 installedApps.size(),
                 protectedApps,
                 installedApps.size() - protectedApps,
@@ -114,23 +114,55 @@ class BackupReportService {
                 Instant.now());
     }
 
-    String nextRoutineRun(ProjectSettings settings, RestorePoint lastRoutine) {
-        return nextRoutineRun(settings, lastRoutine, Instant.now());
-    }
-
-    String nextRoutineRun(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
-        if (!settings.automaticBackupsEnabled()) {
-            return "";
-        }
-        Instant candidate = scheduledWindow(settings, lastRoutine, now);
-        while (!candidate.isAfter(now)) {
-            candidate = advance(settings, candidate);
+    String nextRoutineRun(ProjectSettings settings, Instant now) {
+        if (!settings.automaticBackupsEnabled()) return "";
+        Instant candidate = calendarWindow(settings, now);
+        if (!candidate.isAfter(now)) {
+            var job = jobs.findById(AutarkOsJobService.onceJobId(windowKey(settings, candidate)));
+            if (job.isPresent() && List.of("succeeded", "failed", "cancelled").contains(job.get().status())) {
+                candidate = nextWindow(settings, candidate);
+            }
         }
         return candidate.toString();
     }
 
-    boolean routineBackupDue(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
-        return settings.automaticBackupsEnabled() && !scheduledWindow(settings, lastRoutine, now).isAfter(now);
+    record RoutineWindow(Instant startsAt, String key) { }
+
+    static Optional<RoutineWindow> routineWindow(ProjectSettings settings, Instant now) {
+        if (!settings.automaticBackupsEnabled()) return Optional.empty();
+        Instant candidate = calendarWindow(settings, now);
+        return candidate.isAfter(now) ? Optional.empty()
+                : Optional.of(new RoutineWindow(candidate, windowKey(settings, candidate)));
+    }
+
+    private static String windowKey(ProjectSettings settings, Instant candidate) {
+        return "routine:" + settings.backupFrequency() + ":" + settings.timeZone() + ":" + settings.backupTime() + ":" + candidate;
+    }
+
+    // No historical catch-up on first enable. Daily/weekly windows use local calendar
+    // time; DST gaps move forward, overlaps use the earlier offset exactly once.
+    // Hourly windows follow elapsed hours and therefore include both repeated hours.
+    private static Instant calendarWindow(ProjectSettings settings, Instant now) {
+        ZoneId zone = ZoneId.of(settings.timeZone());
+        ZonedDateTime local = now.atZone(zone);
+        LocalTime time = parseBackupTime(settings.backupTime());
+        if ("hourly".equals(settings.backupFrequency())) {
+            ZonedDateTime candidate = local.withMinute(time.getMinute()).withSecond(0).withNano(0);
+            return (candidate.toInstant().isAfter(now) ? candidate.minusHours(1) : candidate).toInstant();
+        }
+        LocalDate date = "weekly".equals(settings.backupFrequency())
+                ? local.toLocalDate().with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                : local.toLocalDate();
+        return ZonedDateTime.of(date, time, zone).toInstant();
+    }
+
+    private static Instant nextWindow(ProjectSettings settings, Instant candidate) {
+        ZoneId zone = ZoneId.of(settings.timeZone());
+        ZonedDateTime local = candidate.atZone(zone);
+        if ("hourly".equals(settings.backupFrequency())) return local.plusHours(1).toInstant();
+        LocalDate date = "weekly".equals(settings.backupFrequency())
+                ? local.toLocalDate().plusWeeks(1) : local.toLocalDate().plusDays(1);
+        return ZonedDateTime.of(date, parseBackupTime(settings.backupTime()), zone).toInstant();
     }
 
     private BackupModels.AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
@@ -142,8 +174,8 @@ class BackupReportService {
         RestorePoint latest = restorePoints.stream().findFirst().orElse(null);
         long dataSize = fileOperations.directorySize(Path.of(app.runtimePath()));
         BackupModels.BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));
-        boolean backupAvailable = AppRuntimeFiles.hasComposeFile(app.runtimePath());
-        String backupUnavailableReason = backupAvailable ? "" : missingRuntimeReason(app.appName());
+        String backupUnavailableReason = this.backupUnavailableReason.apply(app);
+        boolean backupAvailable = backupUnavailableReason.isBlank();
         boolean protectedByBackups = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(
                 BackupProtectionPolicy.state(policy.enabled(), manifestsById.get(app.appId()), restorePoints));
         String status = protectedByBackups ? "protected" : appBackupStatus(policy, latest, contract, backupAvailable);
@@ -152,7 +184,7 @@ class BackupReportService {
                 app.appName(),
                 status,
                 "protected".equals(status),
-                policy.frequency(),
+                projectSettingsService.current().backupFrequency(),
                 policy.retention(),
                 Math.toIntExact(Math.min(
                         Integer.MAX_VALUE,
@@ -171,14 +203,12 @@ class BackupReportService {
     }
 
     private String appBackupStatus(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract, boolean backupAvailable) {
+        if (contract.reviewRequired()) return "needs_backup_review";
         if (!backupAvailable) {
             return "recovery_limited";
         }
         if (!policy.enabled()) {
             return "unprotected";
-        }
-        if (contract.reviewRequired()) {
-            return "needs_backup_review";
         }
         if (latest == null) {
             return "not_backed_up";
@@ -194,7 +224,7 @@ class BackupReportService {
             return backupUnavailableReason;
         }
         if (!policy.enabled()) {
-            return "Backups are off.";
+            return "Excluded from the routine. You can still create a manual backup.";
         }
         if (contract.reviewRequired()) {
             return "Needs backup review: " + contract.summary();
@@ -219,74 +249,44 @@ class BackupReportService {
         return "No completed restore point yet.";
     }
 
-    private String missingRuntimeReason(String appName) {
-        return appName + " cannot use backups because its original Compose file is missing. Review recovery in My Apps before changing or removing its data.";
-    }
-
     private String nextRunLabel(ProjectSettings settings) {
         if (!settings.automaticBackupsEnabled()) {
             return "Automatic backups are off";
         }
-        return "Next " + settings.backupFrequency() + " backup near " + settings.backupTime() + " " + settings.timeZone();
-    }
-
-    private Instant scheduledWindow(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
-        ZoneId zone = ZoneId.of(settings.timeZone());
-        LocalDate startDate = lastRoutine == null
-                ? ZonedDateTime.ofInstant(now, zone).toLocalDate()
-                : ZonedDateTime.ofInstant(lastRoutine.createdAt(), zone).toLocalDate();
-        LocalDate scheduledDate = switch (settings.backupFrequency()) {
-            case "weekly" -> lastRoutine == null ? startDate : startDate.plusWeeks(1);
-            case "daily" -> lastRoutine == null ? startDate : startDate.plusDays(1);
-            default -> startDate;
-        };
-        Instant candidate = ZonedDateTime.of(scheduledDate, parseBackupTime(settings.backupTime()), zone).toInstant();
-        if (lastRoutine == null) {
-            return candidate;
-        }
-        while (!candidate.isAfter(lastRoutine.createdAt())) {
-            candidate = advance(settings, candidate);
-        }
-        return candidate;
-    }
-
-    private Instant advance(ProjectSettings settings, Instant candidate) {
-        ZoneId zone = ZoneId.of(settings.timeZone());
-        ZonedDateTime localCandidate = ZonedDateTime.ofInstant(candidate, zone);
         return switch (settings.backupFrequency()) {
-            case "weekly" -> localCandidate.plusWeeks(1).toInstant();
-            case "daily" -> localCandidate.plusDays(1).toInstant();
-            default -> localCandidate.plusHours(1).toInstant();
+            case "hourly" -> "Hourly at minute " + parseBackupTime(settings.backupTime()).getMinute() + " · " + settings.timeZone();
+            case "weekly" -> "Mondays at " + settings.backupTime() + " " + settings.timeZone();
+            default -> "Daily at " + settings.backupTime() + " " + settings.timeZone();
         };
     }
 
-    private String schedulerHealth(ProjectSettings settings, RestorePoint lastRoutine, BackupModels.BackupDestination destination) {
+    private String schedulerHealth(ProjectSettings settings, AutarkOsJob lastScheduledJob, BackupModels.BackupDestination destination) {
         if (!settings.automaticBackupsEnabled()) {
             return "off";
         }
         if (!destination.ready()) {
             return "warning";
         }
-        if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
+        if (lastScheduledJob != null && "failed".equals(lastScheduledJob.status())) {
             return "warning";
         }
         return "healthy";
     }
 
-    private String schedulerMessage(ProjectSettings settings, RestorePoint lastRoutine, BackupModels.BackupDestination destination) {
+    private String schedulerMessage(ProjectSettings settings, AutarkOsJob lastScheduledJob, BackupModels.BackupDestination destination) {
         if (!settings.automaticBackupsEnabled()) {
             return "Automatic backups are turned off in Settings.";
         }
         if (!destination.ready()) {
             return destination.message();
         }
-        if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
-            return "The latest routine backup failed: " + lastRoutine.message();
+        if (lastScheduledJob != null && "failed".equals(lastScheduledJob.status())) {
+            return "The latest scheduled backup failed or was interrupted. Review its saved progress in Activity. You can run a routine backup now; the next scheduled window is unchanged.";
         }
-        return "Routine backups are scheduled in the background. Autark-OS records these runs separately from manual checkpoints.";
+        return "Routine windows run once. Busy windows wait; failed or interrupted attempts remain in Activity and the next window runs normally. Manual backups do not change this schedule.";
     }
 
-    private LocalTime parseBackupTime(String value) {
+    private static LocalTime parseBackupTime(String value) {
         if (value == null || value.isBlank()) {
             return LocalTime.of(2, 0);
         }
@@ -301,7 +301,7 @@ class BackupReportService {
         if (!policy.enabled()) {
             return "Not scheduled";
         }
-        return "Next " + policy.frequency() + " window";
+        return nextRunLabel(projectSettingsService.current());
     }
 
     private String status(List<BackupModels.AppBackupStatus> apps, int failedBackups) {

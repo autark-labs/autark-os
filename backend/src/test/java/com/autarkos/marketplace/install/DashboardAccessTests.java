@@ -25,7 +25,7 @@ class DashboardAccessTests {
         var props = new AutarkOsRuntimeProperties();
         props.setRuntimeRoot(root.toString());
         var layout = new RuntimeLayout(props);
-        var resolver = new InstallCustomizationResolver(new PortAllocator());
+        var resolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         for (String mode : List.of("local", "private")) {
             var configuration = resolver.resolve(manifest, options(mode, freePort()));
             var path = new ComposeRenderer(layout).render(manifest, root.resolve(mode), configuration);
@@ -46,7 +46,7 @@ class DashboardAccessTests {
         var props = new AutarkOsRuntimeProperties();
         props.setRuntimeRoot(root.toString());
         var renderer = new ComposeRenderer(new RuntimeLayout(props));
-        var resolver = new InstallCustomizationResolver(new PortAllocator());
+        var resolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         var local = resolver.resolve(manifest, options("local", freePort()));
         var lan = resolver.resolve(manifest, options("network", freePort()));
         assertThat(Files.readString(renderer.render(manifest, root.resolve("local"), local))).contains("127.0.0.1:");
@@ -60,7 +60,7 @@ class DashboardAccessTests {
         try (var peer = new ServerSocket(0)) {
             String compose = "services:\n  syncthing:\n    ports:\n      - \"127.0.0.1:18384:8384\"\n      - \"" + peer.getLocalPort()
                     + ":22000/tcp\"\n      - \"22000:22000/udp\"\n      - \"21027:21027/udp\"\n";
-            var result = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options("local", freePort()), compose);
+            var result = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings()).resolveSettings(manifest, options("local", freePort()), compose);
             assertThat(result.ports()).contains(peer.getLocalPort() + ":22000/tcp", "22000:22000/udp", "21027:21027/udp");
             assertThat(result.ports()).hasSize(4);
         }
@@ -73,7 +73,7 @@ class DashboardAccessTests {
         Files.writeString(compose, "services:\n  syncthing:\n    image: syncthing/syncthing:2.1.1\n    container_name: autarkos_owned_syncthing\n    labels:\n      - autark-os.instance-id=owner\n    volumes:\n      - /preserved/data:/var/syncthing/data\n    ports:\n      - '127.0.0.1:18384:8384'\n      - '22000:22000/tcp'\n      - '22000:22000/udp'\n      - '21027:21027/udp'\nnetworks:\n  default:\n    name: existing-network\n");
         var yaml = new org.yaml.snakeyaml.Yaml();
         java.util.Map<String, Object> before = yaml.load(Files.readString(compose));
-        var result = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options("local", freePort()), Files.readString(compose));
+        var result = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings()).resolveSettings(manifest, options("local", freePort()), Files.readString(compose));
         var props = new AutarkOsRuntimeProperties();props.setRuntimeRoot(root.toString());
         new ComposeRenderer(new RuntimeLayout(props)).updatePorts(compose, manifest, result);
         java.util.Map<String, Object> after = yaml.load(Files.readString(compose));

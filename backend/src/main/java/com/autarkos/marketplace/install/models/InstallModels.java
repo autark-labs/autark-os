@@ -40,9 +40,9 @@ public final class InstallModels {
 
         public String label() {
             if (!enabled) {
-                return "Disabled";
+                return "Excluded from routine backups";
             }
-            return frequency + ", keep " + retention;
+            return "Included in routine backups, keep " + retention;
         }
     }
 

@@ -2917,6 +2917,7 @@ SETUP_USAGE
     fi
     log "Runtime storage is currently: ${runtime_path:-unknown}"
     backup_destination="$(read_default "Backup destination" "${backup_destination:-${runtime_path}/backups}")"
+    log "Routine backups use the shared $(json_value backupFrequency "${onboarding_file}") schedule from Settings. Running participating apps temporarily stop while data is copied, then resume. Manual backups remain available when routines are off."
     if confirm_default_yes "Turn on routine backups?"; then
       automatic_backups=true
     else

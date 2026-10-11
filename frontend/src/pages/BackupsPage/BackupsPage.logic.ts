@@ -47,7 +47,7 @@ export function backupStatusLabel(status: string) {
   if (status === 'needs_backup_review') return 'Needs backup review';
   if (status === 'recovery_limited') return 'Recovery limited';
   if (status === 'not_backed_up') return 'No restore point yet';
-  if (status === 'unprotected') return 'Backups off';
+  if (status === 'unprotected') return 'Excluded from routines';
   if (status === 'protected') return 'Protected by restore point';
   return status.replaceAll('_', ' ');
 }

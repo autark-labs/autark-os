@@ -44,7 +44,7 @@ class ApplicationInventoryServiceTests {
     void activeInstallIsNotOfferedAsRecoveryBeforeRegistrationExists() {
         var repository = installedRepository();
         var recovery = recovery();
-        var inventory = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery);
+        var inventory = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery, backups());
         var evidence = List.of(observed("docker:syncthing", "syncthing", "owned_managed", "observed"));
         var operation = com.autarkos.api.AppOperationView.running("installing", "Installing", "install-1", "Starting services", "Starting services");
 
@@ -79,7 +79,7 @@ class ApplicationInventoryServiceTests {
                 "syncthing", "instance", "syncthing", "current-instance", runtimeRoot.resolve("apps/syncthing").toString(),
                 "installed", "owned", Instant.now(), Instant.now()));
         String privateUrl = "https://server.example.ts.net:14384";
-        var service = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery());
+        var service = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery(), backups());
         var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl)), Map.of())
                 .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
         assertThat(view.runtime().accessRoute().privateLinkStatus()).isEqualTo("verified");
@@ -114,7 +114,7 @@ class ApplicationInventoryServiceTests {
         when(snapshot.attest(org.mockito.ArgumentMatchers.<InstalledApp>any())).thenAnswer(invocation ->
                 invocation.getArgument(0) == null ? attestation.attest((InstalledApp) null) : result);
         Files.delete(runtimeRoot.resolve("apps/syncthing/compose.yaml"));
-        var service = new ApplicationInventoryService(catalogService(), repository, snapshot, recovery());
+        var service = new ApplicationInventoryService(catalogService(), repository, snapshot, recovery(), backups());
         var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", "http://localhost:18384")), Map.of())
                 .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
         assertThat(view.availableActions()).filteredOn(action -> action.id().equals("settings")).singleElement().satisfies(action -> {
@@ -307,7 +307,7 @@ class ApplicationInventoryServiceTests {
                 "autarkos_autark-os_vaultwarden", "appinst_vaultwarden", List.of("vaultwarden"), List.of(), List.of(),
                 List.of(), List.of("Restore registration"), List.of())));
         ApplicationInventoryService inventory = new ApplicationInventoryService(
-                catalogService(), repository, managedApps(repository), recovery);
+                catalogService(), repository, managedApps(repository), recovery, backups());
 
         ApplicationView view = app(inventory, observed, "vaultwarden");
 
@@ -376,7 +376,7 @@ class ApplicationInventoryServiceTests {
         ManagedAppAttestationService managedApps = managedApps(repository);
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"));
         ApplicationInventoryService inventory = new ApplicationInventoryService(
-                catalogService(), repository, managedApps, recovery());
+                catalogService(), repository, managedApps, recovery(), backups());
         ObservedService currentRuntime = observed(
                 "docker:vaultwarden", "vaultwarden", "owned_managed", "observed");
 
@@ -398,7 +398,16 @@ class ApplicationInventoryServiceTests {
                 catalogService(),
                 installedRepository,
                 managedApps(installedRepository),
-                recovery());
+                recovery(), backups());
+    }
+
+    private com.autarkos.backups.BackupService backups() {
+        var backups = mock(com.autarkos.backups.BackupService.class);
+        when(backups.backupUnavailableReason(org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+            InstalledApp app = call.getArgument(0);
+            return com.autarkos.marketplace.install.AppRuntimeFiles.hasComposeFile(app.runtimePath()) ? "" : "Original Compose file is missing.";
+        });
+        return backups;
     }
 
     private AppRecoveryService recovery() {

@@ -44,6 +44,29 @@ class DiscoverServiceTests {
     Path runtimeRoot;
 
     @Test
+    void backupDefaultsAndPreviewFollowTheSharedSchedule() {
+        var defaults = com.autarkos.system.ProjectSettings.defaults("test");
+        var configured = new com.autarkos.system.ProjectSettings(defaults.deviceName(), defaults.timeZone(),
+                defaults.language(), defaults.temperatureUnit(), defaults.dateFormat(), defaults.timeFormat(),
+                defaults.startOnBoot(), defaults.telemetryEnabled(), defaults.defaultInstallAccess(),
+                false, false, "hourly", 21, defaults.backupTime(), java.time.Instant.now());
+        var settings = com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings();
+        org.mockito.Mockito.when(settings.current()).thenReturn(configured);
+        var setup = new DiscoverSetupService(null, settings);
+        var manifest = catalogService().findById("vaultwarden").orElseThrow();
+        var answers = setup.defaults(manifest);
+        assertThat(answers.stringValue("backupPolicy")).isEqualTo("disabled");
+        var preview = new DiscoverInstallPreviewService(
+                new InstallPlanService(runtimeLayout(), new InstallCustomizationResolver(new PortAllocator(), settings)), setup);
+        var options = preview.installOptions(manifest, answers);
+        assertThat(options.backup().enabled()).isFalse();
+        assertThat(options.backup().frequency()).isEqualTo("hourly");
+        assertThat(options.backup().retention()).isEqualTo(21);
+        assertThat(setup.schema(manifest).inputs().stream().filter(input -> input.id().equals("backupPolicy"))
+                .findFirst().orElseThrow().help()).contains("hourly");
+    }
+
+    @Test
     void simpleCatalogOffersOnlyManagedStorageAndRejectsStaleExternalFolderChoices() throws Exception {
         var service = discoverService(observedRepository());
         var media = Files.createDirectory(runtimeRoot.resolve("external-media"));
@@ -282,8 +305,8 @@ class DiscoverServiceTests {
     void installPersistsSetupAnswersOnlyAfterItsJobIsAcceptedAndRuns() {
         RuntimeLayout layout = runtimeLayout();
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
-        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
-        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
+        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         AutarkOsJobService jobs = jobService();
         DiscoverService service = new DiscoverService(
                 catalogService(),
@@ -313,8 +336,8 @@ class DiscoverServiceTests {
     void installInvalidatesApplicationStateWhenJobIsAccepted() {
         RuntimeLayout layout = runtimeLayout();
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
-        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
-        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
+        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         when(applicationStateService.snapshot()).thenReturn(new ApplicationState(
                 List.of(), Instant.parse("2026-06-21T12:00:00Z")));
@@ -335,8 +358,8 @@ class DiscoverServiceTests {
         RuntimeLayout layout = runtimeLayout();
         InstalledAppRepository installedAppRepository = repository();
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
-        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
-        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
+        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         return new DiscoverService(
                 catalogService(),
                 applicationStateService(() -> applicationViews(installedAppRepository, observedRepository)),
@@ -350,8 +373,8 @@ class DiscoverServiceTests {
         RuntimeLayout layout = runtimeLayout();
         InstalledAppRepository installedAppRepository = repository();
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
-        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
-        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
+        DiscoverSetupService setupService = new DiscoverSetupService(setupRepository, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator(), com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         return new DiscoverService(
                 catalogService(),
                 applicationStateService(() -> applicationViews(installedAppRepository, observedRepository)),
@@ -382,9 +405,11 @@ class DiscoverServiceTests {
                 .filter(app -> managedApps.attest(app).managed())
                 .map(this::runtime)
                 .toList();
+        var backups = mock(com.autarkos.backups.BackupService.class);
+        org.mockito.Mockito.when(backups.backupUnavailableReason(org.mockito.ArgumentMatchers.any())).thenReturn("");
         return new com.autarkos.apps.ApplicationInventoryService(
                 catalogService(), installedAppRepository, managedApps,
-                mock(com.autarkos.apps.recovery.AppRecoveryService.class))
+                mock(com.autarkos.apps.recovery.AppRecoveryService.class), backups)
                 .apps(observedServices.observedServices(), runtimes, Map.of());
     }
 
@@ -440,7 +465,7 @@ class DiscoverServiceTests {
         private InstallOptionsRequest lastOptions;
 
         private RecordingMarketplaceInstallService() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
         }
 
         @Override

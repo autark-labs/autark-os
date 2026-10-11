@@ -34,6 +34,17 @@ class OnboardingServiceTests {
     Path externalRoot;
 
     @Test
+    void onboardingReportsTheSharedCadenceWithoutReplacingItOnUnrelatedSave() {
+        RuntimeLayout layout = runtimeLayout();
+        var repository = JpaTestRepositories.projectSettingsRepository(layout);
+        repository.saveValues(java.util.Map.of("backupFrequency", "hourly"));
+        var onboarding = service(repository, layout);
+        assertThat(onboarding.state().backupFrequency()).isEqualTo("hourly");
+        assertThat(onboarding.update(new OnboardingModels.OnboardingUpdateRequest(
+                "in_progress", 3, "renamed", null, null, null, null, null)).backupFrequency()).isEqualTo("hourly");
+    }
+
+    @Test
     void recommendationsUseBetaRosterAndFilterPreviouslySavedExcludedApps() {
         RuntimeLayout layout = runtimeLayout();
         ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(layout);
@@ -118,11 +129,8 @@ class OnboardingServiceTests {
         InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
         AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "test", runtimeRoot.toString(),
                 "runtime-hash", Instant.now(), 1);
-        ProjectSettingsService settingsService = new ProjectSettingsService(
-                repository,
-                new ActivityLogService(mock(ActivityLogRepository.class)),
-                installedApps,
-                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
+        ProjectSettingsService settingsService = new ProjectSettingsService(repository,
+                new ActivityLogService(mock(ActivityLogRepository.class)));
         return new OnboardingService(repository, settingsService, runtimeLayout, new FakeTailscaleService(), new FakeSystemDoctorService());
     }
 

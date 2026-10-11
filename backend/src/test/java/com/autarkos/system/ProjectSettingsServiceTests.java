@@ -26,8 +26,9 @@ class ProjectSettingsServiceTests {
     @TempDir
     Path runtimeRoot;
 
-    @Test
-    void appliesBackupAndRepairDefaultsToInstalledAppsWithoutReplacingAppSpecificSettings() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"false,true", "true,false", "false,false"})
+    void globalBackupAndRepairChangesPreserveExistingAppPreferences(boolean repair, boolean backups) {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
         Instant installedAt = Instant.parse("2026-06-21T12:00:00Z");
@@ -41,11 +42,8 @@ class ProjectSettingsServiceTests {
         saveOwnership(installedApps, runtimeLayout, identity, "vaultwarden", installedAt);
         saveOwnership(installedApps, runtimeLayout, identity, "homepage", installedAt);
         ManagedAppTestContract.writeAll(installedApps, runtimeLayout, identity);
-        ProjectSettingsService service = new ProjectSettingsService(
-                JpaTestRepositories.projectSettingsRepository(runtimeLayout),
-                new ActivityLogService(mock(ActivityLogRepository.class)),
-                installedApps,
-                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
+        ProjectSettingsService service = new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout),
+                new ActivityLogService(mock(ActivityLogRepository.class)));
         installedApps.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://vaultwarden.tailnet.ts.net",
@@ -72,8 +70,8 @@ class ProjectSettingsServiceTests {
                 true,
                 false,
                 "manifest-default",
-                false,
-                false,
+                repair,
+                backups,
                 "monthly",
                 120,
                 "02:00",
@@ -81,8 +79,8 @@ class ProjectSettingsServiceTests {
         ProjectSettingsAppDefaultsResult result = saveResult.appDefaults();
 
         assertThat(result.ok()).isTrue();
-        assertThat(result.updatedApps()).isEqualTo(2);
-        assertThat(saveResult.settings().automaticBackupsEnabled()).isFalse();
+        assertThat(result.updatedApps()).isZero();
+        assertThat(saveResult.settings().automaticBackupsEnabled()).isEqualTo(backups);
         assertThat(installedApps.settingsFor("vaultwarden")).hasValueSatisfying(settings -> {
             assertThat(settings.accessUrl()).isEqualTo("http://localhost:8090");
             assertThat(settings.privateAccessUrl()).isEqualTo("https://vaultwarden.tailnet.ts.net");
@@ -92,14 +90,10 @@ class ProjectSettingsServiceTests {
             assertThat(settings.privateAccessRequirement()).isEqualTo("required");
             assertThat(settings.expectedLocalPort()).isEqualTo(8090);
             assertThat(settings.lastRepairStatus()).isEqualTo("completed");
-            assertThat(settings.backup()).isEqualTo(new InstallModels.BackupPolicy(false, "daily", 7));
-            assertThat(settings.autoRepairEnabled()).isFalse();
+            assertThat(settings.backup()).isEqualTo(new InstallModels.BackupPolicy(true, "weekly", 3));
+            assertThat(settings.autoRepairEnabled()).isTrue();
         });
-        assertThat(installedApps.settingsFor("homepage")).hasValueSatisfying(settings -> {
-            assertThat(settings.accessUrl()).isEqualTo("http://localhost:3000");
-            assertThat(settings.backup()).isEqualTo(new InstallModels.BackupPolicy(false, "daily", 7));
-            assertThat(settings.autoRepairEnabled()).isFalse();
-        });
+        assertThat(installedApps.settingsFor("homepage")).isEmpty();
     }
 
     private void saveOwnership(InstalledAppRepository repository, RuntimeLayout layout, AutarkOsIdentity identity,
@@ -115,11 +109,8 @@ class ProjectSettingsServiceTests {
         InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
         AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "test", runtimeRoot.toString(),
                 "runtime-hash", Instant.now(), 1);
-        ProjectSettingsService service = new ProjectSettingsService(
-                JpaTestRepositories.projectSettingsRepository(runtimeLayout),
-                new ActivityLogService(mock(ActivityLogRepository.class)),
-                installedApps,
-                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
+        ProjectSettingsService service = new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout),
+                new ActivityLogService(mock(ActivityLogRepository.class)));
         ProjectSettings defaults = ProjectSettings.defaults("autark-os");
 
         ProjectSettings saved = service.update(new ProjectSettings(

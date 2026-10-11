@@ -196,6 +196,7 @@ export type OnboardingState = {
   tailscaleConnected: boolean;
   privateAccessChoice: 'setup-now' | 'local-only' | 'already-connected' | string;
   automaticBackupsEnabled: boolean;
+  backupFrequency: string;
   recommendedApps: string[];
   completedSteps: string[];
   doctor: SystemDoctorStatus;

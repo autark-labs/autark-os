@@ -48,9 +48,11 @@ public class BackupService {
     private final AppLifecycleService appLifecycleService;
     private final AutarkOsFileOpsService fileOpsService;
     private final RecoveryOperationCoordinator recoveryOperations;
+    private final BackupJobs progress;
     private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, ManagedAppAttestationService managedApps, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, ManagedAppAttestationService managedApps, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, com.autarkos.jobs.AutarkOsJobService jobs) {
+        this.progress = new BackupJobs(jobs);
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
         this.activityLogService = activityLogService;
@@ -63,10 +65,10 @@ public class BackupService {
         BackupContractService backupContractService = new BackupContractService(catalogService);
         this.backupArchiveService = new BackupArchiveService(fileOperations, fileOpsService, backupDestinationService, backupRepository, installedAppRepository, catalogService, activityLogService);
         this.backupVerificationService = backupArchiveService.verification();
-        this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService);
+        this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService, this::backupUnavailableReason, jobs);
         RestoreSimulationService restoreSimulationService = new RestoreSimulationService(backupContractService, this::backupRoot);
         this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps, backupDestinationService::archiveAvailable);
-        this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, backupArchiveService, backupVerificationService, restorePlanner, managedApps);
+        this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, backupArchiveService, backupVerificationService, restorePlanner, managedApps, progress);
     }
 
     public BackupModels.BackupReport report() {
@@ -109,17 +111,18 @@ public class BackupService {
         return runFullBackupUnlocked("automatic");
     }
 
-    public Optional<BackupModels.BackupRunResult> runAutomaticIfDue() {
-        return recoveryOperations.tryRunExclusive(
-                        RecoveryOperationCoordinator.Operation.ROUTINE_BACKUP,
-                        this::runAutomaticIfDueUnlocked)
-                .orElseGet(Optional::empty);
-    }
-
-    private Optional<BackupModels.BackupRunResult> runAutomaticIfDueUnlocked() {
-        if (!automaticBackupDue()) return Optional.empty();
-        activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Autark-OS started the scheduled routine backup window.");
-        return Optional.of(runAutomaticUnlocked());
+    public Optional<BackupModels.BackupRunResult> runScheduledWindow() {
+        progress.start("wait_for_recovery", "Waiting for other app recovery work");
+        return recoveryOperations.runExclusiveWaiting(RecoveryOperationCoordinator.Operation.ROUTINE_BACKUP, () -> {
+            progress.complete("wait_for_recovery", "The backup has exclusive access to app data.");
+            progress.start("prepare_backup", "Validating backup scope and storage");
+            if (!projectSettingsService.current().automaticBackupsEnabled()) {
+                progress.complete("prepare_backup", "Automatic backups were turned off before this window could run. No archive was created.");
+                return Optional.empty();
+            }
+            activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Autark-OS started the scheduled routine backup window.");
+            return Optional.of(runAutomaticUnlocked());
+        });
     }
 
     public BackupModels.BackupRunResult runFullBackup(String source) {
@@ -128,40 +131,62 @@ public class BackupService {
                 () -> runFullBackupUnlocked(source));
     }
 
-    List<InstalledApp> backupEligibleApps() {
+    /** Shared manual-backup eligibility; routine enrollment is deliberately independent. */
+    public String backupUnavailableReason(InstalledApp app) {
+        if (!AppRuntimeFiles.hasComposeFile(app.runtimePath())) {
+            return "The original Compose file is missing. Review recovery in My Apps before backing up this app.";
+        }
+        var contract = backupContract(app);
+        if (contract.reviewRequired()) return contract.summary();
+        if (installedAppRepository.settingsRecoveryFor(app.appId()).isPresent()) {
+            return "This app has an unfinished settings change. Use Repair in My Apps first.";
+        }
+        var destination = backupDestinationService.current();
+        if (!destination.ready()) return destination.message();
+        try {
+            managedApps.durableStorage(app, true);
+        } catch (RuntimeException failure) {
+            return "The managed data for this app could not be confirmed. Review it in My Apps before backing it up.";
+        }
+        return "";
+    }
+
+    List<InstalledApp> backupEligibleApps(boolean routine) {
         return managedInstalledApps().stream()
-                .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled())
+                .filter(app -> !routine || installedAppRepository.settingsFor(app.appId()).map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled())
                 .filter(app -> !backupContract(app).reviewRequired())
                 .toList();
     }
 
-    public boolean automaticBackupDue() {
-        ProjectSettings settings = projectSettingsService.current();
-        if (!settings.automaticBackupsEnabled()) return false;
-        RestorePoint lastRoutine = backupRepository.recent(50).stream().map(RestorePoints::toDomain)
-                .filter(point -> "automatic".equals(point.source())).findFirst().orElse(null);
-        return backupReportService.routineBackupDue(settings, lastRoutine, Instant.now());
+    Optional<BackupReportService.RoutineWindow> automaticBackupWindow() {
+        return BackupReportService.routineWindow(projectSettingsService.current(), Instant.now());
     }
 
     private BackupModels.BackupRunResult runFullBackupUnlocked(String source) {
+        progress.start("prepare_backup", "Validating backup scope and storage");
+        List<InstalledApp> apps = managedInstalledApps();
+        List<InstalledApp> protectedApps = backupEligibleApps("automatic".equals(source));
+        String scopeSummary = backupScopeSummary(apps, protectedApps, "automatic".equals(source));
         BackupModels.BackupDestination destinationState = backupDestinationService.current();
         if (!destinationState.ready()) {
-            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
+            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message() + " " + scopeSummary);
             return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
-        List<InstalledApp> apps = managedInstalledApps();
-        List<InstalledApp> protectedApps = backupEligibleApps();
-        List<InstalledApp> recoveryLimitedApps = apps.stream()
-                .filter(app -> !AppRuntimeFiles.hasComposeFile(app.runtimePath()))
-                .toList();
-        if (!recoveryLimitedApps.isEmpty()) {
-            String appNames = recoveryLimitedApps.stream().map(InstalledApp::appName).collect(java.util.stream.Collectors.joining(", "));
-            String message = "Full backup is unavailable because the original Compose file is missing for: " + appNames + ". Review these apps in My Apps before running a full backup.";
+        List<String> blockers = protectedApps.stream()
+                .map(app -> {
+                    String reason = backupUnavailableReason(app);
+                    return reason.isBlank() ? "" : app.appName() + ": " + reason;
+                }).filter(reason -> !reason.isBlank()).toList();
+        if (!blockers.isEmpty()) {
+            String message = "Full backup is unavailable. " + String.join(" ", blockers) + " " + scopeSummary;
+            progress.fail(message);
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
             return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
         if (protectedApps.isEmpty()) {
-            return new BackupModels.BackupRunResult("__full__", "All apps", "not_applicable", "No apps currently have a backup contract that Autark-OS can protect automatically.", null, Instant.now());
+            String message = "No archive was created or verified. " + scopeSummary;
+            progress.complete("prepare_backup", message);
+            return new BackupModels.BackupRunResult("__full__", "All apps", "not_applicable", message, null, Instant.now());
         }
         List<AppLifecycleService.CheckpointState> checkpoints = new java.util.ArrayList<>();
         List<String> restartFailures = new java.util.ArrayList<>();
@@ -172,34 +197,54 @@ public class BackupService {
                     .toList();
             // Validate every source and the destination before pausing the first app.
             backupArchiveService.validateFullBackup(storage);
+            progress.complete("prepare_backup", "Backup scope and storage validated.");
+            progress.start("stop_apps", "Pausing included apps");
             for (InstalledApp app : protectedApps) {
                 var state = appLifecycleService.prepareCheckpoint(app.appId());
                 checkpoints.add(state);
                 appLifecycleService.stopForCheckpoint(state);
             }
             protectedApps.forEach(appLifecycleService::confirmCheckpointStopped);
+            progress.complete("stop_apps", "Included apps are stopped.");
+            progress.start("copy_data", "Copying app data");
             Files.createDirectories(backupRoot().resolve("full"));
             Path destination = backupRoot().resolve("full").resolve("autark-os-full-" + BACKUP_NAME_FORMAT.format(Instant.now()) + "-" + java.util.UUID.randomUUID() + ".zip");
             long size = backupArchiveService.createFullArchive(storage, destination);
+            progress.complete("copy_data", "App data archived.");
+            progress.start("verify_backup", "Verifying restore point");
             String included = protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(","));
             BackupModels.BackupContract contract = new BackupModels.BackupContract("cold_file", 1, "Stopped app file backup", "standard", false, "All included apps were stopped before archiving.", List.of());
-            RestorePoint point = backupArchiveService.recordVerifiedArchive("__full__", "All apps", "full", cleanSource(source), included, destination, size, "Full backup completed for " + protectedApps.size() + " app(s).", contract);
+            RestorePoint point = backupArchiveService.recordVerifiedArchive("__full__", "All apps", "full", cleanSource(source), included, destination, size, "Backup completed. " + scopeSummary, contract);
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
+                progress.fail(point.verificationMessage());
                 result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
             } else {
+                progress.complete("verify_backup", point.verificationMessage());
+                progress.start("record_result", "Recording backup result");
                 enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
                 activityLogService.success("backup", cleanSource(source) + "_full_backup", "Full backup completed", point.message(), null);
                 protectedApps.forEach(app -> installedAppRepository.recordEvent(app.appId(), "backup_completed", "Included in full " + cleanSource(source) + " backup."));
+                progress.complete("record_result", "Restore point and backup history saved.");
                 result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.COMPLETED, point.message(), point, Instant.now());
             }
         } catch (RuntimeException | IOException exception) {
-            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(",")), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
+            progress.fail(userMessage(exception));
+            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(",")), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception) + " " + scopeSummary);
             activityLogService.error("backup", cleanSource(source) + "_full_backup", "Full backup failed", userMessage(exception), null, exception);
             result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         } finally {
             restartFailures.addAll(restartAppsAfterBackup(checkpoints));
         }
         return withRestartOutcome(result, restartFailures);
+    }
+
+    private String backupScopeSummary(List<InstalledApp> all, List<InstalledApp> included, boolean routine) {
+        String names = included.stream().map(InstalledApp::appName).collect(java.util.stream.Collectors.joining(", "));
+        var exclusions = all.stream().filter(app -> included.stream().noneMatch(item -> item.appId().equals(app.appId())))
+                .map(app -> app.appName() + ": " + (routine && !installedAppRepository.settingsFor(app.appId())
+                        .map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled()
+                        ? "excluded from the routine" : backupContract(app).summary())).toList();
+        return "Included: " + (names.isEmpty() ? "none" : names) + "." + (exclusions.isEmpty() ? "" : " Excluded: " + String.join("; ", exclusions));
     }
 
     public RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
@@ -211,7 +256,16 @@ public class BackupService {
     public BackupModels.BackupVerificationResult verify(long restorePointId) {
         return recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.RESTORE_VERIFICATION,
-                () -> backupVerificationService.verifyRestorePoint(findRestorePoint(restorePointId)).result());
+                () -> {
+                    progress.start("load_restore_point", "Loading restore point");
+                    var point = findRestorePoint(restorePointId);
+                    progress.complete("load_restore_point", "Restore point loaded.");
+                    progress.start("verify_archive", "Verifying backup archive");
+                    var result = backupVerificationService.verifyRestorePoint(point).result();
+                    if ("verified".equals(result.status())) progress.complete("verify_archive", result.message());
+                    else progress.fail(result.message());
+                    return result;
+                });
     }
 
     public RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
@@ -245,20 +299,13 @@ public class BackupService {
         InstallModels.BackupPolicy policy = installedAppRepository.settingsFor(appId)
                 .map(InstallModels.InstallSettings::backup)
                 .orElse(InstallModels.BackupPolicy.defaults());
-        if (!policy.enabled()) {
-            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Backups are turned off for this app.");
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
-        }
+        progress.start("prepare_backup", "Validating backup scope and storage");
         BackupModels.BackupContract contract = backupContract(app);
-        if (contract.reviewRequired()) {
-            String message = app.appName() + " needs a stronger " + contract.label().toLowerCase() + " before Autark-OS can create a protection claim.";
-            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, message, point, Instant.now());
-        }
-        BackupModels.BackupDestination destinationState = backupDestinationService.current();
-        if (!destinationState.ready()) {
-            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
+        String unavailable = backupUnavailableReason(app);
+        if (!unavailable.isBlank()) {
+            progress.fail(unavailable);
+            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, unavailable);
+            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, unavailable, point, Instant.now());
         }
         AppLifecycleService.CheckpointState checkpoint = null;
         List<String> restartFailures = new java.util.ArrayList<>();
@@ -266,21 +313,32 @@ public class BackupService {
         try {
             java.util.Map<String, Path> protectedPaths = managedApps.durableStorage(app, true).protectedPaths();
             backupArchiveService.validateAppBackup(protectedPaths);
+            progress.complete("prepare_backup", "Backup scope and storage validated.");
+            progress.start("stop_apps", "Pausing " + app.appName());
             checkpoint = appLifecycleService.prepareCheckpoint(appId);
             appLifecycleService.stopForCheckpoint(checkpoint);
+            progress.complete("stop_apps", "App is stopped.");
+            progress.start("copy_data", "Copying app data");
             Files.createDirectories(backupRoot().resolve(app.appId()));
             Path destination = backupRoot().resolve(app.appId()).resolve(app.appId() + "-" + BACKUP_NAME_FORMAT.format(Instant.now()) + "-" + java.util.UUID.randomUUID() + ".zip");
             long size = backupArchiveService.createArchive(app.appId(), protectedPaths, destination);
+            progress.complete("copy_data", "App data archived.");
+            progress.start("verify_backup", "Verifying restore point");
             RestorePoint point = backupArchiveService.recordVerifiedArchive(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination, size, "Backup completed.", contract);
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
+                progress.fail(point.verificationMessage());
                 result = new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
             } else {
+                progress.complete("verify_backup", point.verificationMessage());
+                progress.start("record_result", "Recording backup result");
                 enforceRetention(app.appId(), policy.retention());
                 activityLogService.success("backup", cleanSource(backupSource) + "_app_backup", "Backup completed", app.appName() + " backup is ready.", app.appId());
                 installedAppRepository.recordEvent(app.appId(), "backup_completed", "Backup completed.");
+                progress.complete("record_result", "Restore point and backup history saved.");
                 result = new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.COMPLETED, "Backup completed.", point, Instant.now());
             }
         } catch (RuntimeException | IOException exception) {
+            progress.fail(userMessage(exception));
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
             activityLogService.error("backup", cleanSource(backupSource) + "_app_backup", "Backup failed", userMessage(exception), app.appId(), exception);
             installedAppRepository.recordEvent(app.appId(), "backup_failed", userMessage(exception));
@@ -306,6 +364,8 @@ public class BackupService {
 
     private List<String> restartAppsAfterBackup(List<AppLifecycleService.CheckpointState> checkpoints) {
         List<String> failures = new java.util.ArrayList<>();
+        if (checkpoints.isEmpty()) return failures;
+        progress.start("resume_apps", "Resuming apps that were running");
         for (var state : checkpoints.reversed()) {
             try {
                 appLifecycleService.resumeAfterCheckpoint(state).ifPresent(failures::add);
@@ -314,6 +374,8 @@ public class BackupService {
                 failures.add(state.app().appName() + " recovery could not be recorded. Review the app in My Apps.");
             }
         }
+        if (failures.isEmpty()) progress.complete("resume_apps", "Previous app availability restored.");
+        else progress.fail(String.join(" ", failures));
         return failures;
     }
 

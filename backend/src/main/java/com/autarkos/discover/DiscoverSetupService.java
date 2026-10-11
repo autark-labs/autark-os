@@ -1,5 +1,7 @@
 package com.autarkos.discover;
 
+import com.autarkos.system.ProjectSettings;
+import com.autarkos.system.ProjectSettingsService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,9 +14,11 @@ import org.springframework.stereotype.Service;
 public class DiscoverSetupService {
 
     private final DiscoverSetupRepository setupRepository;
+    private final ProjectSettingsService projectSettings;
 
-    public DiscoverSetupService(DiscoverSetupRepository setupRepository) {
+    public DiscoverSetupService(DiscoverSetupRepository setupRepository, ProjectSettingsService projectSettings) {
         this.setupRepository = setupRepository;
+        this.projectSettings = projectSettings;
     }
 
     public DiscoverSetupModels.DiscoverSetupSchema schema(ApplicationManifest manifest) {
@@ -55,8 +59,8 @@ public class DiscoverSetupService {
                 "choice",
                 "recommended",
                 true,
-                "enabled_first_checkpoint",
-                "Backups save app data so you can recover after a bad update, mistake, or broken install.",
+                settings().automaticBackupsEnabled() ? "enabled_first_checkpoint" : "disabled",
+                "Routine backups use the appliance-wide " + settings().backupFrequency() + " schedule. Manual backups remain available when routine participation is off.",
                 backupOptions(),
                 Map.of()));
         inputs.addAll(appSpecificInputs(manifest));
@@ -90,6 +94,10 @@ public class DiscoverSetupService {
 
     public void persist(String appId, String catalogAppId, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         setupRepository.save(appId, catalogAppId, answers);
+    }
+
+    ProjectSettings settings() {
+        return projectSettings.current();
     }
 
     private List<DiscoverSetupModels.DiscoverSetupInput> appSpecificInputs(ApplicationManifest manifest) {
@@ -171,9 +179,9 @@ public class DiscoverSetupService {
 
     private List<DiscoverSetupModels.DiscoverSetupOption> backupOptions() {
         return List.of(
-                option("enabled_first_checkpoint", "Enable backups and create first restore point", "Include the app in backups and recommend a first restore point after install.", true, false),
-                option("enabled_no_checkpoint", "Enable backups, create restore point later", "Include the app in backups without a first-checkpoint reminder.", false, false),
-                option("disabled", "Do not back up this app", "Skip backup protection for now.", false, true));
+                option("enabled_first_checkpoint", "Include in routine backups and recommend a first restore point", "Temporarily stop the app during routine backups, then resume it if it was running.", true, false),
+                option("enabled_no_checkpoint", "Include in routine backups", "Use the shared schedule. A manual restore point can also be created after install.", false, false),
+                option("disabled", "Exclude from routine backups", "Manual backups and required safety checkpoints remain available.", false, true));
     }
 
     private DiscoverSetupModels.DiscoverSetupOption option(String value, String label, String description, boolean recommended, boolean advanced) {

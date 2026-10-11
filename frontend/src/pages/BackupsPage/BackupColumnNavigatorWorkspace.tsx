@@ -284,7 +284,7 @@ function BackupActions({
         <DisabledAction disabled={routineDisabled} reason={routineReason}><button className="text-xs font-medium text-cyan-200 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={routineDisabled} onClick={onRunRoutineBackup} type="button">{running === 'routine' ? 'Running scheduled backup…' : 'Run scheduled backup now'}</button></DisabledAction>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
-        <DisabledAction disabled={fullBackupAvailability.disabled} reason={fullBackupAvailability.reason}><ProjectPrimaryButton disabled={fullBackupAvailability.disabled} onClick={onCreateFullBackup} size="sm" type="button">{running === 'full' ? <Loader2 className="size-3.5 animate-spin" /> : <Layers3 className="size-3.5" />}{running === 'full' ? 'Backing up all' : 'Back up all'}</ProjectPrimaryButton></DisabledAction>
+        <DisabledAction disabled={fullBackupAvailability.disabled} reason={fullBackupAvailability.reason}><ProjectPrimaryButton disabled={fullBackupAvailability.disabled} onClick={onCreateFullBackup} size="sm" type="button">{running === 'full' ? <Loader2 className="size-3.5 animate-spin" /> : <Layers3 className="size-3.5" />}{running === 'full' ? 'Creating backup' : 'Review full backup'}</ProjectPrimaryButton></DisabledAction>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <ProjectDarkControlButton size="sm" type="button"><AppWindow className="size-3.5" />Choose an app</ProjectDarkControlButton>
@@ -365,8 +365,8 @@ function DirectoryHeader({
   onCreateAppBackup: (app: AppBackupStatus) => void;
   running: string | null;
 }) {
-  const disabled = appBackupAvailability.disabled || !app?.backupAvailable || app.status === 'unprotected';
-  const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app?.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
+  const disabled = appBackupAvailability.disabled || !app?.backupAvailable;
+  const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app?.backupUnavailableReason || 'Review this app’s backup requirements before creating a restore point.';
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-sky-300/15 px-3 py-3">
       <div className="min-w-0"><div className="flex min-w-0 items-center gap-1 text-xs text-sky-100/55"><HardDrive className="size-3.5 shrink-0" /><span className="truncate">{directoryPath(directory, app)}</span></div><p className="mt-1 text-sm font-semibold text-white">{directoryTitle(directory, app)} <span className="font-normal text-sky-100/50">· {fileCount} {fileCount === 1 ? 'file' : 'files'}</span></p></div>
@@ -430,13 +430,13 @@ function PreviewSlot({
   if (!point) return <EmptyPreview app={app} appBackupAvailability={appBackupAvailability} onCreateAppBackup={onCreateAppBackup} running={running} />;
   const tone = restorePointTone(point);
   const selectedApp = app ?? null;
-  const appBackupDisabled = appBackupAvailability.disabled || !selectedApp?.backupAvailable || selectedApp.status === 'unprotected';
-  const appBackupReason = appBackupAvailability.disabled ? appBackupAvailability.reason : selectedApp?.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
+  const appBackupDisabled = appBackupAvailability.disabled || !selectedApp?.backupAvailable;
+  const appBackupReason = appBackupAvailability.disabled ? appBackupAvailability.reason : selectedApp?.backupUnavailableReason || 'Review this app’s backup requirements before creating a restore point.';
   return (
     <section className={cn('rounded-xl border border-sky-300/20 bg-slate-900 p-4', compact && 'mt-3')}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2">{point.scope === 'full' ? <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-800', tone.text)}>{point.verificationStatus === 'verified' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}</span> : <BackupAppIcon className="size-8 rounded-lg" iconUrl={appIconUrlById[point.appId]} />}<div className="min-w-0"><p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-white">{point.scope === 'full' ? 'Full checkpoint' : point.appName}</p><p className="mt-0.5 text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</p></div></div><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></div>
-      <p className="mt-3 text-xs leading-5 text-sky-100/65">{point.scope === 'full' ? 'This file contains a recovery point for every protected app at that moment.' : `This file contains the backup data Autark-OS recorded for ${point.appName}.`} Review the plan before restoring anything.</p>
-      <div className="mt-4 grid gap-2"><PreviewFact icon={point.scope === 'full' ? Layers3 : AppWindow} label="Restore scope" value={point.scope === 'full' ? 'All protected apps' : point.appName} /><PreviewFact icon={point.verificationStatus === 'verified' ? CheckCircle2 : Clock3} label="Verification" value={verificationDetail(point)} /><PreviewFact icon={CalendarClock} label="Next scheduled backup" value={settings.nextRunLabel || formatBackupDate(settings.nextRoutineRun, timeZone)} /></div>
+      <p className="mt-3 text-xs leading-5 text-sky-100/65">{point.scope === 'full' ? 'This file contains restore points for the apps included when it was created.' : `This file contains the backup data Autark-OS recorded for ${point.appName}.`} Review the plan before restoring anything.</p>
+      <div className="mt-4 grid gap-2"><PreviewFact icon={point.scope === 'full' ? Layers3 : AppWindow} label="Restore scope" value={point.scope === 'full' ? 'Included apps' : point.appName} /><PreviewFact icon={point.verificationStatus === 'verified' ? CheckCircle2 : Clock3} label="Verification" value={verificationDetail(point)} /><PreviewFact icon={CalendarClock} label="Next scheduled backup" value={settings.nextRoutineRun ? formatBackupDate(settings.nextRoutineRun, timeZone) : settings.nextRunLabel || 'Not scheduled'} /></div>
       <div className="mt-4 flex flex-wrap gap-2"><DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}><ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onOpenRestorePlan(point)} size="sm" type="button"><ArchiveRestore className="size-3.5" />Review restore plan</ProjectPrimaryButton></DisabledAction><DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}><ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} size="sm" type="button">{running === `verify-${point.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}{running === `verify-${point.id}` ? 'Verifying' : point.verificationStatus === 'verified' ? 'View verification' : 'Verify file'}</ProjectDarkControlButton></DisabledAction></div>
       <div className="mt-2 flex flex-wrap gap-2"><ProjectDarkControlButton onClick={() => onOpenDetails(point)} size="sm" type="button">Details</ProjectDarkControlButton>{point.scope !== 'full' && selectedApp && <DisabledAction disabled={appBackupDisabled} reason={appBackupReason}><ProjectDarkControlButton disabled={appBackupDisabled} onClick={() => onCreateAppBackup(selectedApp)} size="sm" type="button"><Play className="size-3.5" />Back up again</ProjectDarkControlButton></DisabledAction>}</div>
     </section>
@@ -464,8 +464,8 @@ function EmptyPreview({
   running: string | null;
 }) {
   if (!app) return <div className="rounded-xl border border-sky-300/15 bg-slate-900 p-4 text-sm text-sky-100/65">Select a backup file to review its recovery details.</div>;
-  const disabled = appBackupAvailability.disabled || !app.backupAvailable || app.status === 'unprotected';
-  const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
+  const disabled = appBackupAvailability.disabled || !app.backupAvailable;
+  const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app.backupUnavailableReason || 'Review this app’s backup requirements before creating a restore point.';
   return <section className="rounded-xl border border-sky-300/20 bg-slate-900 p-4"><div className="flex items-center gap-2"><CircleAlert className="size-4 text-amber-200" /><p className="text-sm font-semibold text-white">No recovery file yet</p></div><p className="mt-2 text-xs leading-5 text-sky-100/65">{app.message || `Create the first backup for ${app.appName}.`}</p><DisabledAction disabled={disabled} reason={reason}><ProjectPrimaryButton className="mt-4" disabled={disabled} onClick={() => onCreateAppBackup(app)} size="sm" type="button">{running === `app-${app.appId}` ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}{running === `app-${app.appId}` ? 'Backing up' : 'Back up this app'}</ProjectPrimaryButton></DisabledAction></section>;
 }
 

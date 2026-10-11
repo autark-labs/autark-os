@@ -43,6 +43,29 @@ class BackupRepositoryTests {
                 .containsExactly("Vaultwarden");
     }
 
+    @Test
+    void routineAndVerificationSummariesSurviveMoreThanTwentyManualPoints() {
+        BackupRepository repository = repository();
+        var success = repository.save(RestorePoints.create("__full__", "All apps", "full", "automatic", "homepage",
+                "/backups/routine.zip", "completed", 1, "Routine completed", "a".repeat(64), "cold_file", 1));
+        success.updateVerification("verified", "Verified", "high", "2026-10-10T12:00:00Z");
+        repository.save(success);
+        var failure = repository.save(RestorePoints.create("__full__", "All apps", "full", "automatic", "homepage",
+                "", "failed", 0, "Routine failed", "", "cold_file", 1));
+        var newerArchive = repository.save(RestorePoints.create("homepage", "Homepage", "app", "manual", "homepage",
+                "/backups/manual.zip", "completed", 1, "Manual completed", "b".repeat(64), "cold_file", 1));
+        newerArchive.updateVerification("verified", "Verified earlier", "high", "2026-10-09T12:00:00Z");
+        repository.save(newerArchive);
+        for (int i = 0; i < 25; i++) {
+            repository.save(RestorePoints.create("homepage", "Homepage", "app", "manual", "homepage",
+                    "", "failed", 0, "Manual failure", "", "cold_file", 1));
+        }
+        assertThat(repository.recent(20)).extracting(RestorePointEntity::source).containsOnly("manual");
+        assertThat(repository.latestRoutine(false)).map(RestorePointEntity::id).contains(failure.id());
+        assertThat(repository.latestRoutine(true)).map(RestorePointEntity::id).contains(success.id());
+        assertThat(repository.latestSuccessfulVerification()).map(RestorePointEntity::id).contains(success.id());
+    }
+
     private BackupRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

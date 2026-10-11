@@ -564,7 +564,7 @@ public class AppLifecycleService {
                 new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode()),
                 new InstallOptionsRequest.StorageOptions(settings.storageSubfolders()),
                 new InstallOptionsRequest.BackupOptions(settings.backup().enabled(), settings.backup().frequency(), settings.backup().retention()));
-        RuntimeModels.ResolvedRuntimeConfiguration configuration = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options, previousCompose);
+        RuntimeModels.ResolvedRuntimeConfiguration configuration = InstallCustomizationResolver.resolveSettings(manifest, options, previousCompose);
         List<RuntimeModels.DockerContainerStatus> containers = inventory.ownedContainersFor(app.appId(), app.composeProject());
         if (containers.isEmpty()) {
             throw new InstallationException("Autark-OS cannot confirm this app's running state. Check Docker and the app in My Apps before changing its settings.");
@@ -962,7 +962,7 @@ public class AppLifecycleService {
                 desiredAccess,
                 observedAccess,
                 app.installedAt(),
-                settings.backup().enabled() ? settings.backup().label() : "Backups disabled",
+                settings.backup().label(),
                 backupState,
                 settings,
                 telemetry,

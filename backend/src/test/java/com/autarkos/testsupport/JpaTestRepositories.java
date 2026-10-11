@@ -50,6 +50,12 @@ public final class JpaTestRepositories {
         return context(layout).getBean(AutarkOsJobRepository.class);
     }
 
+    public static com.autarkos.system.ProjectSettingsService defaultProjectSettings() {
+        var service = org.mockito.Mockito.mock(com.autarkos.system.ProjectSettingsService.class);
+        org.mockito.Mockito.when(service.current()).thenReturn(com.autarkos.system.ProjectSettings.defaults("test"));
+        return service;
+    }
+
     public static ProjectSettingsRepository projectSettingsRepository(RuntimeLayout layout) {
         return context(layout).getBean(ProjectSettingsRepository.class);
     }

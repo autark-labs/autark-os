@@ -21,7 +21,7 @@ export function settingsFromFormValues(app: AppRuntimeView, values: ApplicationS
     accessUrl,
     backup: {
       enabled: values.backupEnabled,
-      frequency: values.backupFrequency,
+      frequency: currentSettings.backup.frequency,
       retention: values.backupRetention,
     },
     expectedLocalPort: values.localPort,

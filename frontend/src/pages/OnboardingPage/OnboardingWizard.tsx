@@ -181,7 +181,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (current.id === 'device') return <DeviceStep deviceName={draft.deviceName} onDeviceNameChange={(deviceName) => updateDraft({ deviceName })} />;
     if (current.id === 'readiness') return <ReadinessStep existingInstall={existingInstall} setupStatus={setupStatus} state={state} showExistingInstallWarning={showExistingInstallWarning} />;
     if (current.id === 'access') return <AccessStep draft={draft} onChange={updateDraft} state={state} />;
-    if (current.id === 'backups') return <BackupsStep defaultDestination={defaultBackupDestination} draft={draft} onChange={updateDraft} />;
+    if (current.id === 'backups') return <BackupsStep backupFrequency={state?.backupFrequency} defaultDestination={defaultBackupDestination} draft={draft} onChange={updateDraft} />;
     if (current.id === 'apps') return <AppsStep selectedApps={draft.selectedApps} onToggleApp={toggleApp} />;
     return <ReviewStep advancedFinish={advancedFinish} draft={draft} onAdvancedFinishChange={setAdvancedFinish} readiness={readiness} state={state} />;
   }, [advancedFinish, current, defaultBackupDestination, draft, existingInstall, readiness, setupStatus, showExistingInstallWarning, state, toggleApp, updateDraft]);
@@ -298,7 +298,7 @@ function AccessStep({ draft, onChange, state }: { draft: OnboardingDraft; onChan
   );
 }
 
-function BackupsStep({ defaultDestination, draft, onChange }: { defaultDestination: string; draft: OnboardingDraft; onChange: (updates: Partial<OnboardingDraft>) => void }) {
+function BackupsStep({ backupFrequency, defaultDestination, draft, onChange }: { backupFrequency?: string; defaultDestination: string; draft: OnboardingDraft; onChange: (updates: Partial<OnboardingDraft>) => void }) {
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -308,7 +308,7 @@ function BackupsStep({ defaultDestination, draft, onChange }: { defaultDestinati
       </div>
       {draft.backupPosture === 'external' && <div className="grid gap-2"><label className="grid gap-2 text-sm font-semibold text-white" htmlFor="backup-destination">Backup destination<Input className="border-sky-400/25 bg-slate-800 text-white" id="backup-destination" onChange={(event) => onChange({ backupDestination: event.target.value })} placeholder="/mnt/backup-drive/autark-os-backups" value={draft.backupDestination} /></label><p className="text-xs leading-5 text-slate-400">Use a folder on a mounted external drive. Autark-OS checks that it is writable, has room, is not a link, and is not on this device’s runtime drive before it accepts the location.</p></div>}
       {draft.backupPosture !== 'later' && <label className="flex items-center gap-3 rounded-xl border border-sky-400/25 bg-slate-800 p-4"><Checkbox checked={draft.automaticBackups} onCheckedChange={(checked) => onChange({ automaticBackups: Boolean(checked) })} /><span><span className="block font-semibold text-white">Run routine backups</span><span className="text-sm text-slate-400">{draft.backupPosture === 'external' ? draft.backupDestination || 'Choose a destination above.' : `Use ${defaultDestination}`}</span></span></label>}
-      <p className="text-sm leading-6 text-slate-400">Routine backups temporarily stop participating apps while their data is copied, then resume apps that were running. Same-device restore points help with app mistakes. Use an external location to protect against drive failure. If that drive is disconnected later, Autark-OS pauses backups instead of silently saving them on this device.</p>
+      <p className="text-sm leading-6 text-slate-400">Routine backups use one shared {backupFrequency || 'configured'} schedule, managed in Settings. They temporarily stop participating apps while their data is copied, then resume apps that were running. Same-device restore points help with app mistakes. Use an external location to protect against drive failure. If that drive is disconnected later, Autark-OS pauses backups instead of silently saving them on this device.</p>
     </div>
   );
 }

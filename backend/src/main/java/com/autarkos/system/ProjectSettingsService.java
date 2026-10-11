@@ -11,10 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.ManagedAppAttestationService;
-import com.autarkos.marketplace.install.models.InstallModels;
 
 @Service
 public class ProjectSettingsService {
@@ -26,15 +22,10 @@ public class ProjectSettingsService {
 
     private final ProjectSettingsRepository repository;
     private final ActivityLogService activityLogService;
-    private final InstalledAppRepository installedAppRepository;
-    private final ManagedAppAttestationService managedApps;
 
-    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService,
-            InstalledAppRepository installedAppRepository, ManagedAppAttestationService managedApps) {
+    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService) {
         this.repository = repository;
         this.activityLogService = activityLogService;
-        this.installedAppRepository = installedAppRepository;
-        this.managedApps = managedApps;
     }
 
     public ProjectSettings current() {
@@ -52,9 +43,7 @@ public class ProjectSettingsService {
         ProjectSettings current = current();
         ProjectSettings sanitized = sanitize(settings, current);
         repository.save(sanitized);
-        ProjectSettingsAppDefaultsResult appDefaults = shouldApplyAppDefaults(current, sanitized)
-                ? applyAppDefaultsInternal(sanitized)
-                : unchangedAppDefaults();
+        ProjectSettingsAppDefaultsResult appDefaults = unchangedAppDefaults();
         activityLogService.info("settings", "project_settings_updated", "Autark-OS settings updated", "Saved Autark-OS preferences.");
         return new ProjectSettingsSaveResult(sanitized, appDefaults);
     }
@@ -63,41 +52,8 @@ public class ProjectSettingsService {
         return save(settings).settings();
     }
 
-    private ProjectSettingsAppDefaultsResult applyAppDefaultsInternal(ProjectSettings sanitized) {
-        int updated = 0;
-        InstallModels.BackupPolicy backup = new InstallModels.BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
-        for (InstalledApp app : managedApps.managedApps()) {
-            InstallModels.InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-            installedAppRepository.saveSettings(app.appId(), new InstallModels.InstallSettings(
-                    current.accessUrl(),
-                    current.privateAccessUrl(),
-                    current.tailscaleEnabled(),
-                    current.storageSubfolders(),
-                    backup,
-                    current.desiredAccessMode(),
-                    current.privateAccessRequirement(),
-                    current.expectedLocalPort(),
-                    current.expectedProtocol(),
-                    current.lastAccessCheckAt(),
-                    current.lastSuccessfulAccessAt(),
-                    current.lastRepairAttemptAt(),
-                    current.lastRepairStatus(),
-                    sanitized.automaticRepairEnabled()));
-            updated++;
-        }
-        activityLogService.info("settings", "app_defaults_applied", "App defaults applied", "Applied backup and repair defaults to " + updated + " app(s).");
-        return new ProjectSettingsAppDefaultsResult(true, "success", "App defaults applied", "Applied backup and repair defaults to " + updated + " app(s).", updated, Instant.now());
-    }
-
-    private boolean shouldApplyAppDefaults(ProjectSettings current, ProjectSettings saved) {
-        return current.automaticRepairEnabled() != saved.automaticRepairEnabled()
-                || current.automaticBackupsEnabled() != saved.automaticBackupsEnabled()
-                || !current.backupFrequency().equals(saved.backupFrequency())
-                || current.backupRetentionDays() != saved.backupRetentionDays();
-    }
-
     private ProjectSettingsAppDefaultsResult unchangedAppDefaults() {
-        return new ProjectSettingsAppDefaultsResult(true, "info", "App defaults unchanged", "Saved appliance settings. Managed app backup and repair defaults did not change.", 0, Instant.now());
+        return new ProjectSettingsAppDefaultsResult(true, "info", "App defaults unchanged", "Saved appliance settings. Existing app backup and repair preferences were preserved. Defaults apply to new apps.", 0, Instant.now());
     }
 
     private ProjectSettings sanitize(ProjectSettings settings, ProjectSettings fallback) {

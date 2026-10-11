@@ -12,7 +12,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -53,15 +52,12 @@ public class BackupPlanService {
             affected = managed.stream().filter(app -> app.appId().equals(appId)).toList();
             if (affected.isEmpty()) blocked.add("This app is no longer managed by this Autark-OS instance. Review it in My Apps.");
         } else {
-            affected = backups.backupEligibleApps();
+            affected = backups.backupEligibleApps("routine".equals(scope));
             fingerprint.add(Integer.toString(settings.current().backupRetentionDays()));
             for (InstalledApp app : managed) {
                 if (affected.stream().noneMatch(included -> included.appId().equals(app.appId()))) {
-                    warnings.add(app.appName() + " is excluded: " + (policy(app).enabled()
-                            ? "its backup contract needs review." : "backups are turned off for this app."));
-                }
-                if (!AppRuntimeFiles.hasComposeFile(app.runtimePath())) {
-                    blocked.add("The original Compose file is missing for " + app.appName() + ". Review this app in My Apps.");
+                    warnings.add(app.appName() + " is excluded: " + ("routine".equals(scope) && !policy(app).enabled()
+                            ? "excluded from the routine." : "its backup contract needs review."));
                 }
             }
         }
@@ -78,21 +74,18 @@ public class BackupPlanService {
             var contract = contracts.backupContract(app);
             fingerprint.addAll(List.of(app.appId(), app.appName(), app.runtimePath(), app.composeProject(),
                     policy.toString(), contract.strategy(), Integer.toString(contract.version())));
-            if (!policy.enabled()) blocked.add("Backups are turned off for " + app.appName() + ". Enable them in app settings first.");
-            if (contract.reviewRequired()) blocked.add(app.appName() + ": " + contract.summary());
+            String unavailable = backups.backupUnavailableReason(app);
+            if (!unavailable.isBlank()) blocked.add(app.appName() + ": " + unavailable);
             installedApps.ownershipFor(app.appId()).ifPresentOrElse(ownership -> {
                 fingerprint.add(ownership.appInstanceId());
                 fingerprint.add(ownership.autarkOsInstanceId());
             }, () -> blocked.add("Ownership could not be confirmed for " + app.appName() + ". Review it in My Apps."));
-            if (installedApps.settingsRecoveryFor(app.appId()).isPresent()) {
-                blocked.add(app.appName() + " has an unfinished settings change. Use Repair in My Apps first.");
-            }
             try {
                 managedApps.durableStorage(app, true).protectedPaths().entrySet().stream()
                         .sorted(java.util.Map.Entry.comparingByKey())
                         .forEach(path -> fingerprint.add(path.getKey() + "=" + path.getValue().toAbsolutePath().normalize()));
             } catch (RuntimeException exception) {
-                blocked.add("The managed data for " + app.appName() + " could not be confirmed. Review this app in My Apps before backing it up.");
+                if (unavailable.isBlank()) blocked.add("The managed data for " + app.appName() + " could not be confirmed. Review this app in My Apps before backing it up.");
             }
         }
         warnings.add("The listed apps will be unavailable while Autark-OS stops them, copies their data, and verifies the restore point.");

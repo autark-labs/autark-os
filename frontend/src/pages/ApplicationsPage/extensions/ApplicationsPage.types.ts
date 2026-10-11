@@ -43,7 +43,7 @@ export type ApplicationSurfaceItem = {
   operation: AppOperationState;
   issues: AutarkOsIssue[];
   access: 'Open' | 'Private' | 'Local only' | 'No link';
-  backup: 'Protected' | 'Needs backup' | 'Not managed';
+  backup: 'Protected' | 'Needs backup' | 'Routine off';
   availableActions: ApplicationAction[];
   catalogAppId?: string | null;
   nextAction?: ApplicationNextAction;
@@ -73,7 +73,6 @@ export type ApplicationActionHandlers = {
 export type ApplicationSettingsFormValues = {
   autoRepairEnabled: boolean;
   backupEnabled: boolean;
-  backupFrequency: 'daily' | 'weekly' | 'monthly';
   backupRetention: number;
   localPort: number | null;
 };
@@ -98,7 +97,6 @@ export type ApplicationSettingsView = {
   expectedLocalPort: number | null;
   expectedProtocol: 'http' | 'https' | string;
   backupEnabled: boolean;
-  backupFrequency: 'daily' | 'weekly' | 'monthly' | string;
   backupRetention: number;
   privateAccessRequired: boolean;
   privateAccessUrl?: string;

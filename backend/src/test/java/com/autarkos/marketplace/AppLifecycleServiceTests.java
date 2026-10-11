@@ -134,6 +134,24 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void rejectsPerAppCadenceChangesAndPreservesLegacyCadenceOnOtherEdits() {
+        var original = new InstallModels.InstallSettings("http://localhost:8090", null, false,
+                java.util.Map.of(), new InstallModels.BackupPolicy(true, "hourly", 3));
+        repository.saveSettings("vaultwarden", original);
+        var changedCadence = new InstallModels.InstallSettings("http://localhost:8090", null, false,
+                java.util.Map.of(), new InstallModels.BackupPolicy(true, "weekly", 3));
+        assertThat(service.settingsChangePlan("vaultwarden", changedCadence).blockedReasons())
+                .anyMatch(reason -> reason.contains("shared by all apps"));
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", changedCadence))
+                .hasMessageContaining("shared by all apps");
+        var participation = new InstallModels.InstallSettings("http://localhost:8090", null, false,
+                java.util.Map.of(), new InstallModels.BackupPolicy(false, "hourly", 5));
+        service.updateSettings("vaultwarden", participation);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().backup())
+                .isEqualTo(new InstallModels.BackupPolicy(false, "hourly", 5));
+    }
+
+    @Test
     void returnsFriendlyRuntimeStatusAndRecentEvents() {
         AppRuntimeView app = service.getApp("vaultwarden");
 
@@ -159,13 +177,13 @@ class AppLifecycleServiceTests {
         assertThat(current.tailscaleEnabled()).isFalse();
         assertThat(current.privateAccessRequirement()).isEqualTo("disabled");
         var preferences = new InstallModels.InstallSettings(current.accessUrl(), null, false,
-                current.storageSubfolders(), new InstallModels.BackupPolicy(true, "weekly", 14),
+                current.storageSubfolders(), new InstallModels.BackupPolicy(true, current.backup().frequency(), 14),
                 current.desiredAccessMode(), current.privateAccessRequirement(), current.expectedLocalPort(),
                 current.expectedProtocol(), null, null, null, null, current.autoRepairEnabled());
 
         assertThat(service.settingsChangePlan("vaultwarden", preferences).saveAllowed()).isTrue();
         var updated = service.updateSettings("vaultwarden", preferences);
-        assertThat(updated.settings().backup().frequency()).isEqualTo("weekly");
+        assertThat(updated.settings().backup().frequency()).isEqualTo(current.backup().frequency());
         assertThat(updated.settings().tailscaleEnabled()).isFalse();
     }
 
@@ -1002,10 +1020,10 @@ class AppLifecycleServiceTests {
                 null,
                 true,
                 java.util.Map.of(),
-                new InstallModels.BackupPolicy(true, "weekly", 14)));
+                new InstallModels.BackupPolicy(true, "daily", 14)));
 
         assertThat(app.settings().tailscaleEnabled()).isTrue();
-        assertThat(app.settings().backup().frequency()).isEqualTo("weekly");
+        assertThat(app.settings().backup().frequency()).isEqualTo("daily");
         assertThat(repository.eventsFor("vaultwarden", 5))
                 .extracting(event -> event.type())
                 .contains("settings_updated", "settings_apply_completed");

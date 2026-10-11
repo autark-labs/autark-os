@@ -156,7 +156,7 @@ test('Settings does not expose appliance update controls', async ({ page }) => {
 async function destinationFixture(page: Parameters<typeof installMockApi>[0]) {
   await installMockApi(page, 'idle');
   await page.goto('/backups');
-  await expect(page.getByRole('button', { name: 'Back up all', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Review full backup', exact: true })).toBeEnabled();
   const report = await page.evaluate(async () => (await fetch('/api/backups')).json());
   const metrics = await page.evaluate(async () => (await fetch('/api/system/metrics')).json());
   const storage = await page.evaluate(async () => (await fetch('/api/system/storage')).json());
@@ -174,7 +174,7 @@ async function destinationFixture(page: Parameters<typeof installMockApi>[0]) {
   });
   page.on('request', request => { if (request.method() === 'PUT' && request.url().endsWith('/api/system/settings')) state.settingsWrites++; });
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Back up all', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Review full backup', exact: true })).toBeEnabled();
   await page.locator('a[href="/storage"]').first().click();
   await expect(page.getByRole('heading', { name: 'Storage', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open settings' }).click();

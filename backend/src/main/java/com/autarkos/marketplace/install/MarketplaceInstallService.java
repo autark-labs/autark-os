@@ -1,5 +1,6 @@
 package com.autarkos.marketplace.install;
 
+import com.autarkos.system.ProjectSettingsService;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import com.autarkos.network.tailscale.TailscaleService;
 public class MarketplaceInstallService {
 
     private final InstallPlanService installPlanService;
+    private final ProjectSettingsService projectSettings;
     private final RuntimeDirectoryManager directoryManager;
     private final CatalogPackageCopier packageCopier;
     private final ComposeRenderer composeRenderer;
@@ -65,8 +67,9 @@ public class MarketplaceInstallService {
             ManagedAppAttestationService managedApps,
             DockerInventoryService dockerInventory,
             RecoveryOperationCoordinator recoveryOperations,
-            AppAccessChecker accessChecker) {
+            AppAccessChecker accessChecker, ProjectSettingsService projectSettings) {
         this.installPlanService = installPlanService;
+        this.projectSettings = projectSettings;
         this.directoryManager = directoryManager;
         this.packageCopier = packageCopier;
         this.composeRenderer = composeRenderer;
@@ -361,12 +364,13 @@ public class MarketplaceInstallService {
             TailscaleServeResult privateAccess) {
         String accessUrl = runtimeConfiguration.accessUrl();
         boolean privateAccessDesired = privateAccessRequested(manifest, runtimeConfiguration);
+        var previousSettings = installedAppRepository.settingsFor(manifest.id());
         return new InstallModels.InstallSettings(
                 accessUrl,
                 privateAccess.configured() ? privateAccess.privateUrl() : null,
                 privateAccessDesired,
                 runtimeConfiguration.storageSubfolders(),
-                runtimeConfiguration.backup(),
+                previousSettings.map(InstallModels.InstallSettings::backup).orElse(runtimeConfiguration.backup()),
                 runtimeConfiguration.accessMode(),
                 manifest.usage().privateHttpsRequired() ? "recommended" : "optional",
                 AppPrivateAccessPorts.portFromUrl(accessUrl),
@@ -375,7 +379,7 @@ public class MarketplaceInstallService {
                 null,
                 null,
                 null,
-                true);
+                previousSettings.map(InstallModels.InstallSettings::autoRepairEnabled).orElseGet(() -> projectSettings.current().automaticRepairEnabled()));
     }
 
     private boolean privateAccessRequested(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {

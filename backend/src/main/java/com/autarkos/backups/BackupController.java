@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
-import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 
@@ -77,7 +76,7 @@ public class BackupController {
         backupPlans.requireReviewed(scope, appId, request);
         AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.BACKUP, subject, BackupJobs.steps(), request, ignored -> {
             try {
-                return BackupJobs.outcome(backupPlans.runReviewed(scope, appId, request));
+                return BackupJobs.outcome(backupPlans.runReviewed(scope, appId, request), jobService);
             } finally {
                 invalidateApplicationState();
             }
@@ -93,75 +92,29 @@ public class BackupController {
 
     @PostMapping("/restore-points/{id}/verify")
     public AutarkOsJob verify(@PathVariable long id) {
-        return jobService.start(AutarkOsStates.JobType.BACKUP_VERIFY, Long.toString(id), verificationSteps(), () -> verificationOutcome(backupService.verify(id)));
+        return jobService.start(AutarkOsStates.JobType.BACKUP_VERIFY, Long.toString(id), java.util.List.of(AutarkOsJobStep.pending("load_restore_point", "Loading restore point")), () -> {
+            try {
+                var result = backupService.verify(id);
+                return BackupJobs.outcome(result.status(), result.message(), jobService);
+            } finally {
+                invalidateApplicationState();
+            }
+        });
     }
 
     @PostMapping("/restore-points/{id}/restore")
     public AutarkOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreModels.RestoreRequest request) {
         String appId = request == null ? null : request.appId();
-        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), restoreSteps(), () -> {
-            RestoreModels.RestoreResult result = backupService.restore(id, appId);
-            invalidateApplicationState();
-            return restoreOutcome(result);
+        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), java.util.List.of(AutarkOsJobStep.pending("validate_restore_point", "Validating restore point")), () -> {
+            try {
+                var result = backupService.restore(id, appId);
+                return BackupJobs.outcome(result.status(), result.message(), jobService);
+            } finally {
+                invalidateApplicationState();
+            }
         });
         invalidateApplicationState();
         return job;
-    }
-
-    private java.util.List<AutarkOsJobStep> verificationSteps() {
-        return java.util.List.of(
-                AutarkOsJobStep.pending("load_restore_point", "Loading restore point"),
-                AutarkOsJobStep.pending("verify_archive", "Verifying backup archive"),
-                AutarkOsJobStep.pending("record_result", "Recording verification result"),
-                AutarkOsJobStep.pending("finish", "Finishing verification"));
-    }
-
-    private AutarkOsJobOutcome verificationOutcome(BackupModels.BackupVerificationResult result) {
-        java.util.List<AutarkOsJobStep> steps = java.util.List.of(
-                AutarkOsJobStep.succeeded("load_restore_point", "Loading restore point", "Restore point loaded."),
-                AutarkOsStates.JobStatus.FAILED.equals(result.status())
-                        ? AutarkOsJobStep.failed("verify_archive", "Verifying backup archive", result.message())
-                        : AutarkOsJobStep.succeeded("verify_archive", "Verifying backup archive", result.message()),
-                AutarkOsJobStep.succeeded("record_result", "Recording verification result", "Verification status saved."),
-                AutarkOsJobStep.succeeded("finish", "Finishing verification", result.message()));
-        if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        return AutarkOsJobOutcome.succeeded(result.message(), steps);
-    }
-
-    private java.util.List<AutarkOsJobStep> restoreSteps() {
-        return java.util.List.of(
-                AutarkOsJobStep.pending("validate_restore_point", "Validating restore point"),
-                AutarkOsJobStep.pending("stop_apps", "Stopping affected apps"),
-                AutarkOsJobStep.pending("create_safety_backup", "Creating safety backup"),
-                AutarkOsJobStep.pending("restore_data", "Restoring app data"),
-                AutarkOsJobStep.pending("start_apps", "Starting affected apps"),
-                AutarkOsJobStep.pending("finish", "Finishing restore"));
-    }
-
-    private AutarkOsJobOutcome restoreOutcome(RestoreModels.RestoreResult result) {
-        boolean failed = AutarkOsStates.JobStatus.FAILED.equals(result.status());
-        boolean warning = AutarkOsStates.Tone.WARNING.equals(result.status());
-        java.util.List<AutarkOsJobStep> steps = java.util.List.of(
-                AutarkOsJobStep.succeeded("validate_restore_point", "Validating restore point", "Restore point is ready."),
-                AutarkOsJobStep.succeeded("stop_apps", "Stopping affected apps", "Affected apps were prepared for restore."),
-                AutarkOsJobStep.succeeded("create_safety_backup", "Creating safety backup", "Current app data was protected before restore."),
-                failed
-                        ? AutarkOsJobStep.failed("restore_data", "Restoring app data", result.message())
-                        : AutarkOsJobStep.succeeded("restore_data", "Restoring app data", result.message()),
-                failed
-                        ? AutarkOsJobStep.pending("start_apps", "Starting affected apps")
-                        : warning
-                                ? AutarkOsJobStep.failed("start_apps", "Starting affected apps", result.message())
-                                : AutarkOsJobStep.succeeded("start_apps", "Starting affected apps", "Affected apps were started after restore."),
-                failed || warning
-                        ? AutarkOsJobStep.pending("finish", "Finishing restore")
-                        : AutarkOsJobStep.succeeded("finish", "Finishing restore", result.message()));
-        if (failed || warning) {
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        return AutarkOsJobOutcome.succeeded(result.message(), steps);
     }
 
     private String restoreSubject(long id, String appId) {

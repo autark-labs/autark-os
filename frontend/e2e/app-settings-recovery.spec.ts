@@ -204,3 +204,33 @@ test('a notification targeting another app cannot replace a dirty app without co
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await expect(port).toHaveValue('8384');
 });
+
+for (const width of [390, 1440]) {
+test(`app settings show the global routine schedule and preserve hourly during unrelated save at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 960 });
+  await installMockApi(page, 'idle');
+  await page.goto('/home');
+  const state = await page.evaluate(async () => (await fetch('/api/application-state')).json());
+  const app = state.applications.find((entry: {id:string}) => entry.id === 'vaultwarden');
+  app.runtime.settings.backup.frequency = 'hourly';
+  const settings = await page.evaluate(async () => (await fetch('/api/system/settings')).json());
+  await page.route('**/api/system/settings', route => route.fulfill({ json: { ...settings, backupFrequency: 'weekly' } }));
+  await page.route('**/api/application-state*', route => route.fulfill({json:state}));
+  let payload: { backup: { frequency: string } } | undefined;
+  await page.route('**/api/apps/vaultwarden/settings-plan', route => {
+    payload=route.request().postDataJSON();
+    return route.fulfill({json:{appId:'vaultwarden',appName:'Vaultwarden',impact:'settings_only',headline:'Save settings',summary:'Save',saveAllowed:true,redeployRequired:false,restartRequired:false,dataMigrationRequired:false,changes:['Repair'],warnings:[],blockedReasons:[]}});
+  });
+  await page.goto('/apps');
+  await page.getByRole('radio', {name:'Grid view'}).click();
+  await page.getByRole('button', {name:`Manage ${app.name}`,exact:true}).click();
+  await page.getByRole('tab',{name:'Settings',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'Backup frequency'})).toHaveCount(0);
+  await expect(page.getByText('Shared by all apps.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Weekly · Automation on', { exact: true })).toBeVisible();
+  await page.getByLabel('Local app port',{exact:true}).fill('18080');
+  await page.getByRole('button',{name:'Save changes',exact:true}).click();
+  await expect.poll(()=>payload?.backup.frequency).toBe('hourly');
+});
+
+}

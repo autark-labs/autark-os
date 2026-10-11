@@ -82,11 +82,15 @@ class StorageServiceTests {
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(layout);
         repository.save(installed(layout, "homepage", "Homepage"));
         repository.save(installed(layout, "vaultwarden", "Vaultwarden"));
+        repository.saveSettings("homepage", new com.autarkos.marketplace.install.models.InstallModels.InstallSettings(
+                "http://localhost", null, false, Map.of(), new com.autarkos.marketplace.install.models.InstallModels.BackupPolicy(true, "hourly", 3)));
         StorageService service = storageService(layout, repository, List.of(installed(layout, "homepage", "Homepage")));
 
         StorageModels.StorageReport report = service.report();
 
         assertThat(report.apps()).extracting(StorageModels.AppStorageUsage::appId).containsExactly("homepage");
+        assertThat(report.apps().getFirst().backupFrequency()).isEqualTo("daily");
+        assertThat(repository.settingsFor("homepage").orElseThrow().backup().frequency()).isEqualTo("hourly");
         assertThat(report.orphanedData()).extracting(StorageModels.OrphanedStorage::name).contains("vaultwarden");
     }
 
@@ -131,8 +135,7 @@ class StorageServiceTests {
                     }
                     return assessments;
                 });
-        return new StorageService(
-                layout,
+        return new StorageService(layout,
                 repository,
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 mock(StorageSampleRepository.class),
@@ -145,7 +148,8 @@ class StorageServiceTests {
                         JpaTestRepositories.projectSettingsRepository(layout)),
                 new RecoveryOperationCoordinator(),
                 storageContracts,
-                fileOps);
+                fileOps,
+                com.autarkos.testsupport.JpaTestRepositories.defaultProjectSettings());
     }
 
     @Test

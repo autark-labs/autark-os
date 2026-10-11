@@ -43,6 +43,7 @@ public class StorageService {
     private static final DateTimeFormatter CHECKPOINT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final RuntimeLayout runtimeLayout;
+    private final ProjectSettingsService projectSettings;
     private final InstalledAppRepository installedAppRepository;
     private final ActivityLogService activityLogService;
     private final StorageSampleRepository storageSampleRepository;
@@ -58,8 +59,9 @@ public class StorageService {
     private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, ManagedAppAttestationService managedApps, BackupRepository backupRepository, MarketplaceCatalogService catalogService, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, ManagedStorageContractService storageContracts, AutarkOsFileOpsService fileOpsService) {
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, ManagedAppAttestationService managedApps, BackupRepository backupRepository, MarketplaceCatalogService catalogService, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, ManagedStorageContractService storageContracts, AutarkOsFileOpsService fileOpsService, ProjectSettingsService projectSettings) {
         this.runtimeLayout = runtimeLayout;
+        this.projectSettings = projectSettings;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
         this.storageSampleRepository = storageSampleRepository;
@@ -83,6 +85,7 @@ public class StorageService {
         ensure(runtimeRoot);
 
         List<InstalledApp> installedApps = managedApps.managedApps();
+        ProjectSettings routineSettings = projectSettings.current();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         StorageModels.StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
         StorageModels.StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
@@ -90,7 +93,7 @@ public class StorageService {
                 ? new StorageModels.StorageUsage("Backup destination unavailable", backupDestination.configuredPath(), -1, -1, -1, -1)
                 : backupDirectoryUsage(backupsRoot);
         List<StorageModels.AppStorageUsage> apps = installedApps.stream()
-                .map(app -> appStorage(app, backupState(app.appId())))
+                .map(app -> appStorage(app, backupState(app.appId()), routineSettings))
                 .sorted(Comparator.comparingLong(StorageModels.AppStorageUsage::usedBytes).reversed())
                 .toList();
         recordStorageSamples(apps);
@@ -170,7 +173,7 @@ public class StorageService {
                 : backupDestinationService.activeRoot();
     }
 
-    private StorageModels.AppStorageUsage appStorage(InstalledApp app, String backupState) {
+    private StorageModels.AppStorageUsage appStorage(InstalledApp app, String backupState, ProjectSettings routineSettings) {
         Path path = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         InstallModels.InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
         long usedBytes = fileOperations.directorySize(path);
@@ -186,8 +189,8 @@ public class StorageService {
                 usedBytes,
                 growth,
                 trend,
-                settings == null || settings.backup().enabled(),
-                settings == null ? "daily" : settings.backup().frequency(),
+                routineSettings.automaticBackupsEnabled() && (settings == null || settings.backup().enabled()),
+                routineSettings.backupFrequency(),
                 backupState);
     }
 

@@ -25,6 +25,25 @@ public class RecoveryOperationCoordinator {
         }
     }
 
+    /** Durable scheduled jobs wait here instead of consuming a due window while busy. */
+    public <T> T runExclusiveWaiting(Operation operation, Supplier<T> action) {
+        Lease lease;
+        synchronized (this) {
+            while (activeOperation != null && activeOperation.ownerThread() != Thread.currentThread()) {
+                try {
+                    wait();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Scheduled backup was interrupted while waiting for another recovery operation.", exception);
+                }
+            }
+            lease = acquire(operation);
+        }
+        try (lease) {
+            return action.get();
+        }
+    }
+
     public <T> Optional<T> tryRunExclusive(Operation operation, Supplier<T> action) {
         Optional<Lease> lease = tryAcquire(operation);
         if (lease.isEmpty()) {
@@ -65,6 +84,7 @@ public class RecoveryOperationCoordinator {
     private synchronized void release(long leaseId) {
         if (activeOperation != null && activeOperation.leaseId() == leaseId) {
             activeOperation = null;
+            notifyAll();
         }
     }
 
