@@ -474,6 +474,23 @@ class ApplicationStateServiceTests {
                 .contains("stop", "restart");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"backup,__full__", "backup,__routine__", "backup_restore,42:all"})
+    void unresolvedSharedJobRecoveryAppearsOnlyOnItsAffectedApp(String type, String subject) {
+        var base = lifecycleJob("interrupted", type, subject, "failed", "copy_data");
+        var recovery = new AutarkOsJobStep("resume_app:vaultwarden", "Restore availability", "failed", "Review recovery",
+                base.createdAt(), base.updatedAt(), new AutarkOsJobStep.Recovery("vaultwarden", "appinst_vaultwarden", true));
+        var job = new AutarkOsJob(base.jobId(), type, subject, "failed", recovery.id(), List.of(recovery), base.createdAt(), base.updatedAt(), base.error());
+        ApplicationStateService service = createService(
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()), inventory(),
+                () -> Instant.parse("2026-06-21T12:00:00Z"), () -> List.of(job));
+        var apps = applications(service.refreshNow());
+        assertThat(apps.getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(apps.get(1).operation().kind()).isEqualTo("failed");
+        assertThat(apps.get(1).operation().jobId()).isEqualTo("interrupted");
+    }
+
     @Test
     void snapshotKeepsFailedTargetedRestoreVisibleOnTargetApp() {
         ApplicationStateService service = createService(

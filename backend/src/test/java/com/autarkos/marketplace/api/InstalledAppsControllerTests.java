@@ -104,9 +104,10 @@ class InstalledAppsControllerTests {
         var controller = new InstalledAppsController(lifecycle, mock(MonitoringMetricsService.class), state, jobs);
         var first = controller.restart("vaultwarden");
         assertThat(controller.restart("vaultwarden").jobId()).isEqualTo(first.jobId());
-        var mvc = MockMvcBuilders.standaloneSetup(controller, new com.autarkos.backups.BackupController(backups, jobs, state))
+        var mvc = MockMvcBuilders.standaloneSetup(controller, new com.autarkos.backups.BackupController(backups, jobs, state, mock(com.autarkos.backups.BackupPlanService.class)))
                 .setControllerAdvice(new MarketplaceExceptionHandler(mock(com.autarkos.activity.ActivityLogService.class))).build();
-        mvc.perform(MockMvcRequestBuilders.post("/api/backups/apps/vaultwarden/run"))
+        mvc.perform(MockMvcRequestBuilders.post("/api/backups/apps/vaultwarden/run")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"planId\":\"reviewed-plan\"}"))
                 .andExpect(result -> {
                     assertThat(result.getResponse().getStatus()).isEqualTo(409);
                     assertThat(result.getResponse().getContentAsString()).contains("job_conflict", "restart_app", first.jobId(), "This request was not started");

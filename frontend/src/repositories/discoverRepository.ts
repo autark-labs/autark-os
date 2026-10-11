@@ -101,8 +101,8 @@ export function useDiscoverInstallMutation() {
 
 export function useDiscoverBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob, unknown, string>({
-    mutationFn: (appId) => BackupAPIClient.run(appId),
+  return useMutation<AutarkOsJob, unknown, { appId: string; planId: string }>({
+    mutationFn: ({ appId, planId }) => BackupAPIClient.run(appId, planId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateDiscoverQueries(queryClient);

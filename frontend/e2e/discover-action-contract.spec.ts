@@ -291,9 +291,11 @@ for (const missingFromList of [false, true]) {
     await expect(page.getByLabel('Selected Discover app', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Create first backup', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Review backup' }).getByRole('button', { name: 'Start backup', exact: true }).click();
     await expect.poll(() => backupAttempts).toBe(1);
     await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Create first backup', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Review backup' }).getByRole('button', { name: 'Start backup', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Creating backup', exact: true })).toBeDisabled();
     backupJob!.status = 'succeeded';
     await expect(page.getByRole('button', { name: 'Backup created', exact: true })).toBeVisible();

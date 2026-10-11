@@ -29,12 +29,17 @@ test('maps backend-shaped uninstall plans without turning normal confirmations i
     headline: 'Autark-OS can remove the app while keeping your data on disk.',
     safetyCheckpointPlanned: true,
     safetyCheckpointMessage: 'Autark-OS will save a safety checkpoint.',
-    willStop: ['Stop the app containers'],
+    willStop: ['Stop the app containers and confirm they are stopped', 'Create and verify a safety checkpoint before removing containers', 'Remove the Compose project'],
     willKeep: ['Application data in /runtime/apps/jellyfin'],
     needsConfirmation: ['Confirm you understand that containers will be removed'],
   });
 
   assert.equal(plan.title, 'Uninstall Jellyfin');
+  assert.deepEqual(Array.from(plan.steps).slice(0, 3), [
+    'Stop the app containers and confirm they are stopped',
+    'Create and verify a safety checkpoint before removing containers',
+    'Remove the Compose project',
+  ]);
   assert.deepEqual(Array.from(plan.warnings), [
     'Confirm you understand that containers will be removed',
     'Autark-OS will save a safety checkpoint.',

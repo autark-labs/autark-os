@@ -248,6 +248,7 @@ public class ApplicationStateService {
         if (job == null || appId == null || appId.isBlank()) {
             return false;
         }
+        if (unresolvedRecoveryTargets(job, appId)) return true;
         if (appId.equals(job.subjectId())) {
             return true;
         }
@@ -256,6 +257,11 @@ public class ApplicationStateService {
         }
         String restoreTarget = restoreTarget(job.subjectId());
         return "all".equals(restoreTarget) || appId.equals(restoreTarget);
+    }
+
+    private boolean unresolvedRecoveryTargets(AutarkOsJob job, String appId) {
+        return job != null && job.steps().stream().anyMatch(step -> step.recovery() != null
+                && appId.equals(step.recovery().appId()) && !"succeeded".equals(step.status()));
     }
 
     private String restoreTarget(String subjectId) {
@@ -283,7 +289,7 @@ public class ApplicationStateService {
     }
 
     private boolean failedLifecycleJobStillRelevant(AutarkOsJob job, AppRuntimeView app) {
-        if (isFailedFullRestore(job)) {
+        if (isFailedFullRestore(job) && !unresolvedRecoveryTargets(job, app.appId())) {
             return false;
         }
         if (job != null && !List.of(AutarkOsStates.JobType.START_APP, AutarkOsStates.JobType.STOP_APP,

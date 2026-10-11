@@ -83,7 +83,7 @@ test('applications page starts app backup jobs from real backup actions', () => 
   assert.match(types, /onCreateBackup: \(id: string\) => void/);
   assert.match(types, /'backup'/);
   assert.match(page, /BackupAPIClient/);
-  assert.match(page, /BackupAPIClient\.run\(appId\)/);
+  assert.match(page, /BackupAPIClient\.run\(appId, planId\)/);
   assert.match(page, /setAppActionLoading\(appId, 'backup'\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /invalidateBackupQueries\(queryClient\)/);

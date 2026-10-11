@@ -506,6 +506,13 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname === '/api/network/private-access/reconciliation') return reconciliation;
   if (pathname === '/api/network/tailscale/connect-guide') return { headline: 'Tailscale is connected', summary: 'Private links are ready to use.', steps: ['Open Tailscale from the app header.'], installUrl: 'https://tailscale.com/download', connectCommand: 'sudo tailscale up', advancedNote: 'Fixture guide' };
   if (pathname === '/api/network/devices/access') return { status: 'ready', headline: 'Trusted devices can reach private apps', summary: 'One device is online.', tailscale: networkStatus, privateAccess: reconciliation, devices: [], onboardingSteps: [], checkedAt: fixedAt };
+  if (pathname === '/api/backups/plan') return {
+    scope: 'app', appId: 'vaultwarden', planId: 'fixture-backup-plan', executable: true,
+    apps: [{ appId: 'vaultwarden', appName: 'Vaultwarden' }], warnings: [
+      'The listed apps will be unavailable while Autark-OS stops them, copies their data, and verifies the restore point.',
+      'Apps that were running will be resumed, including after a failed backup when ownership can be confirmed. Apps already paused will stay paused. Any app that cannot resume will need attention in Activity.',
+    ], blockedReasons: [], checkedAt: fixedAt,
+  };
   if (pathname === '/api/backups') return backupReport;
   if (pathname.includes('/api/backups/restore-points/') && pathname.endsWith('/plan')) return restorePlan;
   if (pathname.startsWith('/api/backups/')) return activeJob;

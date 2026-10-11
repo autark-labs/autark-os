@@ -25,7 +25,7 @@ export function mapUninstallPlanToDestructiveActionPlan(plan: UninstallPlan): De
     severity: 'danger',
     preservesDataByDefault: true,
     steps: [
-      ...plan.willStop.map((step) => `Stop ${step}`),
+      ...plan.willStop,
       ...plan.willKeep.map((step) => `Preserve ${step}`),
       'Remove the Autark-OS app record',
       'Refresh app state',

@@ -46,8 +46,8 @@ export function useBackupReportRepository({ paused = false }: { paused?: boolean
 
 export function useRunAppBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob, unknown, string>({
-    mutationFn: (appId) => BackupAPIClient.run(appId),
+  return useMutation<AutarkOsJob, unknown, { appId: string; planId: string }>({
+    mutationFn: ({ appId, planId }) => BackupAPIClient.run(appId, planId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
@@ -72,8 +72,8 @@ export function useConfigureBackupDestinationMutation() {
 
 export function useRunFullBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob>({
-    mutationFn: () => BackupAPIClient.runFull(),
+  return useMutation<AutarkOsJob, unknown, string>({
+    mutationFn: (planId) => BackupAPIClient.runFull(planId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
@@ -83,8 +83,8 @@ export function useRunFullBackupMutation() {
 
 export function useRunRoutineBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob>({
-    mutationFn: () => BackupAPIClient.runRoutine(),
+  return useMutation<AutarkOsJob, unknown, string>({
+    mutationFn: (planId) => BackupAPIClient.runRoutine(planId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);

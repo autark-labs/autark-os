@@ -5,6 +5,7 @@ import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
+import { BackupReviewDialog } from '@/components/autark-os/BackupReviewDialog';
 import { ContextChip } from '@/components/autark-os/ContextChip';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -62,6 +63,7 @@ export const ApplicationsPage = () => {
   const navigate = useNavigate();
   const appState = useApplicationStateRepository();
   const jobsQuery = useAutarkOsJobsQuery();
+  const [backupAppId, setBackupAppId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [collectionFilters, setCollectionFilters] = useState<ApplicationCollectionFilter[]>([]);
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
@@ -221,17 +223,18 @@ export const ApplicationsPage = () => {
     }
   };
 
-  const runBackup = async (appId: string) => {
+  const runBackup = async (appId: string, planId: string) => {
     setAppActionLoading(appId, 'backup');
 
     try {
-      const job = await BackupAPIClient.run(appId);
+      const job = await BackupAPIClient.run(appId, planId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification(job);
       void invalidateBackupQueries(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Backup could not start');
+      throw err;
     } finally {
       setAppActionLoading(appId, null);
     }
@@ -325,7 +328,7 @@ export const ApplicationsPage = () => {
   const handleDirtyChange = useCallback((id: string, dirty: boolean) => {
     setSettingsDirtyByAppId((current) => current[id] === dirty ? current : { ...current, [id]: dirty });
   }, []);
-  const handleCreateBackup = (id: string) => void runBackup(id);
+  const handleCreateBackup = (id: string) => setBackupAppId(id);
 
   const actions = {
     onCreateBackup: handleCreateBackup,
@@ -485,6 +488,7 @@ export const ApplicationsPage = () => {
         onRefresh={appState.refresh}
         open={Boolean(reviewedApplication)}
       />
+      {backupAppId && <BackupReviewDialog request={{ scope: 'app', appId: backupAppId }} onClose={() => setBackupAppId(null)} onConfirm={(planId) => runBackup(backupAppId, planId)} />}
     </PageShell>
   );
 };

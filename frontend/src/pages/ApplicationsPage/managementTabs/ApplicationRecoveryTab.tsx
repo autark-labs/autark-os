@@ -1,20 +1,36 @@
+import { useAutarkOsJobQuery, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { Link } from 'react-router-dom';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
-import { applicationActionRestriction } from '../extensions/ApplicationsPage.operations';
+import { applicationActionRestriction, runtimeActionDisabled, runtimeActionDisabledReason } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationRecoveryTabProps = {
   item: ApplicationSurfaceItem;
   onEditSettings: () => void;
   onReviewManagement: () => void;
+  onStart: () => void;
 };
 
-export function ApplicationRecoveryTab({ item, onEditSettings, onReviewManagement }: ApplicationRecoveryTabProps) {
+export function ApplicationRecoveryTab({ item, onEditSettings, onReviewManagement, onStart }: ApplicationRecoveryTabProps) {
+  const jobs = useAutarkOsJobsQuery();
+  const operationId = item.operation.kind === 'failed' ? item.operation.jobId ?? null : null;
+  const job = useAutarkOsJobQuery(operationId, jobs.data);
   if (item.operation.kind !== 'failed') return null;
+  const pendingRecoveries = job.data?.steps.filter(step => step.recovery?.appId === (item.sourceId || item.id) && step.status !== 'succeeded') ?? [];
+  const recoveryPending = pendingRecoveries.length > 0;
+  const resumeAllowed = recoveryPending && pendingRecoveries.every(step => step.recovery?.resumeAllowed);
+  if (operationId && !job.data) return <section className="space-y-3 rounded-xl border border-border p-5">
+    <h3 className="font-semibold">Review recovery</h3>
+    <p className="text-sm">{job.isError ? 'Recovery details are unavailable. Check again before retrying the operation.' : 'Checking saved recovery details…'}</p>
+    {job.isError && <Button size="sm" variant="outline" onClick={() => void job.refetch()}>Check recovery</Button>}
+  </section>;
   const settings = applicationActionRestriction(item, 'settings');
   const uninstall = applicationActionRestriction(item, 'uninstall');
-  const operationRecovery = recoveryForOperation(item.operation.jobType);
+  const operationRecovery = recoveryPending ? {
+    title: 'App recovery needs attention', destination: 'recovery',
+    description: resumeAllowed ? 'Autark-OS could not confirm the previous running state. Review the error, then start the app if available before retrying the backup.' : 'Data replacement was interrupted. Review a verified restore point in Backups before starting the app.',
+  } : recoveryForOperation(item.operation.jobType);
   const recovery = operationRecovery ?? explainFailure(item.operation.message);
   const reviewUninstall = operationRecovery?.destination === 'overview';
   const restriction = reviewUninstall ? uninstall : settings;
@@ -24,7 +40,7 @@ export function ApplicationRecoveryTab({ item, onEditSettings, onReviewManagemen
       <p className="text-sm">{item.operation.message}</p>
       <p className="text-sm text-muted-foreground">{recovery.description}</p>
       {!operationRecovery && item.backup !== 'Protected' && <p className="text-sm text-muted-foreground">Repair preserves data when possible. Create a backup first if the app can safely run one.</p>}
-      {operationRecovery?.destination === 'backups'
+      {recoveryPending && resumeAllowed ? <DisabledAction disabled={runtimeActionDisabled(item, 'start', null)} reason={runtimeActionDisabledReason(item, 'start', null)}><Button disabled={runtimeActionDisabled(item, 'start', null)} size="sm" variant="outline" onClick={onStart}>Start app</Button></DisabledAction> : recoveryPending || operationRecovery?.destination === 'backups'
         ? <Button asChild size="sm" variant="outline"><Link to={`/backups?app=${encodeURIComponent(item.sourceId || item.id)}`}>Review backups and restore plan</Link></Button>
         : <DisabledAction disabled={restriction.disabled} reason={restriction.reason}>
           <Button disabled={restriction.disabled} onClick={reviewUninstall ? onReviewManagement : onEditSettings} size="sm" variant="outline">

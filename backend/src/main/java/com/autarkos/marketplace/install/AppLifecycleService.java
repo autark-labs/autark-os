@@ -15,6 +15,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.BackupArchiveService;
 import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
@@ -22,6 +23,8 @@ import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.host.DockerInventoryService;
 import com.autarkos.host.DockerInventorySnapshot;
+import com.autarkos.jobs.AutarkOsJobService;
+import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -58,6 +61,7 @@ public class AppLifecycleService {
     private final RecoveryOperationCoordinator recoveryOperations;
     private final ManagedAppAttestationService managedApps;
     private final DockerInventoryService dockerInventory;
+    private final AutarkOsJobService jobs;
 
     public AppLifecycleService(
             InstalledAppRepository repository,
@@ -74,7 +78,8 @@ public class AppLifecycleService {
             AutarkOsFileOpsService fileOpsService,
             ManagedAppAttestationService managedApps,
             AppAccessChecker accessChecker,
-            DockerInventoryService dockerInventory) {
+            DockerInventoryService dockerInventory,
+            AutarkOsJobService jobs) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -87,7 +92,11 @@ public class AppLifecycleService {
         this.recoveryOperations = recoveryOperations;
         this.managedApps = managedApps;
         this.dockerInventory = dockerInventory;
-        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations, fileOpsService, dockerInventory);
+        this.jobs = jobs;
+        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, tailscaleService,
+                activityLogService, recoveryOperations, dockerInventory,
+                new BackupArchiveService(new com.autarkos.system.RuntimeFileOperations(), fileOpsService,
+                        backupDestinationService, backupRepository, repository, catalogService, activityLogService));
         this.healthService = new AppHealthService(repository, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
         this.reliabilityService = new AppReliabilityService(repository, tailscaleService);
@@ -155,6 +164,116 @@ public class AppLifecycleService {
         return managedApps.requireManaged(appId, action);
     }
 
+    public record CheckpointState(InstalledApp app, String appInstanceId, boolean wasRunning, String jobId) { }
+
+    /** Capture live state and persist recovery responsibility before any stop attempt. */
+    public CheckpointState prepareCheckpoint(String appId) {
+        InstalledApp app = requireManagedApp(appId, "create a checkpoint for");
+        assertNoPendingSettingsRecovery(app);
+        var containers = requireFreshMutationInventory(app).ownedContainersFor(appId, app.composeProject());
+        if (containers.stream().anyMatch(container -> !List.of("running", "restarting", "exited", "dead", "created").contains(container.state()))) {
+            throw new InstallationException("Autark-OS cannot determine whether " + app.appName() + " is stopped. No checkpoint was created.");
+        }
+        boolean running = containers.stream().anyMatch(container -> List.of("running", "restarting").contains(container.state()));
+        String appInstanceId = repository.ownershipFor(appId).orElseThrow().appInstanceId();
+        CheckpointState state = new CheckpointState(app, appInstanceId, running, jobs.executingJobId());
+        recordCheckpointRecovery(state, running, running ? "pending" : "succeeded", running
+                ? "This app was running. Restore its availability if the operation fails."
+                : "This app was stopped. Keep it stopped if checkpoint preparation fails.");
+        return state;
+    }
+
+    public void stopForCheckpoint(CheckpointState state) {
+        if (state.wasRunning()) stopAndConfirm(state.app().appId());
+        confirmCheckpointStopped(state.app());
+    }
+
+    public void confirmCheckpointStopped(InstalledApp app) {
+        var containers = requireFreshMutationInventory(app).ownedContainersFor(app.appId(), app.composeProject());
+        if (containers.stream().anyMatch(container -> !List.of("exited", "dead", "created").contains(container.state()))) {
+            throw new InstallationException("Autark-OS could not confirm that " + app.appName() + " is stopped. No checkpoint or restore may proceed.");
+        }
+    }
+
+    public void confirmCheckpointRunning(InstalledApp app) {
+        var observed = requireFreshMutationInventory(app).ownedContainersFor(app.appId(), app.composeProject());
+        if (observed.isEmpty() || observed.stream().anyMatch(container -> !"running".equals(container.state()))) {
+            throw new InstallationException("Running containers could not be confirmed for " + app.appName() + ".");
+        }
+    }
+
+    public void checkpointDataChanging(CheckpointState state) {
+        recordCheckpointRecovery(state, false, "pending", "Restore is changing app data. If interrupted, review its verified safety checkpoint in Backups before starting the app.");
+    }
+
+    public void checkpointDataReady(CheckpointState state) {
+        recordCheckpointRecovery(state, true, "pending", "Restored data is ready. The app still needs to be started.");
+    }
+
+    public void failCheckpoint(CheckpointState state, boolean resumeAllowed, String message) {
+        recordCheckpointRecovery(state, resumeAllowed, "failed", message);
+    }
+
+    public void completeCheckpoint(CheckpointState state, String message) {
+        recordCheckpointRecovery(state, state.wasRunning(), "succeeded", message);
+    }
+
+    public java.util.Optional<String> resumeAfterCheckpoint(CheckpointState state) {
+        try {
+            if (state.wasRunning()) {
+                requireCheckpointIdentity(state);
+                start(state.app().appId());
+                confirmCheckpointRunning(state.app());
+            }
+        } catch (RuntimeException exception) {
+            String message = state.app().appName() + " could not resume. Open My Apps to review the app and retry starting it.";
+            recordCheckpointRecovery(state, state.wasRunning(), "failed", message);
+            activityLogService.warning("backup", "checkpoint_resume_failed", "App availability needs attention", message, state.app().appId());
+            return java.util.Optional.of(message);
+        }
+        completeCheckpoint(state, state.wasRunning() ? "The app is running again." : "This operation did not start the previously stopped app.");
+        return java.util.Optional.empty();
+    }
+
+    private void requireCheckpointIdentity(CheckpointState state) {
+        InstalledApp current = requireManagedApp(state.app().appId(), "resume after a checkpoint");
+        String currentInstance = repository.ownershipFor(current.appId()).orElseThrow().appInstanceId();
+        if (!Objects.equals(state.appInstanceId(), currentInstance)) {
+            throw new InstallationException("The app's ownership changed. Review it in My Apps before recovery.");
+        }
+    }
+
+    private void recordCheckpointRecovery(CheckpointState state, boolean resumeAllowed, String status, String message) {
+        jobs.recordAppRecovery(state.jobId(), state.app().appName(),
+                new AutarkOsJobStep.Recovery(state.app().appId(), state.appInstanceId(), resumeAllowed), status, message);
+    }
+
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @org.springframework.core.annotation.Order(0)
+    public void recoverInterruptedCheckpoints() {
+        recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> {
+            for (var job : jobs.activeJobs()) {
+                for (var step : job.steps()) {
+                    var recovery = step.recovery();
+                    if (recovery == null || "succeeded".equals(step.status())) continue;
+                    var app = repository.findAppById(recovery.appId());
+                    if (!recovery.resumeAllowed() || app.isEmpty()) {
+                        jobs.recordAppRecovery(job.jobId(), app.map(InstalledApp::appName).orElse(recovery.appId()),
+                                new AutarkOsJobStep.Recovery(recovery.appId(), recovery.appInstanceId(), false), "failed", "The operation was interrupted. Review the app and its safety checkpoint in Backups before starting it.");
+                        continue;
+                    }
+                    try {
+                        resumeAfterCheckpoint(new CheckpointState(app.get(), recovery.appInstanceId(), true, job.jobId()));
+                    } catch (RuntimeException recordingFailure) {
+                        // The saved obligation remains unresolved. Continue with the other apps;
+                        // generic job reconciliation will keep the interruption visible in Activity.
+                    }
+                }
+            }
+            return null;
+        });
+    }
+
     public AppActionResult start(String appId) {
         return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> startUnlocked(appId));
     }
@@ -192,14 +311,7 @@ public class AppLifecycleService {
         requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         AppActionResult result = containerLifecycleService.stop(app, composeFile(app));
-        boolean stillRunning = dockerInventory.requireFresh().ownedContainersFor(app.appId(), app.composeProject()).stream()
-                .anyMatch(container -> {
-                    String state = container.state() == null ? "" : container.state().trim().toLowerCase();
-                    return "running".equals(state) || "restarting".equals(state);
-                });
-        if (stillRunning) {
-            throw new InstallationException("Autark-OS could not confirm that " + app.appName() + " is stopped. No backup or restore data was changed.");
-        }
+        confirmCheckpointStopped(app);
         return result;
     }
 
@@ -758,7 +870,16 @@ public class AppLifecycleService {
             requireFreshMutationInventory(app);
             assertNoPendingSettingsRecovery(app);
             InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-            return uninstallService.uninstall(app, settings, composeFile(app), storage.protectedPaths());
+            CheckpointState state = prepareCheckpoint(appId);
+            try {
+                stopForCheckpoint(state);
+                AppActionResult result = uninstallService.uninstall(app, settings, composeFile(app), storage.protectedPaths());
+                completeCheckpoint(state, "App removed. Its data and verified safety checkpoint were preserved.");
+                return result;
+            } catch (RuntimeException failure) {
+                var recoveryFailure = resumeAfterCheckpoint(state);
+                throw new InstallationException(failure.getMessage() + recoveryFailure.map(message -> " " + message).orElse(""), failure);
+            }
         });
     }
 

@@ -197,7 +197,7 @@ function BackupsPanel({ apps, draft, runtimeRoot, onUpdate }: PanelProps & { app
 
   return (
     <SettingsGroup description="Schedule changes apply with Save changes. Backup location uses its own Apply location action." title="Backups">
-      <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
+      <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Scheduled backups temporarily stop participating apps while copying data, then resume apps that were running.">
         <Switch checked={draft.automaticBackupsEnabled} id="settings-automatic-backups" onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
       </SettingRow>
       <SettingRow controlId="settings-backup-frequency" helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Autark-OS should create automatic backups.">

@@ -39,6 +39,7 @@ public class AutarkOsJobService {
     // are reconciled rather than guessed equivalent or automatically replayed.
     private final ConcurrentHashMap<String, RequestSignature> activeRequests = new ConcurrentHashMap<>();
     private final Object jobStartTransition = new Object();
+    private final ThreadLocal<String> executingJob = new ThreadLocal<>();
 
     @Autowired
     public AutarkOsJobService(AutarkOsJobRepository repository, @Value("${autark-os.jobs.reconcile-on-startup:true}") boolean reconcileOnStartup) {
@@ -121,6 +122,29 @@ public class AutarkOsJobService {
         return repository.findById(jobId).map(this::toDomain);
     }
 
+    public String executingJobId() {
+        return executingJob.get();
+    }
+
+    public List<AutarkOsJob> activeJobs() {
+        return repository.activeJobs().stream().map(this::toDomain).toList();
+    }
+
+    /** Keep the recovery obligation in the same durable job, before touching a container. */
+    public void recordAppRecovery(String jobId, String appName, AutarkOsJobStep.Recovery recovery, String status, String message) {
+        if (jobId == null) return; // Synchronous internal/test invocation has no job wrapper.
+        var job = findById(jobId).orElseThrow();
+        var steps = new ArrayList<>(job.steps());
+        String id = "resume_app:" + recovery.appId();
+        var previous = steps.stream().filter(step -> id.equals(step.id())).findFirst();
+        var step = new AutarkOsJobStep(id, "Restore availability for " + appName, status, message,
+                previous.map(AutarkOsJobStep::startedAt).orElse(clock.get()),
+                "succeeded".equals(status) || "failed".equals(status) ? clock.get() : null, recovery);
+        int index = previous.map(steps::indexOf).orElse(steps.size());
+        if (index == steps.size()) steps.add(step); else steps.set(index, step);
+        recordProgress(jobId, steps);
+    }
+
     public AutarkOsJob recordProgress(String jobId, List<AutarkOsJobStep> steps) {
         AutarkOsJob existing = findById(jobId).orElseThrow();
         if (terminalStatus(existing.status())) {
@@ -190,6 +214,7 @@ public class AutarkOsJobService {
     }
 
     @EventListener(ApplicationReadyEvent.class)
+    @org.springframework.core.annotation.Order(100)
     public void reconcileInterruptedJobs() {
         if (!reconcileOnStartup) {
             return;
@@ -239,6 +264,7 @@ public class AutarkOsJobService {
     }
 
     private void run(AutarkOsJob job, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
+        executingJob.set(job.jobId());
         try {
             AutarkOsJobOutcome outcome = operation.apply(job);
             if ("failed".equals(outcome.status())) {
@@ -248,6 +274,8 @@ public class AutarkOsJobService {
             }
         } catch (RuntimeException exception) {
             fail(job.jobId(), "job_failed", safeMessage(exception), Map.of("exception", exception.getClass().getSimpleName()));
+        } finally {
+            executingJob.remove();
         }
     }
 
@@ -362,7 +390,10 @@ public class AutarkOsJobService {
     }
 
     private AutarkOsJob succeed(String jobId, String message, List<AutarkOsJobStep> steps) {
-        List<AutarkOsJobStep> nextSteps = steps == null || steps.isEmpty() ? markAllPending(jobId, "succeeded", message) : steps;
+        List<AutarkOsJobStep> nextSteps = preserveRecovery(jobId, steps == null || steps.isEmpty() ? markAllPending(jobId, "succeeded", message) : steps);
+        if (nextSteps.stream().anyMatch(step -> step.recovery() != null && !"succeeded".equals(step.status()))) {
+            return fail(jobId, "app_recovery_required", message + " App availability needs attention. Open My Apps to review recovery.", Map.of(), nextSteps);
+        }
         String currentStep = nextSteps.isEmpty() ? "" : nextSteps.getLast().id();
         return update(jobId, "succeeded", currentStep, nextSteps, null, null, Map.of());
     }
@@ -375,7 +406,14 @@ public class AutarkOsJobService {
         if (steps == null || steps.isEmpty()) {
             return fail(jobId, code, message, details);
         }
-        return update(jobId, "failed", failedStepId(steps), steps, AutarkOsJobs.clean(code, "job_failed"), AutarkOsJobs.clean(message, "Job failed."), details == null ? Map.of() : details);
+        var retained = preserveRecovery(jobId, steps);
+        return update(jobId, "failed", failedStepId(retained), retained, AutarkOsJobs.clean(code, "job_failed"), AutarkOsJobs.clean(message, "Job failed."), details == null ? Map.of() : details);
+    }
+
+    private List<AutarkOsJobStep> preserveRecovery(String jobId, List<AutarkOsJobStep> proposed) {
+        var result = new ArrayList<>(proposed.stream().filter(step -> step.recovery() == null).toList());
+        findById(jobId).orElseThrow().steps().stream().filter(step -> step.recovery() != null).forEach(result::add);
+        return result;
     }
 
     private AutarkOsJob cancelJob(String jobId) {
@@ -438,6 +476,12 @@ public class AutarkOsJobService {
     }
 
     private String interruptedMessage(AutarkOsJob job) {
+        var unresolved = job.steps().stream().filter(step -> step.recovery() != null && !"succeeded".equals(step.status())).toList();
+        if (!unresolved.isEmpty()) {
+            return unresolved.stream().anyMatch(step -> !step.recovery().resumeAllowed())
+                    ? "This operation was interrupted. Keep the affected app stopped and review its verified safety checkpoint in Backups before starting it."
+                    : "This operation was interrupted and app availability could not be restored. Open My Apps to review the app and retry starting it.";
+        }
         return switch (job.type()) {
             case AutarkOsStates.JobType.STORAGE_CLEANUP -> "Storage cleanup was interrupted. Review the folder in Storage and any manual recovery archive in the backup destination's storage-cleanup folder before retrying. Cleanup was not automatically resumed.";
             case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";

@@ -84,7 +84,7 @@ class PrivateAccessReconciliationServiceTests {
                 com.autarkos.testsupport.DockerInventoryTestData.service(() ->
                         com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
                                 "vaultwarden", "appinst_vaultwarden", "autark-os-vaultwarden",
-                                composeExecutor.containers(Path.of("compose.yaml"), "autark-os-vaultwarden"))));
+                                composeExecutor.containers(Path.of("compose.yaml"), "autark-os-vaultwarden"))), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         when(applicationStateService.snapshot()).thenAnswer(ignored -> new ApplicationState(
                 appLifecycleService.listApps().stream()

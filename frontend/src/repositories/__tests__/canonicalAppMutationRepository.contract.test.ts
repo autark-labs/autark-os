@@ -49,7 +49,7 @@ test('applications page uses canonical synchronization for managed lifecycle act
   assert.match(page, /syncCanonicalAppMutationResult/);
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, data\)/);
   assert.match(page, /InstalledAppsAPIClient\.repair\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
-  assert.match(page, /BackupAPIClient\.run\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
+  assert.match(page, /BackupAPIClient\.run\(appId, planId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /InstalledAppsAPIClient\.uninstall\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /InstalledAppsAPIClient\.enablePrivateAccess\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.doesNotMatch(page, /ObservedServicesAPIClient|setObservedServicePinnedInApplicationStateCache\(queryClient/);

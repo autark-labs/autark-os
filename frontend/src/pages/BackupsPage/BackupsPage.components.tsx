@@ -122,7 +122,7 @@ export function RestoreFlowDialog({
               <>
                 <InfoBlock title="Autark-OS will restore" values={plan.affectedApps.length ? plan.affectedApps : ['No installed app matches this restore point.']} />
                 <InfoBlock title="What will change" values={plan.steps.length ? plan.steps : ['Autark-OS will stop affected apps, replace their data with this restore point, then start them again.']} />
-                <InfoBlock tone="warning" title="What is preserved" values={plan.warnings.length ? plan.warnings : ['A safety restore point is created before data is replaced. Other apps are left unchanged.']} />
+                <InfoBlock tone="warning" title="What is preserved" values={plan.warnings.length ? plan.warnings : ['A safety restore point is created and verified before data is replaced. If that checkpoint fails, restoration does not proceed. Other apps are left unchanged.']} />
                 {flow.error && <RestoreIssue message={flow.error} onRetry={onRetryPlan} title="Restore could not start" />}
                 <details className="rounded-lg border border-sky-400/20 bg-slate-950/60 p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-200">Technical restore details</summary>

@@ -266,7 +266,7 @@ class BackupServiceCanonicalAppTests {
                 composeExecutor);
 
         assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
-                .hasMessageContaining("could not restore the safety checkpoint");
+                .hasMessageContaining("requested restore was rolled back").hasMessageContaining("could not resume");
         assertThat(fileOpsService.restoreCalls).hasSize(2);
         assertThat(fileOpsService.restoreCalls.getFirst()).isEqualTo("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
         assertThat(fileOpsService.restoreCalls.get(1)).contains("homepage|app|").contains("pre-restore");
@@ -295,7 +295,7 @@ class BackupServiceCanonicalAppTests {
     }
 
     @Test
-    void restoreDoesNotApplySafetyCheckpointWhenRequestedDataWasNeverSwapped() throws Exception {
+    void restoreAttemptsSafetyRecoveryWhenAWriteThrowsBeforeReportingCompletion() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
@@ -317,7 +317,8 @@ class BackupServiceCanonicalAppTests {
         assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
                 .hasMessageContaining("Restore failed for Homepage")
                 .hasMessageContaining("requested archive could not be applied");
-        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
+        assertThat(fileOpsService.restoreCalls).hasSize(2);
+        assertThat(fileOpsService.restoreCalls.get(1)).contains("pre-restore");
     }
 
     @Test
@@ -468,6 +469,193 @@ class BackupServiceCanonicalAppTests {
         return appLifecycleService(runtimeLayout, repository, catalogService, backupRepository, new NoopDockerComposeExecutor());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void stalePausedRegistrationStillQuiescesLiveWriters(boolean full) throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(new InstalledApp(app.appId(), app.appName(), "Paused", app.runtimePath(), app.composeProject(), app.accessUrl(), app.installedAt()));
+        saveOwned(installed, app);
+        var compose = new ObservedWriterDockerComposeExecutor();
+        var fileOps = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations());
+        var service = backupService(layout, installed, backups, catalog, fileOps, compose);
+
+        var result = full ? service.runFullBackup("manual") : service.run(app.appId());
+
+        assertThat(result.status()).isEqualTo("completed");
+        assertThat(compose.stopCalls).as("live writers must stop even when the saved app status says Paused").isEqualTo(1);
+        assertThat(compose.startCalls).isEqualTo(1);
+        assertThat(compose.running).isTrue();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void backupResumesAppWhenStopSucceedsButItsObservationFails(boolean full) throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var compose = new ObservedWriterDockerComposeExecutor();
+        compose.failNextStoppedObservation = true;
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+
+        var result = full ? service.runFullBackup("manual") : service.run(app.appId());
+
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(compose.stopCalls).isEqualTo(1);
+        assertThat(compose.startCalls).as("a stop attempt already changed availability before the observation failed").isEqualTo(1);
+        assertThat(compose.running).isTrue();
+        assertThat(backups.recent(10)).allSatisfy(point -> assertThat(RestorePoints.toDomain(point).status()).isNotEqualTo("completed"));
+    }
+
+    @Test
+    void restoreResumesAppWhenStopSucceedsButItsObservationFails() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        RestorePoint point = backupService(layout, installed, backups, catalog).run(app.appId()).restorePoint();
+        var compose = new ObservedWriterDockerComposeExecutor();
+        compose.failNextStoppedObservation = true;
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+
+        assertThatThrownBy(() -> service.restore(point.id(), app.appId())).hasMessageContaining("stop");
+
+        assertThat(compose.stopCalls).isEqualTo(1);
+        assertThat(compose.startCalls).isEqualTo(1);
+        assertThat(compose.running).isTrue();
+    }
+
+    @Test
+    void partialMultiServiceStopBlocksArchiveAndResumesEveryWriter() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var compose = new ObservedWriterDockerComposeExecutor() {
+            @Override
+            public List<RuntimeModels.DockerContainerStatus> containers(Path file, String project) {
+                var primary = super.containers(file, project).getFirst();
+                return List.of(primary, new RuntimeModels.DockerContainerStatus("writer", "writer", "running", "", "Up", ""));
+            }
+        };
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+        var result = service.run("homepage");
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.message()).contains("could not confirm");
+        assertThat(result.restorePoint().path()).isEmpty();
+        assertThat(compose.startCalls).isEqualTo(1);
+        assertThat(compose.running).isTrue();
+    }
+
+    @Test
+    void failedArchiveResumesWriterAndDoesNotClaimProtection() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var compose = new ObservedWriterDockerComposeExecutor();
+        var fileOps = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()) {
+            @Override
+            public long createManagedArchive(String appId, java.util.Map<String, Path> paths, Path destination, Path root) throws java.io.IOException {
+                assertThat(compose.running).as("copy must not overlap live writers").isFalse();
+                throw new java.io.IOException("Injected archive write failure");
+            }
+        };
+        var result = backupService(layout, installed, backups, catalog, fileOps, compose).run("homepage");
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.message()).contains("archive write failure");
+        assertThat(compose.startCalls).isEqualTo(1);
+        assertThat(compose.running).isTrue();
+    }
+
+    @Test
+    void failedFailureRecordCannotSkipAvailabilityRecovery() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = mock(BackupRepository.class, org.mockito.AdditionalAnswers.delegatesTo(JpaTestRepositories.backupRepository(layout)));
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var compose = new ObservedWriterDockerComposeExecutor();
+        compose.failNextStoppedObservation = true;
+        org.mockito.Mockito.doThrow(new IllegalStateException("Failure record could not be saved"))
+                .when(backups).save(org.mockito.ArgumentMatchers.any(RestorePointEntity.class));
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+        assertThatThrownBy(() -> service.run("homepage")).hasMessageContaining("Failure record");
+        assertThat(compose.startCalls).isEqualTo(1);
+        assertThat(compose.running).isTrue();
+    }
+
+    @Test
+    void successfulRestoreIsNotRolledBackWhenHistoryWriteFails() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = mock(InstalledAppRepository.class, org.mockito.AdditionalAnswers.delegatesTo(JpaTestRepositories.installedAppRepository(layout)));
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        Path data = Path.of(app.runtimePath()).resolve("config/known.txt");
+        Files.createDirectories(data.getParent());
+        Files.writeString(data, "original records");
+        var compose = new ObservedWriterDockerComposeExecutor();
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+        var point = service.run("homepage").restorePoint();
+        Files.writeString(data, "changed records");
+        org.mockito.Mockito.doThrow(new IllegalStateException("History write failed"))
+                .when(installed).recordEvent(org.mockito.ArgumentMatchers.eq("homepage"), org.mockito.ArgumentMatchers.eq("restore_completed"), org.mockito.ArgumentMatchers.anyString());
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage")).hasMessageContaining("History write failed");
+        assertThat(data).hasContent("original records");
+        assertThat(compose.running).isTrue();
+        assertThat(compose.stopCalls).isEqualTo(2); // Backup and requested restore; no bookkeeping rollback.
+    }
+
+    @Test
+    void restoreCannotClaimRunningAfterSuccessfulStartCommandWithStoppedContainers() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        var installed = JpaTestRepositories.installedAppRepository(layout);
+        var backups = JpaTestRepositories.backupRepository(layout);
+        var catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed("homepage", "Homepage", layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        var point = backupService(layout, installed, backups, catalog).run("homepage").restorePoint();
+        var compose = new ObservedWriterDockerComposeExecutor() {
+            @Override
+            public RuntimeModels.DockerComposeResult up(Path file, String project) {
+                var result = super.up(file, project);
+                running = false;
+                return result;
+            }
+        };
+        var service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+                .hasMessageContaining("Running containers could not be confirmed").hasMessageContaining("could not resume");
+    }
+
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService) {
         return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
     }
@@ -521,13 +709,18 @@ class BackupServiceCanonicalAppTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(repository, runtimeLayout),
-                new AppAccessChecker(),
+                new AppAccessChecker() {
+                    @Override
+                    public com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck localHealthCheck(String appId, com.autarkos.marketplace.model.ApplicationManifest manifest, String url) {
+                        return com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck.reachable(appId, url);
+                    }
+                },
                 com.autarkos.testsupport.DockerInventoryTestData.service(() -> {
                     InstalledApp app = repository.findAllApps().getFirst();
                     return com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
                             app.appId(), "appinst_" + app.appId(), app.composeProject(),
                             composeExecutor.containers(Path.of(app.runtimePath()).resolve("compose.yaml"), app.composeProject()));
-                }));
+                }), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
     }
 
     private ProjectSettingsService projectSettingsService(RuntimeLayout layout, InstalledAppRepository repository) {
@@ -602,17 +795,20 @@ class BackupServiceCanonicalAppTests {
     }
 
     private static class NoopDockerComposeExecutor implements DockerComposeExecutor {
+        boolean observedRunning;
         int stopCalls;
         int startCalls;
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             startCalls++;
+            observedRunning = true;
             return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
         public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
             stopCalls++;
+            observedRunning = false;
             return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
@@ -633,7 +829,9 @@ class BackupServiceCanonicalAppTests {
 
         @Override
         public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
-            return List.of();
+            String service = projectName.replaceFirst("^autark-os-", "");
+            return List.of(new RuntimeModels.DockerContainerStatus(service, service,
+                    observedRunning ? "running" : "exited", "", observedRunning ? "Up" : "Exited", ""));
         }
 
         @Override
@@ -642,14 +840,41 @@ class BackupServiceCanonicalAppTests {
         }
     }
 
-    private static class FailingStartDockerComposeExecutor extends NoopDockerComposeExecutor {
+    private static class FailingStartDockerComposeExecutor extends ObservedWriterDockerComposeExecutor {
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             return new RuntimeModels.DockerComposeResult(1, List.of("failed to bind host port 0.0.0.0:8080/tcp: address already in use"));
         }
     }
 
-    private static class FailingStopDockerComposeExecutor extends NoopDockerComposeExecutor {
+    private static class ObservedWriterDockerComposeExecutor extends NoopDockerComposeExecutor {
+        boolean running = true;
+        boolean failNextStoppedObservation;
+
+        @Override
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            running = false;
+            return super.stop(composeFile, projectName);
+        }
+
+        @Override
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            running = true;
+            return super.up(composeFile, projectName);
+        }
+
+        @Override
+        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
+            if (!running && failNextStoppedObservation) {
+                failNextStoppedObservation = false;
+                throw new IllegalStateException("Docker observation failed after the stop succeeded");
+            }
+            return List.of(new RuntimeModels.DockerContainerStatus("homepage", "homepage",
+                    running ? "running" : "exited", "", running ? "Up" : "Exited", ""));
+        }
+    }
+
+    private static class FailingStopDockerComposeExecutor extends ObservedWriterDockerComposeExecutor {
         @Override
         public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
             return new RuntimeModels.DockerComposeResult(1, List.of("container did not stop"));
@@ -659,10 +884,9 @@ class BackupServiceCanonicalAppTests {
     private static class FailingRollbackStopDockerComposeExecutor extends FailingStartDockerComposeExecutor {
         @Override
         public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            if (stopCalls == 0) return super.stop(composeFile, projectName);
             stopCalls++;
-            return stopCalls == 1
-                    ? new RuntimeModels.DockerComposeResult(0, List.of())
-                    : new RuntimeModels.DockerComposeResult(1, List.of("container could not be stopped before rollback"));
+            return new RuntimeModels.DockerComposeResult(1, List.of("container could not be stopped before rollback"));
         }
     }
 

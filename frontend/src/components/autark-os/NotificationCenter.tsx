@@ -14,6 +14,7 @@ import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 import { formatLocalizedDateTime } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
+import { applicationDeepLinkForManagedApp } from '@/pages/ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { currentJobStepText, jobTypeLabel, terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
 import { invalidateStorageCleanupQueries } from '@/repositories/storageRepository';
@@ -137,6 +138,12 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
     if (action.disabled || runningAction) return;
     if (action.route) { navigate(action.route); setOpen(false); return; }
     if (!action.href) return;
+    const backupMatch = action.href.match(/^\/api\/backups\/(?:apps\/([^/]+)\/run|(full|routine)\/run)$/);
+    if (backupMatch && action.method?.toUpperCase() === 'POST') {
+      navigate(backupMatch[1] ? `/backups?app=${encodeURIComponent(decodeURIComponent(backupMatch[1]))}` : '/backups');
+      setOpen(false);
+      return;
+    }
     if (!action.method || action.method.toUpperCase() === 'GET') {
       if (action.href.startsWith('http')) {
         const reason = appBrowserAccessReason(action.href);
@@ -226,7 +233,7 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
               <p>{new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'long' })}</p>
               <p className="break-words leading-relaxed">{item.message || item.title}</p>
               {item.nextAction && actionButton(item.nextAction)}
-              {item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}
+              {item.job && <><RecoveryLinks job={item.job} onNavigate={() => setOpen(false)} /><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}
             </div>
           </details>)}
           {!history.isPending && !jobs.isPending && !history.isError && !jobs.isError && rows.length === 0 && <p className="py-4 text-xs text-muted-foreground">No history yet.</p>}
@@ -240,6 +247,15 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
 function ResultIcon({ severity }: { severity: string }) {
   const Icon = severity === 'success' ? Check : severity === 'info' ? Info : CircleAlert;
   return <Icon role="img" aria-label={severity} className={cn('size-3.5 shrink-0', severity === 'success' ? 'text-emerald-600 dark:text-emerald-300' : severity === 'info' ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-200')} />;
+}
+
+function RecoveryLinks({ job, onNavigate }: { job: AutarkOsJob; onNavigate: () => void }) {
+  const pending = job.steps.filter(step => step.recovery && step.status !== 'succeeded');
+  const appIds = [...new Set(pending.map(step => step.recovery!.appId))];
+  return <>{appIds.map(appId => {
+    const resumeAllowed = pending.filter(step => step.recovery!.appId === appId).every(step => step.recovery!.resumeAllowed);
+    return <Link key={appId} className="block underline underline-offset-2" to={resumeAllowed ? applicationDeepLinkForManagedApp(appId, { panel: 'manage', tab: 'overview' }) : `/backups?app=${encodeURIComponent(appId)}`} onClick={onNavigate}>{resumeAllowed ? 'Review app recovery' : 'Review restore points before starting'} · {appId}</Link>;
+  })}</>;
 }
 
 function JobSteps({ job }: { job: AutarkOsJob }) {

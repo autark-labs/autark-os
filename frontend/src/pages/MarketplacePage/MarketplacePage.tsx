@@ -1,3 +1,4 @@
+import { BackupReviewDialog } from '@/components/autark-os/BackupReviewDialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Info, Sparkles } from 'lucide-react';
@@ -84,6 +85,7 @@ function MarketplacePage() {
   const [catalogScope, setCatalogScope] = useState('starter');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
+  const [backupAppId, setBackupAppId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
@@ -235,13 +237,14 @@ function MarketplacePage() {
     }
   }
 
-  async function createFirstBackup(appId: string) {
+  async function createFirstBackup(appId: string, planId: string) {
     try {
-      const job = await backupMutation.mutateAsync(appId);
+      const job = await backupMutation.mutateAsync({ appId, planId });
       setBackupJob(job);
       showJobNotification(job);
     } catch (error) {
       showActionErrorNotification(error, 'Backup could not start');
+      throw error;
     }
   }
 
@@ -445,7 +448,7 @@ function MarketplacePage() {
           installing={selectedAppInstalling}
           installedApp={detailView.application.relationship === 'managed' ? detailView.application : null}
           onBack={closeAppDetails}
-          onCreateBackup={createFirstBackup}
+          onCreateBackup={async (appId) => setBackupAppId(appId)}
           onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.application.id)}
           onInstall={() => installApp(detailView.application.id)}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -474,6 +477,7 @@ function MarketplacePage() {
           setupSchema={selectedView.setupSchema}
         />
       )}
+      {backupAppId && <BackupReviewDialog request={{ scope: 'app', appId: backupAppId }} onClose={() => setBackupAppId(null)} onConfirm={(planId) => createFirstBackup(backupAppId, planId)} />}
     </PageShell>
   );
 }

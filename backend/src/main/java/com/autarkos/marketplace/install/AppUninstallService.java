@@ -4,18 +4,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.api.AutarkOsStates;
-import com.autarkos.backups.BackupRepository;
-import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.BackupArchiveService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
-import com.autarkos.backups.RestorePoints;
-import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.host.DockerInventoryService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
@@ -25,50 +19,42 @@ import com.autarkos.network.tailscale.TailscaleService;
 
 class AppUninstallService {
 
-    private static final DateTimeFormatter SAFETY_CHECKPOINT_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
-
     private final InstalledAppRepository repository;
     private final DockerComposeExecutor composeExecutor;
     private final RuntimeLayout runtimeLayout;
-    private final BackupRepository backupRepository;
     private final TailscaleService tailscaleService;
     private final PrivateAccessStateResolver privateAccessStateResolver;
     private final ActivityLogService activityLogService;
-    private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
-    private final AutarkOsFileOpsService fileOpsService;
+    private final BackupArchiveService archives;
     private final DockerInventoryService dockerInventory;
 
     AppUninstallService(
             InstalledAppRepository repository,
             DockerComposeExecutor composeExecutor,
             RuntimeLayout runtimeLayout,
-            BackupRepository backupRepository,
             TailscaleService tailscaleService,
             ActivityLogService activityLogService,
-            BackupDestinationService backupDestinationService,
             RecoveryOperationCoordinator recoveryOperations,
-            AutarkOsFileOpsService fileOpsService,
-            DockerInventoryService dockerInventory) {
+            DockerInventoryService dockerInventory,
+            BackupArchiveService archives) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
-        this.backupRepository = backupRepository;
         this.tailscaleService = tailscaleService;
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.activityLogService = activityLogService;
-        this.backupDestinationService = backupDestinationService;
         this.recoveryOperations = recoveryOperations;
-        this.fileOpsService = fileOpsService;
+        this.archives = archives;
         this.dockerInventory = dockerInventory;
     }
 
     InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
         boolean runtimeCheckpointPlanned = hasCheckpointableData(app);
         String checkpointMessage = runtimeCheckpointPlanned
-                    ? "Autark-OS will create a complete safety checkpoint before removing containers. If it cannot read every file, the app will stay installed. Your app data is still kept on disk."
+                    ? "Autark-OS will stop the app, create and verify a safety checkpoint, then remove its containers. If the checkpoint fails, the app stays installed and Autark-OS will try to resume it if it was running. Your app data is kept on disk."
                     : "Autark-OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
-        List<String> willStop = List.of("Create a safety checkpoint when protected app data is present", "Stop the app containers", "Remove the Compose project", "Hide the app from the managed Applications list");
+        List<String> willStop = List.of("Stop the app containers and confirm they are stopped", "Create and verify a safety checkpoint before removing containers", "Remove the Compose project", "Hide the app from the managed Applications list");
         List<String> willKeep = List.of("Protected application data in " + app.runtimePath(), "Backups and files created outside Docker", "Historical activity events");
         return new InstallModels.UninstallPlan(
                 app.appId(),
@@ -89,8 +75,7 @@ class AppUninstallService {
 
     private AppActionResult uninstallUnlocked(InstalledApp app, InstallModels.InstallSettings settings, Path composeFile, Map<String, Path> protectedPaths) {
         List<String> logs = new java.util.ArrayList<>();
-        SafetyCheckpointResult checkpoint = createPreUninstallCheckpoint(app, protectedPaths);
-        logs.addAll(checkpoint.logs());
+        logs.add(createPreUninstallCheckpoint(app, protectedPaths));
         dockerInventory.requireFresh().requireMutationOwnership(app.appId());
         if (settings.tailscaleEnabled() || settings.privateAccessUrl() != null) {
             TailscaleServeResult disableResult = disablePrivateAccessMapping(app, settings);
@@ -129,20 +114,12 @@ class AppUninstallService {
         return result;
     }
 
-    private SafetyCheckpointResult createPreUninstallCheckpoint(InstalledApp app, Map<String, Path> protectedPaths) {
-        Path source = runtimeLayout.appRoot(app.appId()).toAbsolutePath().normalize();
-        if (!Files.isDirectory(source)) {
-            return new SafetyCheckpointResult(false, List.of("No app data found to checkpoint before uninstall."));
-        }
+    private String createPreUninstallCheckpoint(InstalledApp app, Map<String, Path> protectedPaths) {
         try {
-            Path directory = backupRoot().resolve("pre-uninstall");
-            Files.createDirectories(directory);
-            Path destination = directory.resolve(app.appId() + "-pre-uninstall-" + SAFETY_CHECKPOINT_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = fileOpsService.createManagedArchive(app.appId(), protectedPaths, destination, backupRoot());
-            backupRepository.save(RestorePoints.create(app.appId(), app.appName(), "app", "pre_uninstall", app.appId(), destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety checkpoint created before uninstall."));
+            var point = archives.createCheckpoint(app, protectedPaths, "pre_uninstall");
             repository.recordEvent(app.appId(), "safety_checkpoint_created", "Saved a safety checkpoint before removing " + app.appName() + ".");
             activitySuccess("safety_checkpoint_created", "Saved safety checkpoint", "Autark-OS saved a checkpoint before removing " + app.appName() + ".", app.appId());
-            return new SafetyCheckpointResult(true, List.of("Created safety checkpoint " + destination));
+            return "Created and verified safety checkpoint #" + point.id();
         } catch (IOException | RuntimeException exception) {
             String reason = exception.getMessage() == null || exception.getMessage().isBlank()
                     ? "No detailed reason was returned."
@@ -152,10 +129,6 @@ class AppUninstallService {
             activityWarning("safety_checkpoint_failed", "Safety checkpoint failed", message, app.appId());
             throw new InstallationException(message, exception);
         }
-    }
-
-    private Path backupRoot() {
-        return backupDestinationService.activeRoot();
     }
 
     private boolean hasCheckpointableData(InstalledApp app) {
@@ -183,8 +156,5 @@ class AppUninstallService {
 
     private void activityWarning(String action, String title, String message, String appId) {
         activityLogService.warning("applications", action, title, message, appId);
-    }
-
-    private record SafetyCheckpointResult(boolean created, List<String> logs) {
     }
 }

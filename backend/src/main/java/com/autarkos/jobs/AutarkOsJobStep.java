@@ -10,7 +10,14 @@ public record AutarkOsJobStep(
         String status,
         String message,
         Instant startedAt,
-        Instant finishedAt) {
+        Instant finishedAt,
+        Recovery recovery) {
+
+    public record Recovery(String appId, String appInstanceId, boolean resumeAllowed) { }
+
+    public AutarkOsJobStep(String id, String label, String status, String message, Instant startedAt, Instant finishedAt) {
+        this(id, label, status, message, startedAt, finishedAt, null);
+    }
 
     public static AutarkOsJobStep pending(String id, String label) {
         return new AutarkOsJobStep(id, label, AutarkOsStates.JobStatus.PENDING, "", null, null);
@@ -35,6 +42,7 @@ public record AutarkOsJobStep(
                 nextStatus,
                 nextMessage == null || nextMessage.isBlank() ? message : nextMessage,
                 startedAt == null ? this.startedAt : startedAt,
-                finishedAt == null ? this.finishedAt : finishedAt);
+                finishedAt == null ? this.finishedAt : finishedAt,
+                recovery);
     }
 }

@@ -77,6 +77,17 @@ public final class BackupModels {
     public record BackupDestinationRequest(String path) {
     }
 
+    public record BackupPlanApp(String appId, String appName) {
+    }
+
+    public record BackupPlan(
+            String scope, String appId, String planId, boolean executable,
+            List<BackupPlanApp> apps, List<String> warnings, List<String> blockedReasons, Instant checkedAt) {
+    }
+
+    public record BackupRunRequest(String planId) {
+    }
+
     public record BackupRunResult(
             String appId,
             String appName,

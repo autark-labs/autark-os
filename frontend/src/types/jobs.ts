@@ -3,6 +3,7 @@ export type AutarkOsJobStep = {
   label: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | string;
   message: string;
+  recovery?: { appId: string; appInstanceId: string; resumeAllowed: boolean } | null;
   startedAt?: string | null;
   finishedAt?: string | null;
 };

@@ -1,3 +1,13 @@
+export type BackupReviewRequest = { scope: 'app' | 'full' | 'routine'; appId?: string | null };
+export type BackupPlan = BackupReviewRequest & {
+  planId: string;
+  executable: boolean;
+  apps: { appId: string; appName: string }[];
+  warnings: string[];
+  blockedReasons: string[];
+  checkedAt: string;
+};
+
 export type RestorePoint = {
   id: number;
   appId: string;

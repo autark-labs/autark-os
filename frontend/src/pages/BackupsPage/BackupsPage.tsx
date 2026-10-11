@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage } from '@/api/httpClient';
+import { BackupReviewDialog } from '@/components/autark-os/BackupReviewDialog';
 import { ContextChip } from '@/components/autark-os/ContextChip';
 import { Button } from '@/components/ui/button';
 import { JobProgress } from '@/components/autark-os/JobProgress';
@@ -25,7 +26,7 @@ import {
   invalidateApplicationState,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
-import type { AppBackupStatus, RestorePoint } from '@/types/backup';
+import type { AppBackupStatus, RestorePoint, BackupReviewRequest } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 import { RestoreFlowDialog } from './BackupsPage.components';
 import type { RestoreFlowState } from './BackupsPage.components';
@@ -44,6 +45,7 @@ function BackupsPage() {
   const queryClient = useQueryClient();
   const { openSettings } = useSettingsDialog();
   const applicationState = useApplicationStateRepository();
+  const [backupReview, setBackupReview] = useState<BackupReviewRequest | null>(null);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
   const [restoreSelection, setRestoreSelection] = useState<{ pointId: number; targetAppId: string | null; phase: 'details' | 'confirm'; error: string | null } | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -131,17 +133,29 @@ function BackupsPage() {
     : appBackupAvailability;
   async function runManualAppBackup(app: AppBackupStatus) {
     if (appBackupOperationAvailability.disabled) return;
-    await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
+    setBackupReview({ scope: 'app', appId: app.appId });
   }
 
   async function runFullBackup() {
     if (fullBackupAvailability.disabled) return;
-    await runBackup('full', () => runFullBackupMutation.mutateAsync());
+    setBackupReview({ scope: 'full' });
   }
 
   async function runRoutineBackup() {
     if (routineBackupAvailability.disabled) return;
-    await runBackup('routine', () => runRoutineBackupMutation.mutateAsync());
+    setBackupReview({ scope: 'routine' });
+  }
+
+  async function confirmBackup(planId: string) {
+    if (!backupReview) return;
+    if (backupReview.scope === 'app' && backupReview.appId) {
+      const appId = backupReview.appId;
+      await runBackup(`app-${appId}`, () => runAppBackupMutation.mutateAsync({ appId, planId }));
+    } else if (backupReview.scope === 'full') {
+      await runBackup('full', () => runFullBackupMutation.mutateAsync(planId));
+    } else {
+      await runBackup('routine', () => runRoutineBackupMutation.mutateAsync(planId));
+    }
   }
 
   function acceptJob(job: AutarkOsJob) {
@@ -159,6 +173,7 @@ function BackupsPage() {
       const notificationMessage = apiErrorMessage(runError, 'Backup could not be started.');
       showActionNotification({ severity: 'error', title: 'Backup could not start', message: notificationMessage }, 'Backup could not start');
       setPendingOperation(null);
+      throw runError;
     }
   }
 
@@ -270,6 +285,7 @@ function BackupsPage() {
         </ExtensionActionTarget>
       )}
 
+      {backupReview && <BackupReviewDialog request={backupReview} onClose={() => setBackupReview(null)} onConfirm={confirmBackup} />}
       <RestoreFlowDialog
         appOptions={report?.apps ?? []}
         flow={restoreFlow}

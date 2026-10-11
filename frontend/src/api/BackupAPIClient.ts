@@ -1,6 +1,6 @@
 import { httpClient } from './httpClient';
 import type { AutarkOsJob } from '@/types/jobs';
-import type { BackupDestination, BackupReport, RestorePlan } from '@/types/backup';
+import type { BackupDestination, BackupReport, RestorePlan, BackupPlan, BackupReviewRequest } from '@/types/backup';
 
 export const BackupAPIClient = {
   async report() {
@@ -23,18 +23,23 @@ export const BackupAPIClient = {
     return response.data;
   },
 
-  async run(appId: string) {
-    const response = await httpClient.post<AutarkOsJob>(`/api/backups/apps/${appId}/run`);
+  async plan(request: BackupReviewRequest) {
+    const response = await httpClient.get<BackupPlan>('/api/backups/plan', { params: request });
     return response.data;
   },
 
-  async runFull() {
-    const response = await httpClient.post<AutarkOsJob>('/api/backups/full/run');
+  async run(appId: string, planId: string) {
+    const response = await httpClient.post<AutarkOsJob>(`/api/backups/apps/${appId}/run`, { planId });
     return response.data;
   },
 
-  async runRoutine() {
-    const response = await httpClient.post<AutarkOsJob>('/api/backups/routine/run');
+  async runFull(planId: string) {
+    const response = await httpClient.post<AutarkOsJob>('/api/backups/full/run', { planId });
+    return response.data;
+  },
+
+  async runRoutine(planId: string) {
+    const response = await httpClient.post<AutarkOsJob>('/api/backups/routine/run', { planId });
     return response.data;
   },
 

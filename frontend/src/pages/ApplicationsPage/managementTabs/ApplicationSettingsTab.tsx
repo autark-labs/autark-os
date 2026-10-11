@@ -233,7 +233,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <SwitchField
               control={control}
               disabled={!editable || busy}
-              explanation="When enabled, this app is included in Autark-OS backup policy."
+              explanation="Scheduled backups temporarily stop this app while copying data, then resume it if it was running."
               label="Include in backups"
               name="backupEnabled"
             />

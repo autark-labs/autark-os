@@ -72,6 +72,7 @@ class AppLifecycleServiceTests {
     InstalledAppRepository repository;
     AppLifecycleService service;
     FakeLifecycleDockerComposeExecutor composeExecutor;
+    com.autarkos.jobs.AutarkOsJobService checkpointJobs;
     FakeTailscaleService tailscaleService;
     RuntimeLayout runtimeLayout;
     BackupRepository backupRepository;
@@ -97,6 +98,7 @@ class AppLifecycleServiceTests {
         identity = new AutarkOsIdentity("pos_test", "test", runtimeRoot.toString(),
                 "runtime-hash", Instant.parse("2026-06-11T00:00:00Z"), 1);
         lifecycleCatalog = legacyDashboardCatalog();
+        checkpointJobs = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false);
         service = new AppLifecycleService(
                 repository,
                 composeExecutor,
@@ -112,7 +114,7 @@ class AppLifecycleServiceTests {
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
                 accessChecker,
-                dockerInventory());
+                dockerInventory(), checkpointJobs);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  vaultwarden:\n    image: vaultwarden/server:1.36.0\n    ports:\n      - '8090:80'\n    labels:\n      - autark-os.instance-id=test-owner\n");
@@ -739,7 +741,7 @@ class AppLifecycleServiceTests {
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
                 new AppAccessChecker(),
-                dockerInventory());
+                dockerInventory(), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
         repository.saveSettings("private-worker", new InstallModels.InstallSettings(
                 null,
                 "https://autark-os-dev.tailnet.local:12890",
@@ -824,7 +826,7 @@ class AppLifecycleServiceTests {
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
                 new AppAccessChecker(),
-                dockerInventory());
+                dockerInventory(), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
 
         AppActionResult result = devService.repair("vaultwarden");
 
@@ -855,7 +857,7 @@ class AppLifecycleServiceTests {
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
                 new AppAccessChecker(),
-                dockerInventory());
+                dockerInventory(), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
 
         List<AppRuntimeView> apps = rediscoveryService.listApps();
 
@@ -880,7 +882,7 @@ class AppLifecycleServiceTests {
         AppActionResult result = service.uninstall("vaultwarden");
 
         assertThat(result.status()).isEqualTo("removed");
-        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Created safety checkpoint"));
+        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Created and verified safety checkpoint"));
         List<RestorePoint> restorePoints = backupRepository.forApp("vaultwarden", 5).stream()
                 .map(RestorePoints::toDomain)
                 .toList();
@@ -889,17 +891,32 @@ class AppLifecycleServiceTests {
                     assertThat(point.source()).isEqualTo("pre_uninstall");
                     assertThat(point.status()).isEqualTo("completed");
                     assertThat(point.path()).contains("pre-uninstall");
+                    assertThat(point.integrityBaselineSha256()).matches("[a-f0-9]{64}");
+                    assertThat(point.backupContractStrategy()).isEqualTo("cold_file");
+                    assertThat(point.verificationStatus()).isEqualTo("verified");
                 });
         assertThat(repository.eventsFor("vaultwarden", 10))
                 .extracting(event -> event.type())
                 .contains("safety_checkpoint_created");
     }
 
-    @Test
-    void uninstallDoesNotRemoveContainersWhenItsPlannedSafetyCheckpointCannotBeCreated() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void uninstallDoesNotRemoveContainersWhenItsPlannedSafetyCheckpointCannotBeCreated(boolean corruptArchive) throws Exception {
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false,
+                java.util.Map.of(), new InstallModels.BackupPolicy(false, "daily", 7)));
+        Path marker = runtimeLayout.appRoot("vaultwarden").resolve("data/known-records.txt");
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, "preserve records");
         AutarkOsFileOpsService fileOpsService = mock(AutarkOsFileOpsService.class);
         when(fileOpsService.createManagedArchive(eq("vaultwarden"), any(java.util.Map.class), any(Path.class), any(Path.class)))
-                .thenThrow(new java.io.IOException("Autark-OS cannot read app-data.sqlite"));
+                .thenAnswer(invocation -> {
+                    assertThat(composeExecutor.containers).allMatch(container -> "exited".equals(container.state()));
+                    if (!corruptArchive) throw new java.io.IOException("Autark-OS cannot read app-data.sqlite");
+                    Path archive = invocation.getArgument(2);
+                    Files.writeString(archive, "invalid zip archive");
+                    return Files.size(archive);
+                });
         AppLifecycleService checkpointFailureService = new AppLifecycleService(
                 repository,
                 composeExecutor,
@@ -915,11 +932,13 @@ class AppLifecycleServiceTests {
                 fileOpsService,
                 managedApps(),
                 new AppAccessChecker(),
-                dockerInventory());
+                dockerInventory(), new com.autarkos.jobs.AutarkOsJobService(com.autarkos.testsupport.JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false));
 
         assertThatThrownBy(() -> checkpointFailureService.uninstall("vaultwarden"))
                 .hasMessageContaining("could not create a safety checkpoint")
-                .hasMessageContaining("cannot read app-data.sqlite");
+                .hasMessageContaining(corruptArchive ? "could not verify" : "cannot read app-data.sqlite");
+        assertThat(marker).hasContent("preserve records");
+        assertThat(composeExecutor.containers).allMatch(container -> "running".equals(container.state()));
 
         assertThat(composeExecutor.downCalled).isFalse();
         assertThat(repository.findAppById("vaultwarden")).isPresent();
@@ -1499,6 +1518,40 @@ class AppLifecycleServiceTests {
         ManagedAppTestContract.write(repository, runtimeLayout, identity, app);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"resume", "data-changing", "start-fails", "ownership-changed", "app-removed"})
+    void interruptedCheckpointRetainsRecoveryAcrossJobReload(String mode) {
+        var job = checkpointJobs.start("backup", "vaultwarden",
+                List.of(com.autarkos.jobs.AutarkOsJobStep.pending("backup", "Create backup")), () -> {
+                    var state = service.prepareCheckpoint("vaultwarden");
+                    service.stopForCheckpoint(state);
+                    if ("data-changing".equals(mode)) service.checkpointDataChanging(state);
+                    if ("app-removed".equals(mode)) repository.deleteApp("vaultwarden");
+                    if ("ownership-changed".equals(mode)) checkpointJobs.recordAppRecovery(state.jobId(), "Vaultwarden",
+                            new com.autarkos.jobs.AutarkOsJobStep.Recovery("vaultwarden", "old-app-instance", true), "pending", "Resume previous app");
+                    throw new AssertionError("Simulated process interruption after stop");
+                });
+        assertThatThrownBy(checkpointJobs::runQueuedJobsNow).isInstanceOf(AssertionError.class);
+        var reloadedJobs = new com.autarkos.jobs.AutarkOsJobService(JpaTestRepositories.jobRepository(runtimeLayout), Runnable::run, false);
+        assertThat(reloadedJobs.findById(job.jobId()).orElseThrow().steps())
+                .anyMatch(step -> step.recovery() != null && "pending".equals(step.status()));
+        if ("start-fails".equals(mode)) composeExecutor.failUpOutput = List.of("Docker cannot start the app");
+
+        service.recoverInterruptedCheckpoints();
+        reloadedJobs.reconcileInterruptedJobs();
+
+        var recovered = reloadedJobs.findById(job.jobId()).orElseThrow();
+        assertThat(recovered.status()).isEqualTo("failed"); // Interrupted work never becomes a successful backup.
+        var obligation = recovered.steps().stream().filter(step -> step.recovery() != null).findFirst().orElseThrow();
+        assertThat(obligation.status()).isEqualTo("resume".equals(mode) ? "succeeded" : "failed");
+        assertThat(composeExecutor.upCalls).isEqualTo(List.of("resume", "start-fails").contains(mode) ? 1 : 0);
+        if (List.of("data-changing", "app-removed").contains(mode)) {
+            assertThat(obligation.recovery().resumeAllowed()).isFalse();
+            assertThat(recovered.error().message()).contains("Backups");
+        }
+        if ("start-fails".equals(mode)) assertThat(recovered.error().message()).contains("My Apps");
+    }
+
     private com.autarkos.host.DockerInventoryService dockerInventory() {
         return com.autarkos.testsupport.DockerInventoryTestData.service(() -> {
             if (composeExecutor.observationFails) {
@@ -1613,11 +1666,15 @@ class AppLifecycleServiceTests {
             if (transitionToStarting) {
                 containers = startingContainer();
             }
+            if (!transitionToStarting) containers = containers.stream().map(container -> new RuntimeModels.DockerContainerStatus(
+                    container.name(), container.service(), "running", "healthy", "Up (healthy)", container.ports())).toList();
             return new RuntimeModels.DockerComposeResult(0, List.of("started " + projectName));
         }
 
         @Override
         public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            containers = containers.stream().map(container -> new RuntimeModels.DockerContainerStatus(
+                    container.name(), container.service(), "exited", "", "Exited", container.ports())).toList();
             return new RuntimeModels.DockerComposeResult(0, List.of("stopped " + projectName));
         }
 

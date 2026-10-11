@@ -32,15 +32,18 @@ final class AutarkOsJobs {
     }
 
     static String stepsJson(List<AutarkOsJobStep> steps, ObjectMapper objectMapper) {
-        List<Map<String, String>> values = (steps == null ? List.<AutarkOsJobStep>of() : steps).stream()
-                .map(step -> Map.of(
-                        "id", clean(step.id(), ""),
-                        "label", clean(step.label(), ""),
-                        "status", clean(step.status(), "pending"),
-                        "message", clean(step.message(), ""),
-                        "startedAt", step.startedAt() == null ? "" : step.startedAt().toString(),
-                        "finishedAt", step.finishedAt() == null ? "" : step.finishedAt().toString()))
-                .toList();
+        List<Map<String, Object>> values = (steps == null ? List.<AutarkOsJobStep>of() : steps).stream()
+                .map(step -> {
+                    Map<String, Object> value = new java.util.LinkedHashMap<>();
+                    value.put("id", clean(step.id(), ""));
+                    value.put("label", clean(step.label(), ""));
+                    value.put("status", clean(step.status(), "pending"));
+                    value.put("message", clean(step.message(), ""));
+                    value.put("startedAt", step.startedAt() == null ? "" : step.startedAt().toString());
+                    value.put("finishedAt", step.finishedAt() == null ? "" : step.finishedAt().toString());
+                    if (step.recovery() != null) value.put("recovery", step.recovery());
+                    return value;
+                }).toList();
         try {
             return objectMapper.writeValueAsString(values);
         } catch (JsonProcessingException exception) {
@@ -66,15 +69,19 @@ final class AutarkOsJobs {
 
     private static List<AutarkOsJobStep> steps(String json, ObjectMapper objectMapper) {
         try {
-            List<Map<String, String>> values = objectMapper.readValue(json == null || json.isBlank() ? "[]" : json, new TypeReference<>() {});
+            List<com.fasterxml.jackson.databind.JsonNode> values = objectMapper.readValue(json == null || json.isBlank() ? "[]" : json, new TypeReference<>() {});
             return values.stream()
                     .map(value -> new AutarkOsJobStep(
-                            value.getOrDefault("id", ""),
-                            value.getOrDefault("label", ""),
-                            value.getOrDefault("status", "pending"),
-                            value.getOrDefault("message", ""),
-                            instant(value.get("startedAt")),
-                            instant(value.get("finishedAt"))))
+                            value.path("id").asText(""),
+                            value.path("label").asText(""),
+                            value.path("status").asText("pending"),
+                            value.path("message").asText(""),
+                            instant(value.path("startedAt").asText()),
+                            instant(value.path("finishedAt").asText()),
+                            value.hasNonNull("recovery") ? new AutarkOsJobStep.Recovery(
+                                    value.path("recovery").path("appId").asText(),
+                                    value.path("recovery").path("appInstanceId").asText(),
+                                    value.path("recovery").path("resumeAllowed").asBoolean()) : null))
                     .toList();
         } catch (JsonProcessingException exception) {
             throw new InstallationException("Unable to read Autark-OS job steps.", exception);

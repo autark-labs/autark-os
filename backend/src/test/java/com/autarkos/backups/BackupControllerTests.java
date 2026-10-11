@@ -31,9 +31,10 @@ class BackupControllerTests {
     @Test
     void appBackupReturnsQueuedJobAndInvalidatesApplicationState() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         BackupModels.BackupRunResult result = new BackupModels.BackupRunResult(
                 "vaultwarden",
                 "Vaultwarden",
@@ -41,9 +42,9 @@ class BackupControllerTests {
                 "Backup completed for Vaultwarden.",
                 null,
                 Instant.parse("2026-06-21T12:00:00Z"));
-        when(backupService.run("vaultwarden")).thenReturn(result);
+        when(plans.runReviewed("app", "vaultwarden", reviewed())).thenReturn(result);
 
-        AutarkOsJob job = controller.run("vaultwarden");
+        AutarkOsJob job = controller.run("vaultwarden", reviewed());
 
         assertThat(job.type()).isEqualTo("backup");
         assertThat(job.subjectId()).isEqualTo("vaultwarden");
@@ -57,16 +58,17 @@ class BackupControllerTests {
 
         AutarkOsJob completed = jobService.findById(job.jobId()).orElseThrow();
         assertThat(completed.status()).isEqualTo("succeeded");
-        verify(backupService).run("vaultwarden");
+        verify(plans).runReviewed("app", "vaultwarden", reviewed());
         verify(applicationStateService, times(2)).invalidate();
     }
 
     @Test
     void appBackupKeepsItsVerifiedRestorePointButFailsTheJobWhenTheAppCannotRestart() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         BackupModels.BackupRunResult result = new BackupModels.BackupRunResult(
                 "vaultwarden",
                 "Vaultwarden",
@@ -77,9 +79,9 @@ class BackupControllerTests {
                         "Backup completed.", "verified", "Archive checksum matched.", "checksum", "baseline", "archive", 1, "high",
                         Instant.parse("2026-06-21T12:00:00Z"), Instant.parse("2026-06-21T12:00:00Z")),
                 Instant.parse("2026-06-21T12:00:00Z"));
-        when(backupService.run("vaultwarden")).thenReturn(result);
+        when(plans.runReviewed("app", "vaultwarden", reviewed())).thenReturn(result);
 
-        AutarkOsJob job = controller.run("vaultwarden");
+        AutarkOsJob job = controller.run("vaultwarden", reviewed());
         jobService.runQueuedJobsNow();
 
         AutarkOsJob completed = jobService.findById(job.jobId()).orElseThrow();
@@ -91,10 +93,32 @@ class BackupControllerTests {
     }
 
     @Test
+    void scopeChangingAfterAdmissionFailsQueuedJobBeforeBackupExecution() {
+        BackupService backups = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
+        ApplicationStateService state = mock(ApplicationStateService.class);
+        AutarkOsJobService jobs = jobService();
+        BackupController controller = new BackupController(backups, jobs, state, plans);
+        AutarkOsJob queued = controller.runFull(reviewed());
+        verify(plans).requireReviewed("full", null, reviewed());
+        when(plans.runReviewed("full", null, reviewed())).thenThrow(
+                new com.autarkos.marketplace.install.InstallationException("The backup scope changed. Review the affected apps again."));
+
+        jobs.runQueuedJobsNow();
+
+        AutarkOsJob failed = jobs.findById(queued.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.error().message()).contains("Review the affected apps again");
+        verify(backups, never()).runFullBackup("manual");
+        verify(state, times(2)).invalidate();
+    }
+
+    @Test
     void configuresBackupDestinationAndRefreshesCanonicalApplicationState() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        BackupController controller = new BackupController(backupService, jobService(), applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService(), applicationStateService, plans);
         BackupModels.BackupDestination destination = new BackupModels.BackupDestination(
                 "external", "ready", "/mnt/backups/autark-os", "/mnt/backups", "uuid:backup", "ext4", true, true,
                 Long.MAX_VALUE, true, "External backup drive is connected and ready.", "Open Backups", Instant.now());
@@ -110,9 +134,10 @@ class BackupControllerTests {
     @Test
     void verifyRestorePointReturnsQueuedJobWithoutRunningVerificationInline() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         BackupModels.BackupVerificationResult result = new BackupModels.BackupVerificationResult(
                 42L,
                 "verified",
@@ -143,9 +168,10 @@ class BackupControllerTests {
     @Test
     void conflictingVerificationFailsItsJobWithTheActiveOperationMessage() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         when(backupService.verify(42L)).thenThrow(new RecoveryOperationConflictException(
                 RecoveryOperationCoordinator.Operation.APP_BACKUP,
                 RecoveryOperationCoordinator.Operation.RESTORE_VERIFICATION));
@@ -163,9 +189,10 @@ class BackupControllerTests {
     @Test
     void restorePointReturnsQueuedJobWithoutRunningRestoreInline() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         RestoreModels.RestoreResult result = new RestoreModels.RestoreResult(
                 42L,
                 "completed",
@@ -198,9 +225,10 @@ class BackupControllerTests {
     @Test
     void restorePointFailsJobWhenAffectedAppsCannotRestart() {
         BackupService backupService = mock(BackupService.class);
+        BackupPlanService plans = mock(BackupPlanService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService, plans);
         RestoreModels.RestoreResult result = new RestoreModels.RestoreResult(
                 42L,
                 "warning",
@@ -220,6 +248,10 @@ class BackupControllerTests {
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
                 .containsExactly("succeeded", "succeeded", "succeeded", "succeeded", "failed", "pending");
         assertThat(completed.steps().get(4).message()).contains("could not restart");
+    }
+
+    private BackupModels.BackupRunRequest reviewed() {
+        return new BackupModels.BackupRunRequest("reviewed-plan");
     }
 
     private AutarkOsJobService jobService() {

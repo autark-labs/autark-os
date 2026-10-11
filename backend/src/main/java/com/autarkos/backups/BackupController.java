@@ -1,6 +1,5 @@
 package com.autarkos.backups;
 
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,16 +22,23 @@ public class BackupController {
     private final BackupService backupService;
     private final AutarkOsJobService jobService;
     private final ApplicationStateService applicationStateService;
+    private final BackupPlanService backupPlans;
 
-    public BackupController(BackupService backupService, AutarkOsJobService jobService, ApplicationStateService applicationStateService) {
+    public BackupController(BackupService backupService, AutarkOsJobService jobService, ApplicationStateService applicationStateService, BackupPlanService backupPlans) {
         this.backupService = backupService;
         this.jobService = jobService;
         this.applicationStateService = applicationStateService;
+        this.backupPlans = backupPlans;
     }
 
     @GetMapping
     public BackupModels.BackupReport report() {
         return backupService.report();
+    }
+
+    @GetMapping("/plan")
+    public BackupModels.BackupPlan plan(@RequestParam String scope, @RequestParam(required = false) String appId) {
+        return backupPlans.plan(scope, appId);
     }
 
     @GetMapping("/destination")
@@ -53,24 +59,31 @@ public class BackupController {
     }
 
     @PostMapping("/apps/{appId}/run")
-    public AutarkOsJob run(@PathVariable String appId) {
-        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP, appId, backupSteps(), () -> {
-            BackupModels.BackupRunResult result = backupService.run(appId);
-            invalidateApplicationState();
-            return backupOutcome(result);
-        });
-        invalidateApplicationState();
-        return job;
+    public AutarkOsJob run(@PathVariable String appId, @RequestBody BackupModels.BackupRunRequest request) {
+        return startReviewedBackup("app", appId, appId, request);
     }
 
     @PostMapping("/full/run")
-    public AutarkOsJob runFull() {
-        return jobService.start(AutarkOsStates.JobType.BACKUP, "__full__", backupSteps(), () -> backupOutcome(backupService.runFullBackup("manual")));
+    public AutarkOsJob runFull(@RequestBody BackupModels.BackupRunRequest request) {
+        return startReviewedBackup("full", null, "__full__", request);
     }
 
     @PostMapping("/routine/run")
-    public AutarkOsJob runRoutine() {
-        return jobService.start(AutarkOsStates.JobType.BACKUP, "__routine__", backupSteps(), () -> backupOutcome(backupService.runAutomatic()));
+    public AutarkOsJob runRoutine(@RequestBody BackupModels.BackupRunRequest request) {
+        return startReviewedBackup("routine", null, "__routine__", request);
+    }
+
+    private AutarkOsJob startReviewedBackup(String scope, String appId, String subject, BackupModels.BackupRunRequest request) {
+        backupPlans.requireReviewed(scope, appId, request);
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.BACKUP, subject, BackupJobs.steps(), request, ignored -> {
+            try {
+                return BackupJobs.outcome(backupPlans.runReviewed(scope, appId, request));
+            } finally {
+                invalidateApplicationState();
+            }
+        });
+        invalidateApplicationState();
+        return job;
     }
 
     @GetMapping("/restore-points/{id}/plan")
@@ -93,39 +106,6 @@ public class BackupController {
         });
         invalidateApplicationState();
         return job;
-    }
-
-    private java.util.List<AutarkOsJobStep> backupSteps() {
-        return java.util.List.of(
-                AutarkOsJobStep.pending("prepare_backup", "Preparing restore point"),
-                AutarkOsJobStep.pending("copy_data", "Copying app data"),
-                AutarkOsJobStep.pending("verify_backup", "Verifying restore point"),
-                AutarkOsJobStep.pending("finish", "Finishing backup"));
-    }
-
-    private AutarkOsJobOutcome backupOutcome(BackupModels.BackupRunResult result) {
-        if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
-            java.util.List<AutarkOsJobStep> steps = java.util.List.of(
-                    AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                    AutarkOsJobStep.failed("copy_data", "Copying app data", result.message()),
-                    AutarkOsJobStep.pending("verify_backup", "Verifying restore point"),
-                    AutarkOsJobStep.pending("finish", "Finishing backup"));
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        if (AutarkOsStates.Tone.WARNING.equals(result.status())) {
-            java.util.List<AutarkOsJobStep> steps = java.util.List.of(
-                    AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                    AutarkOsJobStep.succeeded("copy_data", "Copying app data", "Restore point created."),
-                    AutarkOsJobStep.succeeded("verify_backup", "Verifying restore point", result.restorePoint() == null ? "" : result.restorePoint().verificationMessage()),
-                    AutarkOsJobStep.failed("finish", "Finishing backup", result.message()));
-            return AutarkOsJobOutcome.failed(result.message(), steps);
-        }
-        java.util.List<AutarkOsJobStep> steps = java.util.List.of(
-                AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
-                AutarkOsJobStep.succeeded("copy_data", "Copying app data", result.message()),
-                AutarkOsJobStep.succeeded("verify_backup", "Verifying restore point", result.restorePoint() == null ? "" : result.restorePoint().verificationMessage()),
-                AutarkOsJobStep.succeeded("finish", "Finishing backup", result.message()));
-        return AutarkOsJobOutcome.succeeded(result.message(), steps);
     }
 
     private java.util.List<AutarkOsJobStep> verificationSteps() {

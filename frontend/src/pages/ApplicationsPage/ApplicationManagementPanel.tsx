@@ -91,7 +91,7 @@ export function ApplicationManagementPanel({ actions, item, loadingAction = null
         </TabsList>
         <TabsContent className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6" value="overview">
           <ApplicationStateNotice />
-          {item.operation.kind === 'failed' ? <ApplicationRecoveryTab item={item} onEditSettings={() => onTabValueChange('settings')} onReviewManagement={() => setUninstallOpen(true)} /> : (
+          {item.operation.kind === 'failed' ? <ApplicationRecoveryTab onStart={() => actions.onStart(item.id)} item={item} onEditSettings={() => onTabValueChange('settings')} onReviewManagement={() => setUninstallOpen(true)} /> : (
             <section className="space-y-2 rounded-xl border border-border bg-muted/30 p-5">
               <h3 className="font-semibold">{item.operation.kind !== 'idle' ? item.operation.label : item.issues[0]?.title || labelForRuntimeState(item.state)}</h3>
               <p className="text-sm text-muted-foreground">{item.operation.kind !== 'idle' ? item.operation.currentStep || 'Follow progress in Activity.' : item.issues[0]?.summary || item.description}</p>
