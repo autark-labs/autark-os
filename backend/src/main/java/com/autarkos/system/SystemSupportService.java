@@ -86,7 +86,7 @@ public class SystemSupportService {
 
     public SupportModels.SupportSummary summary() {
         SupportContext context = supportContext(30);
-        return new SupportModels.SupportSummary(
+        return dataRedactor.redactExport(new SupportModels.SupportSummary(
                 context.setup().status(),
                 supportHeadline(context.setup(), context.failures().size(), context.findings().size()),
                 supportSummary(context.setup(), context.failures().size(), context.findings().size()),
@@ -101,7 +101,7 @@ public class SystemSupportService {
                 unifiedIssues(),
                 context.redactionRules(),
                 context.commands(),
-                context.checkedAt());
+                context.checkedAt()), SupportModels.SupportSummary.class);
     }
 
     List<AutarkOsIssue> unifiedIssues() {
@@ -137,7 +137,7 @@ public class SystemSupportService {
         String headline = supportHeadline(context.setup(), context.failures().size(), context.findings().size());
         String summary = supportSummary(context.setup(), context.failures().size(), context.findings().size());
         String bundleText = bundleText(context, headline, summary, metrics, recentActivity, recentFailures, logs);
-        return new SupportModels.SupportBundle(
+        return dataRedactor.redactExport(new SupportModels.SupportBundle(
                 context.setup().status(),
                 headline,
                 summary,
@@ -158,7 +158,35 @@ public class SystemSupportService {
                 context.commands(),
                 bundleText,
                 context.failures().size(),
-                Instant.now());
+                Instant.now()), SupportModels.SupportBundle.class);
+    }
+
+    public SupportModels.AppSupportReport appReport(com.autarkos.apps.ApplicationView app) {
+        var runtime = app.runtime();
+        StringBuilder text = new StringBuilder("Autark-OS App Support Report\nRedaction: enabled\n");
+        text.append("App ID: ").append(app.id()).append("\nName: ").append(app.name())
+                .append("\nType: ").append(app.relationshipLabel());
+        if (app.operation() != null) {
+            text.append("\nOperation: ").append(app.operation().kind())
+                    .append(" - ").append(app.operation().message());
+        }
+        for (var issue : app.issues()) {
+            text.append("\nIssue: ").append(issue.title()).append(" - ").append(issue.summary());
+        }
+        if (runtime != null) {
+            text.append("\nReadiness: ").append(runtime.state())
+                    .append("\nBackup: ").append(runtime.backupProtection())
+                    .append("\nCompose project: ").append(runtime.composeProject())
+                    .append("\nRuntime path: ").append(runtime.runtimePath())
+                    .append("\nPrimary URL: ").append(runtime.accessUrl());
+            if (runtime.accessRoute() != null) {
+                text.append("\nPrivate URL: ").append(runtime.accessRoute().privateUrl())
+                        .append("\nLocal URL: ").append(runtime.accessRoute().localUrl());
+            }
+            runtime.recentEvents().stream().limit(5).forEach(event ->
+                    text.append("\nRecent event: ").append(event.message()));
+        }
+        return new SupportModels.AppSupportReport(true, redact(text.toString()), Instant.now());
     }
 
     private SupportContext supportContext(int failureLimit) {

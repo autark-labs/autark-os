@@ -131,13 +131,11 @@ test('applications page management panel uses canonical runtime data instead of 
   assert.doesNotMatch(page, /Backup review opened just now/);
   assert.doesNotMatch(page, /Review opened just now/);
 
-  assert.match(panel, /item\.runtime\.composeProject/);
-  assert.match(panel, /item\.runtime\.runtimePath/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationTelemetryTab.tsx'), /item\.runtime\.version/);
   assert.match(panel, /item\.runtime\.image/);
   assert.match(panel, /item\.runtime\.recentEvents/);
   assert.match(panel, /LocalizedDateTime/);
-  assert.match(panel, /Copy details/);
+  assert.match(panel, /Copy redacted details/);
   assert.doesNotMatch(panel, /Copy the compact app state, runtime path, access links, and last event for troubleshooting\./);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
   assert.match(liveModel, /recentEvents: app\.recentEvents \?\? \[\]/);

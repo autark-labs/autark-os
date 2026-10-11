@@ -1395,7 +1395,7 @@ class AppLifecycleServiceTests {
         AppActionResult result = service.enablePrivateAccess("vaultwarden");
 
         assertThat(result.status()).isEqualTo("completed");
-        assertThat(result.message()).contains("https://autark-os.example.ts.net:");
+        assertThat(result.message()).contains("Vaultwarden").doesNotContain("https://", "example.ts.net");
         assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
         assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(8090);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
@@ -1408,6 +1408,8 @@ class AppLifecycleServiceTests {
         assertThat(repository.eventsFor("vaultwarden", 5))
                 .extracting(event -> event.type())
                 .contains("private_access_enabled");
+        assertThat(repository.eventsFor("vaultwarden", 5))
+                .allSatisfy(event -> assertThat(event.message()).doesNotContain("https://", "example.ts.net"));
     }
 
     @Test

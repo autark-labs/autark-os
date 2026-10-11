@@ -20,20 +20,20 @@ public class ActivityLogService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ActivityLogService.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final SupportDataRedactor REDACTOR = new SupportDataRedactor();
 
     private final ActivityLogRepository repository;
     private final ApplicationEventPublisher events;
 
     public ActivityLog notification(ActivityController.NotificationRequest notification) {
         String key = "notification:" + notification.id();
-        var redactor = new SupportDataRedactor();
         var action = notification.nextAction();
         var safeAction = action == null ? null : new AutarkOsAction(
-                action.id(), redactor.redact(action.label()), action.method(), action.href(), action.route(),
-                action.confirmationRequired(), action.danger(), action.disabled(), action.reason().map(redactor::redact));
+                action.id(), REDACTOR.redact(action.label()), action.method(), action.href(), action.route(),
+                action.confirmationRequired(), action.danger(), action.disabled(), action.reason().map(REDACTOR::redact));
         return activityLog(repository.findByEventKey(key).orElseGet(() -> repository.save(new ActivityLogEntity(
                 notification.severity(), "notification", key,
-                redactor.redact(notification.title()), redactor.redact(notification.message()), null,
+                REDACTOR.redact(notification.title()), REDACTOR.redact(notification.message()), null,
                 "error".equals(notification.severity()) ? "failed" : "recorded",
                 safeAction == null ? "" : JSON.writeValueAsString(safeAction),
                 Instant.now().toString(), key))));
@@ -126,18 +126,20 @@ public class ActivityLogService {
 
     @Transactional
     private void record(String level, String category, String action, String title, String message, String appId, String outcome, String details) {
+        String safeTitle = REDACTOR.redact(clean(title, "Autark-OS activity"));
+        String safeMessage = REDACTOR.redact(clean(message, ""));
         try {
             repository.save(new ActivityLogEntity(
                     clean(level, "info"),
                     clean(category, "system"),
                     clean(action, "activity"),
-                    clean(title, "Autark-OS activity"),
-                    clean(message, ""),
+                    safeTitle,
+                    safeMessage,
                     cleanFilter(appId),
                     clean(outcome, "recorded"),
-                    clean(details, ""),
+                    REDACTOR.redact(clean(details, "")),
                     Instant.now().toString()));
-            logToConsole(level, category, action, title, message, appId, outcome);
+            logToConsole(level, category, action, safeTitle, safeMessage, appId, outcome);
             if (meaningfulMutation(level, category, action, outcome)) {
                 try {
                     events.publishEvent(new SuccessfulMutationEvent(
@@ -150,7 +152,7 @@ public class ActivityLogService {
                 }
             }
         } catch (RuntimeException exception) {
-            LOGGER.warn("Unable to write Autark-OS activity log: {}", exception.getMessage());
+            LOGGER.warn("Unable to write Autark-OS activity log: {}", REDACTOR.redact(exception.getMessage()));
         }
     }
 

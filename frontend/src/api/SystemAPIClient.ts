@@ -107,4 +107,9 @@ export const SystemAPIClient = {
     const response = await httpClient.get<SupportBundle>('/api/system/support/bundle');
     return response.data;
   },
+
+  async appSupport(id: string) {
+    const response = await httpClient.get<{ redacted: boolean; bundleText: string; generatedAt: string }>(`/api/system/support/apps/${encodeURIComponent(id)}`);
+    return response.data;
+  },
 };

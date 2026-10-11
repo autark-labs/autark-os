@@ -12,10 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
+import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { accessDeepLinkForManagedApp } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
-import { RuntimeBadge, labelForRelationship, labelForRuntimeState } from './components/AppStateBadges';
+import { RuntimeBadge, labelForRuntimeState } from './components/AppStateBadges';
 import { operationBlocksManagement, applicationActionRestriction, runtimeActionDisabled, runtimeActionDisabledReason } from './extensions/ApplicationsPage.operations';
 import { ApplicationGuideTab } from './managementTabs/ApplicationGuideTab';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
@@ -38,6 +39,7 @@ const managementTabs = ['overview', 'guide', 'settings', 'links', 'diagnostics']
 export function ApplicationManagementPanel({ actions, item, loadingAction = null, settingsLoadingAction = null, tabValue, onTabValueChange }: ApplicationManagementPanelProps) {
   const tab = ['advanced', 'telemetry'].includes(tabValue) ? 'diagnostics' : managementTabs.includes(tabValue) ? tabValue : 'overview';
   const [uninstallOpen, setUninstallOpen] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
   const actionsTrigger = useRef<HTMLButtonElement>(null);
   const nextRuntimeAction = item.nextAction?.id === 'start_app' ? 'start' : item.nextAction?.id === 'create_backup' ? 'backup' : null;
   const nextActionDisabled = nextRuntimeAction ? runtimeActionDisabled(item, nextRuntimeAction, loadingAction) : false;
@@ -53,6 +55,21 @@ export function ApplicationManagementPanel({ actions, item, loadingAction = null
     ['backup', 'Create backup', actions.onCreateBackup],
     ['repair', 'Repair app', actions.onRepair],
   ];
+
+  async function copySupportDetails() {
+    setCopyBusy(true);
+    try {
+      const report = await SystemAPIClient.appSupport(item.id);
+      const result = await copyText(report.bundleText);
+      showActionNotification(result.ok
+        ? { ok: true, severity: 'success', title: 'Support details copied', message: 'Redacted app diagnostics are ready to share.' }
+        : { ok: false, severity: 'warning', title: 'Copy unavailable', message: 'Try copying again, or download a redacted support report from Diagnostics.' });
+    } catch {
+      showActionNotification({ ok: false, severity: 'error', title: 'Support details unavailable', message: 'Refresh My Apps and try copying again.' });
+    } finally {
+      setCopyBusy(false);
+    }
+  }
 
   return (
     <>
@@ -112,7 +129,7 @@ export function ApplicationManagementPanel({ actions, item, loadingAction = null
         </TabsContent>
         <TabsContent className="min-h-0 flex-1 overflow-y-auto p-6" value="links"><ApplicationLinksTab item={item} /></TabsContent>
         <TabsContent className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6" value="diagnostics">
-          <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => void copySupportDetails(item)}><Copy />Copy details</Button></div>
+          <div className="flex justify-end"><Button disabled={copyBusy} size="sm" variant="outline" onClick={() => void copySupportDetails()}><Copy />{copyBusy ? 'Preparing…' : 'Copy redacted details'}</Button></div>
           <ApplicationTelemetryTab item={item} />
           {item.issues.map((issue) => <section key={issue.id} className="space-y-1"><h3 className="font-medium">{issue.title}</h3><p className="text-muted-foreground">{issue.summary}</p></section>)}
           <Accordion type="single" collapsible>
@@ -129,43 +146,4 @@ export function ApplicationManagementPanel({ actions, item, loadingAction = null
       {uninstallOpen && <DestructiveActionDialog onClose={() => setUninstallOpen(false)} onReturnFocus={() => actionsTrigger.current?.focus()} loadPlan={loadUninstallPlan} runAction={() => actions.onRunUninstall(item.id)} />}
     </>
   );
-}
-
-async function copySupportDetails(item: ApplicationSurfaceItem) {
-  const result = await copyText(supportDetailsText(item));
-  if (!result.ok) {
-    showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
-    return;
-  }
-  showActionNotification({ ok: true, severity: 'success', title: 'Support details copied', message: 'App details are ready to share.' }, 'Support details copied');
-}
-
-function supportDetailsText(item: ApplicationSurfaceItem) {
-  return [
-    `App ID: ${item.sourceId || item.id}`,
-    `Name: ${item.name}`,
-    `Type: ${labelForRelationship(item.relationship)}`,
-    `Readiness: ${labelForRuntimeState(item.state)}`,
-    `Issue: ${item.issues[0]?.title || 'None'}`,
-    `Operation: ${operationText(item)}`,
-    `Access: ${item.access}`,
-    `Backup: ${item.backup}`,
-    `Primary URL: ${item.links.primaryUrl || 'Not configured'}`,
-    `Private URL: ${item.links.privateUrl || 'Not configured'}`,
-    `Local URL: ${item.links.localUrl || 'Not configured'}`,
-    `Compose project: ${item.runtime.composeProject || 'Not reported'}`,
-    `Runtime path: ${item.runtime.runtimePath || 'Not reported'}`,
-    `Container status: ${item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'}`,
-    `Last event: ${item.lastEvent || item.runtime.recentEvents[0]?.message || 'No recent event reported'}`,
-  ].join('\n');
-}
-
-function operationText(item: ApplicationSurfaceItem) {
-  if (item.operation.kind === 'idle') {
-    return 'Idle';
-  }
-  if (item.operation.kind === 'failed') {
-    return item.operation.message || item.operation.label;
-  }
-  return item.operation.currentStep || item.operation.label;
 }

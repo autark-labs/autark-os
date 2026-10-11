@@ -497,6 +497,7 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname === '/api/system/storage') return storageReport;
   if (pathname === '/api/system/settings') return method === 'PUT' ? { settings, appDefaults: { ok: true, severity: 'success', title: 'Settings saved', message: 'Fixture settings saved.', updatedApps: 1, completedAt: fixedAt } } : settings;
   if (pathname === '/api/system/version') return version;
+  if (pathname.startsWith('/api/system/support/apps/')) return { redacted: true, bundleText: 'App ID: vaultwarden\nPrivate URL: [tailnet-url-redacted]', generatedAt: fixedAt };
   if (pathname === '/api/system/support/summary') return supportSummary;
   if (pathname === '/api/system/support/logs') return [{ line: 'Fixture log: all services are ready.', level: 'info', redacted: true }];
   if (pathname === '/api/system/support/bundle') return { ...supportSummary, setup: setupStatus, metrics, domainSummaries: [], recentActivity: activity, recentFailures: [], logs: [{ line: 'Fixture log: all services are ready.', level: 'info', redacted: true }], bundleText: 'Fixture support bundle', recentFailureCount: 0, generatedAt: fixedAt };

@@ -748,9 +748,10 @@ public class AppLifecycleService {
                 "private_access_enabled",
                 current.autoRepairEnabled());
         repository.saveSettings(app.appId(), updated);
-        repository.recordEvent(app.appId(), "private_access_enabled", "Created private HTTPS link " + serveResult.privateUrl() + " for " + app.appName() + ".");
-        activitySuccess("private_access_enabled", "Private link ready for " + app.appName(), "Created private HTTPS link " + serveResult.privateUrl() + ".", app.appId());
-        return new AppActionResult(app.appId(), "private-access", "completed", app.appName() + " is available privately at " + serveResult.privateUrl() + ".", refresh(app), serveResult.output(), Instant.now());
+        String message = app.appName() + " is available through its private HTTPS link. Use Open app to connect.";
+        repository.recordEvent(app.appId(), "private_access_enabled", message);
+        activitySuccess("private_access_enabled", "Private link ready for " + app.appName(), message, app.appId());
+        return new AppActionResult(app.appId(), "private-access", "completed", message, refresh(app), serveResult.output(), Instant.now());
     }
 
     public AppActionResult disablePrivateAccess(String appId) {

@@ -81,11 +81,16 @@ authorization: bearer lowercase-bearer-secret
 PASSWORD="two secret words"
 PASSWORD='single quoted secret'
 PASSWORD="escaped \"quoted\" secret"
-{"accessToken":"json-access-secret","refresh_token":"json-refresh-secret","password":"json \"escaped\" secret","authorization":"Basic json-basic-secret","hostname":"json-private-host","status":"failed","attempts":3}
+{"accessToken":"json-access-secret","refresh_token":"json-refresh-secret","password":"json \"escaped\" secret","authorization":"Basic json-basic-secret","hostname":"json-private-host","runAsUser":"fixture-runtime-owner","expectedUser":"fixture-service-owner","status":"failed","attempts":3}
 Credential URL: https://synthetic-user:synthetic-password@example.invalid/path
 Private IPv6: http://[fd12::1]/private-ipv6-path
 Link-local IPv6: https://[fe80::1234%eth0]:443/link-local-path
 Loopback IPv6: http://[::1]:8082/loopback-path
+Expanded loopback IPv6: http://[0:0:0:0:0:0:0:1]:8082/expanded-loopback-path
+Mapped IPv6: http://[::ffff:c0a8:102]:8082/mapped-private-path
+Mapped dotted IPv6: http://[::ffff:192.168.1.2]:8082/mapped-dotted-path
+Public IPv6: https://[2001:4860:4860::8888]/docs
+Public mapped IPv6: https://[::ffff:8.8.8.8]/docs
 Oct 10 12:00:00 journal-private-host autark-os[123]: useful journal failure
 2026-10-10T12:00:00+00:00 iso-private-host autark-os[456]: useful ISO journal failure
 Public documentation: https://example.invalid/docs
@@ -187,18 +192,20 @@ output = Path(sys.argv[1]).read_text()
 for secret in (
     "c3ludGhldGljOnNlY3JldA==", "lowercase-bearer-secret", "two secret words",
     "single quoted secret", "quoted", "json-access-secret", "json-refresh-secret",
-    "escaped", "json-basic-secret", "json-private-host", "synthetic-user",
+    "escaped", "json-basic-secret", "json-private-host", "fixture-runtime-owner", "fixture-service-owner", "synthetic-user",
     "synthetic-password", "fd12::1", "private-ipv6-path", "fe80::1234",
     "link-local-path", "::1", "loopback-path", "journal-private-host", "iso-private-host",
+    "0:0:0:0:0:0:0:1", "c0a8:102", "mapped-private-path", "mapped-dotted-path",
 ):
     assert secret not in output, f"Support export leaked synthetic value: {secret}"
 for context in ("useful journal failure", "useful ISO journal failure",
-                "https://example.invalid/docs", "status=failed attempts=3 backup completed"):
+                "https://example.invalid/docs", "https://[2001:4860:4860::8888]/docs",
+                "https://[::ffff:8.8.8.8]/docs", "status=failed attempts=3 backup completed"):
     assert context in output, f"Support export damaged useful context: {context}"
 record = json.loads(next(line for line in output.splitlines() if line.startswith('{"accessToken"')))
 assert record == {"accessToken": "[redacted]", "refresh_token": "[redacted]",
                   "password": "[redacted]", "authorization": "[redacted]",
-                  "hostname": "[redacted-host]", "status": "failed", "attempts": 3}
+                  "hostname": "[redacted-host]", "runAsUser": "[redacted-host]", "expectedUser": "[redacted-host]", "status": "failed", "attempts": 3}
 PY
 
 gui_contract="$("${repo_root}/scripts/autark-os-gui-installer.sh" --preview --json --release-bundle "${bundle_dir}" --state-dir "${state_dir}")"

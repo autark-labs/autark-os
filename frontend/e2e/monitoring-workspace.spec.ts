@@ -128,11 +128,11 @@ test('diagnostics export downloads data and reports failures through global feed
     : route.fulfill({ json: { windowMinutes: 60, exportedFixture: true } }));
   await page.goto('/activity');
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Export redacted metrics', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/^autark-os-monitoring-.*\.json$/);
-  await expect(page.getByText('Diagnostics exported', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Redacted metrics exported', { exact: true }).first()).toBeVisible();
   failing = true;
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Export redacted metrics', exact: true }).click();
   await expect(page.getByText('Monitoring diagnostics could not be exported', { exact: true }).first()).toBeVisible();
 });
 

@@ -158,7 +158,7 @@ test('failed diagnostics export reports the action failure without displacing Ac
   await installMockApi(page, 'idle');
   await page.route('**/api/monitoring/diagnostics**', route => route.fulfill({ status: 503, json: { message: 'Export unavailable' } }));
   await page.goto('/activity');
-  const button = page.getByRole('button', { name: 'Export', exact: true });
+  const button = page.getByRole('button', { name: 'Export redacted metrics', exact: true });
   await expect(button).toBeVisible();
   const before = await button.boundingBox();
   await button.click();

@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.system.SystemCommandRunner;
+import com.autarkos.system.SupportDataRedactor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -240,7 +241,8 @@ public class TailscaleService {
     }
 
     private String conciseOutput(CommandResult result) {
-        return result.output().isEmpty() ? "No details were returned by Tailscale." : result.output().get(0);
+        return result.output().isEmpty() ? "No details were returned by Tailscale."
+                : new SupportDataRedactor().redact(result.output().get(0));
     }
 
     private TailscaleServeConfig parseServeConfig(CommandResult result, String source) {

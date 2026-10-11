@@ -54,7 +54,7 @@ function MonitoringPage() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      showActionNotification({ ok: true, severity: 'success', title: 'Diagnostics exported' });
+      showActionNotification({ ok: true, severity: 'success', title: 'Redacted metrics exported' });
     } catch (exportError) {
       showActionErrorNotification(exportError, 'Monitoring diagnostics could not be exported');
     }

@@ -17,6 +17,92 @@ import com.autarkos.api.AutarkOsIssueFactory;
 class SystemSupportServiceTests {
 
     @Test
+    void redactsEquivalentPrivateIpv6LiteralsAndPreservesPublicAddresses() {
+        var redactor = new SupportDataRedactor();
+        for (String host : List.of("::1", "0:0:0:0:0:0:0:1", "::ffff:192.168.1.2",
+                "::ffff:c0a8:102", "0:0:0:0:0:ffff:a00:1", "::ffff:100.90.12.8",
+                "fd12::1", "fc00::1", "fe80::1234%25eth0")) {
+            assertThat(redactor.redact("Connect https://[" + host + "]:8080/private?view=health"))
+                    .as(host).isEqualTo("Connect [private-url-redacted]");
+        }
+        for (String host : List.of("2001:4860:4860::8888", "2001:db8::1234", "::ffff:8.8.8.8")) {
+            String url = "https://[" + host + "]:443/docs";
+            assertThat(redactor.redact(url)).as(host).isEqualTo(url);
+        }
+    }
+
+    @Test
+    void redactsCommonCredentialAndJournalFormatsWithoutDamagingDiagnostics() {
+        SupportDataRedactor redactor = new SupportDataRedactor();
+        String source = """
+                Authorization: Basic ZmFrZTpmaXh0dXJl
+                Authorization: Bearer short-token
+                {"access_token":"fixture-access", "refreshToken":"fixture-refresh", "password":"two word fixture"}
+                COUCHDB_PASSWORD="multi word secret"
+                password='another private phrase'
+                https://fixture-user:fixture-pass@example.com/resource
+                http://[fd7a:115c:a1e0::1234]:8080/private?token=fixture-query
+                https://[fe80::1234%25eth0]/private
+                Oct 08 12:00:00 fixture-host autark-os[123]: ready
+                2026-10-08T12:00:00+00:00 fixture-host autark-os[123]: ready
+                Version: 1.2.3 status=ready authRequired=true tokenCount=3 sessionTimeout=30
+                https://example.com/docs GET /api/system/metrics CPU=25%
+                """;
+
+        assertThat(redactor.redact(source))
+                .doesNotContain("ZmFrZTpmaXh0dXJl", "short-token", "fixture-access", "fixture-refresh",
+                        "two word fixture", "multi word secret", "another private phrase", "fixture-user", "fixture-pass",
+                        "fd7a:", "fe80:", "fixture-query", "fixture-host")
+                .contains("Version: 1.2.3", "status=ready", "authRequired=true", "tokenCount=3", "sessionTimeout=30",
+                        "https://example.com/docs", "GET /api/system/metrics", "CPU=25%", "autark-os[123]: ready");
+    }
+
+    @Test
+    void sanitizesNestedExportsAndEscapedSecretsWhilePreservingTypes() {
+        var redactor = new SupportDataRedactor();
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        var source = json.readTree("""
+                {"nested":[{"access_token":"private access", "password":"first \\"quoted\\" secret", "hostname":"private-host"}],
+                 "authRequired":true,"tokenCount":3,"sessionTimeout":30,"cpuPercent":12.5,"optional":null}
+                """);
+        var safe = redactor.redactExport(source, tools.jackson.databind.JsonNode.class);
+        assertThat(safe.toString()).doesNotContain("private access", "quoted", "private-host");
+        assertThat(safe.path("authRequired").asBoolean()).isTrue();
+        assertThat(safe.path("tokenCount").asInt()).isEqualTo(3);
+        assertThat(safe.path("cpuPercent").asDouble()).isEqualTo(12.5);
+        assertThat(safe.path("optional").isNull()).isTrue();
+        assertThat(redactor.redact(source.toString())).doesNotContain("private access", "quoted", "private-host");
+        var issue = AutarkOsIssueFactory.appIssue("app-missing", "vaultwarden", "critical", "missing",
+                "App is missing", "Check https://fixture.tail123.ts.net", AutarkOsAction.route("apps", "Open apps", "/apps"));
+        var safeIssue = redactor.redactExport(issue, AutarkOsIssue.class);
+        assertThat(safeIssue.summary()).doesNotContain("fixture.tail123.ts.net");
+        assertThat(safeIssue.primaryAction().orElseThrow().route()).contains("/apps");
+    }
+
+    @Test
+    void buildsAppSupportFromCanonicalStateAndRedactsPrivateRuntimeDetails() {
+        var app = mock(com.autarkos.apps.ApplicationView.class);
+        var runtime = mock(com.autarkos.marketplace.install.AppRuntimeView.class);
+        when(app.id()).thenReturn("vaultwarden");
+        when(app.name()).thenReturn("Vaultwarden");
+        when(app.relationshipLabel()).thenReturn("Managed app");
+        when(app.runtime()).thenReturn(runtime);
+        when(runtime.state()).thenReturn(com.autarkos.apps.ApplicationRuntimeState.READY);
+        when(runtime.runtimePath()).thenReturn("/home/fixture-owner/apps/vaultwarden");
+        when(runtime.accessUrl()).thenReturn("https://fixture.tail123.ts.net:443");
+        when(runtime.recentEvents()).thenReturn(List.of(new com.autarkos.marketplace.install.AppEvent(
+                1, "vaultwarden", "error", "Could not start: password=\"private multi word\"", Instant.now())));
+        var service = new SystemSupportService(null, null, null, command -> new SystemSupportService.CommandResult(0, ""));
+
+        var report = service.appReport(app);
+
+        assertThat(report.redacted()).isTrue();
+        assertThat(report.bundleText()).contains("Vaultwarden", "Managed app", "READY", "Could not start")
+                .doesNotContain("fixture-owner", "fixture.tail123.ts.net", "private multi word");
+        assertThat(runtime.accessUrl()).isEqualTo("https://fixture.tail123.ts.net:443");
+    }
+
+    @Test
     void redactsLocalIdentityPathsInGeneratedReport() {
         ActivityLogService activityLogService = mock(ActivityLogService.class);
         SystemMetricsService metricsService = mock(SystemMetricsService.class);
@@ -41,7 +127,13 @@ class SystemSupportServiceTests {
                 activityLogService, metricsService, setupService, null, null, null, null,
                 versionService, null, command -> new SystemSupportService.CommandResult(0, "INFO service ready"));
 
-        String report = service.bundle().bundleText();
+        SupportModels.SupportBundle bundle = service.bundle();
+        String report = bundle.bundleText();
+
+        assertThat(bundle.redacted()).isTrue();
+        assertThat(bundle.setup().runAsUser()).doesNotContain("owner");
+        assertThat(bundle.metrics().deviceName()).doesNotContain("test-server");
+        assertThat(bundle.version().runtimePath()).doesNotContain("runtime-owner");
 
         assertThat(report)
                 .doesNotContain("install-owner", "runtime-owner", "build-owner", "storage-owner")

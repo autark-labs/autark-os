@@ -1,6 +1,85 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage, type FixtureScenario } from './support/mockApi';
 
+test('private-access feedback saves descriptive text while retaining the working app link', async ({ page }) => {
+  await installMockApi(page, 'ready');
+  await page.goto('/access');
+  const state = await page.evaluate(async () => (await fetch('/api/application-state')).json());
+  const application = state.applications.find((entry: { id: string }) => entry.id === 'vaultwarden');
+  const app = application.runtime;
+  const privateUrl = 'https://fixture-private-host.tail123.ts.net';
+  app.settings.desiredAccessMode = 'network';
+  app.settings.tailscaleEnabled = false;
+  app.desiredAccess.mode = 'network';
+  app.accessRoute.privateLinkStatus = 'not_configured';
+  app.accessRoute.privateUrl = '';
+  app.observedAccess.privateLinkStatus = 'not_configured';
+  app.observedAccess.privateUrl = '';
+  let saved: { title: string; message: string } | undefined;
+  await page.route('**/api/application-state*', route => route.fulfill({ json: state }));
+  await page.route('**/api/activity/notifications', route => {
+    saved = route.request().postDataJSON();
+    return route.fulfill({ json: { id: 991, ...saved } });
+  });
+  await page.route('**/api/apps/vaultwarden/private-access/enable', route => {
+    app.settings.desiredAccessMode = 'local-and-private';
+    app.settings.tailscaleEnabled = true;
+    app.accessRoute.privateLinkStatus = 'verified';
+    app.accessRoute.privateUrl = privateUrl;
+    app.accessRoute.primaryOpenUrl = privateUrl;
+    application.availableActions.find((action: { id: string }) => action.id === 'open').href = privateUrl;
+    return route.fulfill({ json: { appId: 'vaultwarden', action: 'private-access', status: 'completed',
+      message: 'Vaultwarden is available through its private HTTPS link. Use Open app to connect.', app, output: [], checkedAt: '2026-10-10T12:00:00Z' } });
+  });
+  await page.reload();
+  const service = page.getByRole('button', { name: /^Review Vaultwarden/ });
+  await service.click();
+  await service.locator('xpath=ancestor::*[@id][1]').getByRole('button', { name: 'Details and actions', exact: true }).click();
+  await page.getByRole('group', { name: /^Security posture for Vaultwarden/ }).getByRole('radio', { name: 'Private', exact: true }).click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Vaultwarden is available through its private HTTPS link');
+  await expect(page.locator('[data-sonner-toast]')).not.toContainText('fixture-private-host');
+  await expect.poll(() => saved?.message).toBe('Vaultwarden is available through its private HTTPS link. Use Open app to connect.');
+  expect(JSON.stringify(saved)).not.toContain('fixture-private-host');
+  await page.goto('/apps?focus=managed%3Avaultwarden&panel=manage');
+  await expect(page.getByRole('link', { name: 'Open app', exact: true }).last()).toHaveAttribute('href', privateUrl);
+});
+
+test('app support copies the backend report and handles unavailable reports and clipboard denial', async ({ page }) => {
+  await installMockApi(page, 'ready');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  const report = 'App ID: vaultwarden\nPrivate URL: [tailnet-url-redacted]\nLast event: token=[redacted]';
+  let fail = false;
+  let finish!: () => void;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  await page.route('**/api/system/support/apps/vaultwarden', async route => {
+    await pending;
+    await route.fulfill(fail ? { status: 503, json: { message: 'Unavailable' } }
+      : { json: { redacted: true, bundleText: report, generatedAt: '2026-10-10T12:00:00Z' } });
+  });
+  await page.goto('/apps?focus=managed%3Avaultwarden&panel=manage');
+  await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click();
+  const copy = page.getByRole('button', { name: 'Copy redacted details', exact: true });
+  await copy.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Preparing…', exact: true })).toBeDisabled();
+  finish();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(report);
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Redacted app diagnostics are ready to share.');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } });
+    document.execCommand = () => false;
+  });
+  await copy.click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Copy unavailable');
+  await expect(page.locator('[data-sonner-toast]')).toContainText('download a redacted support report from Diagnostics');
+  fail = true;
+  await copy.click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Support details unavailable');
+  await expect(copy).toBeEnabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(copy).toBeVisible();
+});
+
 test('Diagnostics uses structured checks and backend findings without inventing backup protection', async ({ page }) => {
   await installMockApi(page, 'idle');
   await page.goto('/diagnostics');
@@ -58,7 +137,7 @@ test('Diagnostics keeps generated reports as snapshots with independent copy and
   await page.goto('/diagnostics');
   await page.getByRole('tab', { name: 'Support report', exact: true }).click();
   await expect(page.getByText('No report generated yet.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download redacted report', exact: true })).toHaveCount(0);
   expect(requests).toBe(0);
   await page.getByRole('button', { name: 'Generate report', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Generating…', exact: true })).toBeDisabled();
@@ -73,10 +152,10 @@ test('Diagnostics keeps generated reports as snapshots with independent copy and
   await page.getByRole('tab', { name: 'Support report', exact: true }).click();
   await expect(page.getByLabel('Report preview', { exact: true })).toHaveText(text);
   await expect(page.getByText(/^Snapshot · Generated/)).toContainText('2026');
-  await page.getByRole('button', { name: 'Copy report', exact: true }).click();
+  await page.getByRole('button', { name: 'Copy redacted report', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
   const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download report', exact: true }).click();
+  await page.getByRole('button', { name: 'Download redacted report', exact: true }).click();
   const download = await downloadEvent;
   expect(download.suggestedFilename()).toBe('autark-os-support-report-2026-09-20T12-00-00Z.txt');
   const stream = await download.createReadStream();
@@ -102,10 +181,10 @@ test('Diagnostics keeps generated reports as snapshots with independent copy and
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } });
     document.execCommand = () => false;
   });
-  await page.getByRole('button', { name: 'Copy report', exact: true }).click();
+  await page.getByRole('button', { name: 'Copy redacted report', exact: true }).click();
   await expect(page.getByText('Copy unavailable', { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel('Report preview', { exact: true })).toHaveCSS('user-select', 'text');
-  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Download redacted report', exact: true })).toBeEnabled();
 });
 
 test('Diagnostics refresh failures preserve checks and logs, and setup findings open Advanced settings', async ({ page }) => {

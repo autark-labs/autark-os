@@ -188,7 +188,7 @@ test('a notification targeting another app cannot replace a dirty app without co
   const { port } = await editAppSettings(page);
   for (const accept of [false, true]) {
     await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click();
-    await page.getByRole('button', { name: 'Copy details', exact: true }).click();
+    await page.getByRole('button', { name: 'Copy redacted details', exact: true }).click();
     await page.locator('[data-sonner-toast]').getByRole('button', { name: 'Details', exact: true }).click();
     await page.getByRole('tab', { name: 'Now', exact: true }).click();
     await page.getByRole('region', { name: 'Action needed' }).getByRole('button', { name: 'Manage Syncthing', exact: true }).click();

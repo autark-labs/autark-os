@@ -2032,7 +2032,26 @@ UPDATE_USAGE
 }
 
 redact_stream() {
-  sed -E \
+  python3 -c '
+import ipaddress
+import re
+import sys
+
+private_ranges = tuple(map(ipaddress.ip_network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7", "fec0::/10")))
+def redact_ipv6(match):
+    try:
+        address = ipaddress.IPv6Address(match.group(1).split("%", 1)[0])
+        address = address.ipv4_mapped or address
+    except ValueError:
+        return match.group()
+    private = address.is_loopback or address.is_link_local or address.is_unspecified or any(
+        address.version == network.version and address in network for network in private_ranges)
+    return "[redacted-private-url]" if private else match.group()
+
+pattern = re.compile(r"https?://\[([^\]\s]+)\](?::\d+)?(?:[/?#][^\s\"\x27<>]*)?", re.I)
+for line in sys.stdin:
+    sys.stdout.write(pattern.sub(redact_ipv6, line))
+' | sed -E \
     -e 's/([A-Za-z0-9_]*(token|password|secret|session|cookie|setup_code|setupCode|auth_key|api_key|credential|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*")(\\.|[^"\\])*(")/\1[redacted]\4/Ig' \
     -e 's/([A-Za-z0-9_]*(token|password|secret|session|cookie|setup_code|setupCode|auth_key|api_key|credential|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*\x27)[^\x27]*(\x27)/\1[redacted]\3/Ig' \
     -e 's/([A-Za-z0-9_]*(TOKEN|Token|token|PASSWORD|Password|password|SECRET|Secret|secret|SESSION|Session|session|COOKIE|Cookie|cookie|SETUP_CODE|setupCode|setup_code|AUTH_KEY|auth_key|API_KEY|api_key|CREDENTIAL|credential|PRIVATE_KEY|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*)[^[:space:]",}]+/\1[redacted]/g' \
@@ -2044,12 +2063,11 @@ redact_stream() {
     -e 's/[A-Za-z0-9.-]+\.ts\.net\.?/[redacted-tailnet-host]/g' \
     -e 's/100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}/[redacted-tailnet-ip]/g' \
     -e 's#https?://(localhost|127\.[0-9.]+|10\.[0-9.]+|192\.168\.[0-9.]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9.]+|[A-Za-z0-9-]+\.local)(:[0-9]+)?(/[^[:space:]"]*)?#[redacted-private-url]#g' \
-    -e 's#https?://\[((f[cd]|fe[89ab])[0-9a-z:.%_-]*|::1)\](:[0-9]+)?(/[^[:space:]"<>]*)?#[redacted-private-url]#Ig' \
     -e 's#(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})#[redacted-lan-ip]#g' \
     -e 's#/(home|Users)/[^/[:space:]"]+#[redacted-home-path]#g' \
     -e 's/[A-Za-z0-9.!#$%&*+?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
-    -e 's/((host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)[[:space:]]*[=:][[:space:]]*)[^[:space:],;"]+/\1[redacted-host]/Ig' \
-    -e 's/("(host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)"[[:space:]]*:[[:space:]]*")(\\.|[^"\\])*(")/\1[redacted-host]\5/Ig' \
+    -e 's/((host(name)?|device[_-]?name|login[_-]?name|user[_-]?name|runAsUser|expectedUser|instanceId|instanceSlug|runtimeRootHash)[[:space:]]*[=:][[:space:]]*)[^[:space:],;"]+/\1[redacted-host]/Ig' \
+    -e 's/("(host(name)?|device[_-]?name|login[_-]?name|user[_-]?name|runAsUser|expectedUser|instanceId|instanceSlug|runtimeRootHash)"[[:space:]]*:[[:space:]]*")(\\.|[^"\\])*(")/\1[redacted-host]\5/Ig' \
     -e 's/^([[:space:]]*[A-Z][a-z]{2}[[:space:]]+[0-9]{1,2}[[:space:]]+[0-9]{2}:[0-9]{2}:[0-9]{2}[[:space:]]+)[^[:space:]]+/\1[redacted-host]/' \
     -e 's/^([[:space:]]*[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+-]+Z?[[:space:]]+)[^[:space:]]+/\1[redacted-host]/'
 }
@@ -2060,7 +2078,7 @@ redact_file_to() {
   if [[ -r "${source}" ]]; then
     redact_stream <"${source}" >"${target}"
   else
-    printf 'Unavailable: %s\n' "${source}" >"${target}"
+    printf 'Unavailable: %s\n' "${source}" | redact_stream >"${target}"
   fi
 }
 
@@ -2207,13 +2225,13 @@ PY
   printf '{'
   printf '"schemaVersion":1'
   printf ',"runtimeDir":'
-  json_string "$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  json_string "$(configured_value AUTARK_OS_RUNTIME_ROOT | redact_stream)"
   printf ',"installDir":'
-  json_string "$(configured_value AUTARK_OS_INSTALL_DIR)"
+  json_string "$(configured_value AUTARK_OS_INSTALL_DIR | redact_stream)"
   printf ',"configDir":'
-  json_string "$(configured_value AUTARK_OS_CONFIG_DIR)"
+  json_string "$(configured_value AUTARK_OS_CONFIG_DIR | redact_stream)"
   printf ',"logDir":'
-  json_string "$(configured_value AUTARK_OS_LOG_DIR)"
+  json_string "$(configured_value AUTARK_OS_LOG_DIR | redact_stream)"
   printf ',"port":'
   json_string "$(resolve_port)"
   printf '}\n'
@@ -2319,6 +2337,7 @@ SUPPORT_USAGE
   done
 
   has_command tar || die "tar is required to write a support bundle archive."
+  has_command python3 || die "python3 is required to redact a support bundle."
   local timestamp tmp_dir bundle_name bundle_dir archive_output
   timestamp="$(date -u +%Y%m%d%H%M%S)"
   bundle_name="autark-os-installer-support-${timestamp}"

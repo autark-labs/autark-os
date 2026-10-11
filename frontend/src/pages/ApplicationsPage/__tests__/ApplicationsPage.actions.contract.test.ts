@@ -197,15 +197,10 @@ test('applications page has managed-app empty states and compact recent activity
   assert.match(panel, /item\.lastEvent/);
 });
 
-test('applications page diagnostics can copy compact support details', () => {
+test('app support copying uses the shared backend representation', () => {
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
-  assert.match(panel, /Support details/);
-  assert.match(panel, /copySupportDetails\(item\)/);
-  assert.match(panel, /copyText\(supportDetailsText\(item\)\)/);
-  assert.match(panel, /Support details copied/);
-  assert.match(panel, /App ID:/);
-  assert.match(panel, /Compose project:/);
-  assert.match(panel, /Runtime path:/);
-  assert.match(panel, /Last event:/);
+  assert.match(panel, /SystemAPIClient\.appSupport\(item\.id\)/);
+  assert.match(panel, /copyText\(report\.bundleText\)/);
+  assert.doesNotMatch(panel, /supportDetailsText|Primary URL:|Private URL:|Local URL:/);
 });

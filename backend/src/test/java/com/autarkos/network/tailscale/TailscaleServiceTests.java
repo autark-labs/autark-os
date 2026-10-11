@@ -190,6 +190,19 @@ class TailscaleServiceTests {
     }
 
     @Test
+    void serveFailureKeepsPrivateCommandDetailOutOfActionMessage() {
+        String output = "Could not connect to https://synthetic.tailnet.ts.net token=synthetic-token";
+        TailscaleService service = new TailscaleService(command ->
+                String.join(" ", command).equals("tailscale status --json")
+                        ? new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false)
+                        : new TailscaleService.CommandResult(1, List.of(output), false));
+        TailscaleServeResult result = service.serveHttps(8090, 14743);
+        assertThat(result.configured()).isFalse();
+        assertThat(result.message()).contains("could not create").doesNotContain("synthetic.tailnet", "synthetic-token");
+        assertThat(result.output()).contains(output);
+    }
+
+    @Test
     void disableHttpsRemovesServeEndpointByPort() {
         List<List<String>> commands = new ArrayList<>();
         boolean[] removed = { false };

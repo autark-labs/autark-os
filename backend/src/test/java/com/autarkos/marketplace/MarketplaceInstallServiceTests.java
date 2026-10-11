@@ -268,6 +268,8 @@ class MarketplaceInstallServiceTests {
                 new InstallOptionsRequest.BackupOptions(true, "weekly", 4)));
 
         assertThat(result.accessUrl()).isEqualTo("http://localhost:19090");
+        assertThat(result.steps()).allSatisfy(step ->
+                assertThat(step.detail()).doesNotContain("http://localhost", "https://autark-os.example.ts.net"));
         assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml")))
                 .contains("127.0.0.1:19090:80")
                 .contains(runtimeRoot.resolve("apps/vaultwarden/vault-data").toString());

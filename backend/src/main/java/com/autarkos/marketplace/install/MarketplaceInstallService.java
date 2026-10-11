@@ -163,7 +163,7 @@ public class MarketplaceInstallService {
             recordStep(steps, sink, InstallModels.InstallStep.completed("Preparing app configuration", "Prepared the catalog configuration required to start " + manifest.name() + "."));
             Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration, appInstanceId, composeProject);
             RuntimeModels.AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
-            recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Prepared the app's local connection and ownership labels."));
 
             RuntimeModels.DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
@@ -192,7 +192,7 @@ public class MarketplaceInstallService {
             TailscaleServeResult privateAccess = configurePrivateAccess(manifest, runtimeConfiguration);
             logs.addAll(privateAccess.output());
             if (privateAccess.configured()) {
-                recordStep(steps, sink, InstallModels.InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
+                recordStep(steps, sink, InstallModels.InstallStep.completed("Creating private HTTPS link", "Private HTTPS link is ready. Use Open app to connect."));
             } else if (privateAccessRequested(manifest, runtimeConfiguration)) {
                 recordStep(steps, sink, InstallModels.InstallStep.warning(
                         "Creating private HTTPS link",
@@ -204,7 +204,7 @@ public class MarketplaceInstallService {
             logs.addAll(provisioningResult.logs());
             GuideModels.PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult);
 
-            recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl)));
+            recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest)));
             installedAppRepository.save(new InstalledApp(
                     manifest.id(),
                     manifest.name(),
@@ -302,8 +302,11 @@ public class MarketplaceInstallService {
     }
 
     private void recordStep(List<InstallModels.InstallStep> steps, Consumer<InstallModels.InstallStep> sink, InstallModels.InstallStep step) {
-        steps.add(step);
-        sink.accept(step);
+        var redactor = new com.autarkos.system.SupportDataRedactor();
+        var safeStep = new InstallModels.InstallStep(redactor.redact(step.label()), step.status(),
+                redactor.redact(step.detail()), step.timestamp());
+        steps.add(safeStep);
+        sink.accept(safeStep);
     }
 
     private String composeProject(ApplicationManifest manifest) {
@@ -407,14 +410,11 @@ public class MarketplaceInstallService {
         activityLogService.error("marketplace", action, title, message, appId, exception);
     }
 
-    private String readyDetail(ApplicationManifest manifest, String accessUrl, String privateAccessUrl) {
-        if (manifest.usage().privateHttpsRequired() && privateAccessUrl != null && !privateAccessUrl.isBlank()) {
-            return privateAccessUrl;
-        }
+    private String readyDetail(ApplicationManifest manifest) {
         if ("companion-service".equals(manifest.usage().kind())) {
             return "Connection details are available in Applications.";
         }
-        return accessUrl == null || accessUrl.isBlank() ? "Ready." : accessUrl;
+        return "Ready. Use Open app to connect.";
     }
 
 }

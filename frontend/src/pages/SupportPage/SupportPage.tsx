@@ -255,8 +255,8 @@ function SupportReportWorkspace({ bundle, busy, onCopy, onDownload, onGenerate }
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">Snapshot · Generated {formatDate(bundle.generatedAt)}</p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onCopy}><Copy aria-hidden="true" className="size-4" />Copy report</Button>
-            <Button variant="outline" size="sm" onClick={onDownload}><Download aria-hidden="true" className="size-4" />Download report</Button>
+            <Button variant="outline" size="sm" onClick={onCopy}><Copy aria-hidden="true" className="size-4" />Copy redacted report</Button>
+            <Button variant="outline" size="sm" onClick={onDownload}><Download aria-hidden="true" className="size-4" />Download redacted report</Button>
           </div>
         </div>
         <pre aria-label="Report preview" tabIndex={0} className="max-h-80 select-text overflow-auto whitespace-pre-wrap rounded-xl border border-border/50 bg-background p-4 text-xs leading-6 text-muted-foreground">{bundle.bundleText}</pre>

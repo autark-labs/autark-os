@@ -54,7 +54,7 @@ export function MonitoringActivityWorkspace({
   return <section className="flex min-h-0 flex-1 flex-col gap-3">
     <PageHeader icon={Activity} title="Activity Log" description="A history of your server and apps.">
       <DisabledAction disabled={diagnosticsExporting} reason="Diagnostics export is already being prepared.">
-        <ProjectDarkControlButton disabled={diagnosticsExporting} onClick={onExportDiagnostics}><Download className="size-4" />Export</ProjectDarkControlButton>
+        <ProjectDarkControlButton disabled={diagnosticsExporting} onClick={onExportDiagnostics}><Download className="size-4" />Export redacted metrics</ProjectDarkControlButton>
       </DisabledAction>
       <RefreshStatus error={error} intervalLabel="History updates every 10s" onRefresh={() => void refresh()} refreshing={activityQuery.isFetching} updatedAt={activityQuery.dataUpdatedAt ? new Date(activityQuery.dataUpdatedAt) : null} />
     </PageHeader>

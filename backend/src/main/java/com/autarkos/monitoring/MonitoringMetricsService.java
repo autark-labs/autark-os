@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.system.SystemMetrics;
+import com.autarkos.system.SupportDataRedactor;
 
 @Service
 public class MonitoringMetricsService {
@@ -84,14 +85,14 @@ public class MonitoringMetricsService {
         if (history.appSamples().isEmpty()) {
             notes.add("No app telemetry samples exist in this window yet.");
         }
-        return new MonitoringDiagnostics(
+        return new SupportDataRedactor().redactExport(new MonitoringDiagnostics(
                 "Monitoring diagnostics for " + history.windowLabel() + ".",
                 history.windowMinutes(),
                 history.hostSamples().size(),
                 history.appSamples().size(),
                 notes,
                 history,
-                Instant.now());
+                Instant.now()), MonitoringDiagnostics.class);
     }
 
     private void enforceRetention() {

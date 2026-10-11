@@ -12,6 +12,9 @@ public final class SupportModels {
     private SupportModels() {
     }
 
+    public record AppSupportReport(boolean redacted, String bundleText, Instant generatedAt) {
+    }
+
     public record SupportBundle(
             String status,
             String headline,

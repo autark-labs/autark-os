@@ -13,6 +13,23 @@ import org.springframework.context.ApplicationEventPublisher;
 class ActivityLogServiceTests {
 
     @Test
+    void backendActivitySanitizesNewRecordsWithoutChangingActionIdentity() {
+        var repository = mock(ActivityLogRepository.class);
+        var service = new ActivityLogService(repository);
+        service.error("network", "private_access_failed", "Failed on https://synthetic.tailnet.ts.net",
+                "Retry password=synthetic-secret at http://192.168.1.5:8090", "vaultwarden",
+                new IllegalStateException("token=synthetic-token"));
+        var saved = org.mockito.ArgumentCaptor.forClass(ActivityLogEntity.class);
+        verify(repository).save(saved.capture());
+        var record = saved.getValue();
+        org.assertj.core.api.Assertions.assertThat(record.title() + record.message() + record.details())
+                .doesNotContain("synthetic.tailnet", "synthetic-secret", "192.168.1.5", "synthetic-token")
+                .contains("Retry", "IllegalStateException");
+        org.assertj.core.api.Assertions.assertThat(record.action()).isEqualTo("private_access_failed");
+        org.assertj.core.api.Assertions.assertThat(record.appId()).isEqualTo("vaultwarden");
+    }
+
+    @Test
     void notificationEndpointRoundTripsActionsAndRejectsExternalDestinations() throws Exception {
         var repository = mock(ActivityLogRepository.class);
         when(repository.save(any(ActivityLogEntity.class))).thenAnswer(call -> call.getArgument(0));

@@ -147,4 +147,14 @@ public class SystemController {
     public SupportModels.SupportBundle supportBundle() {
         return supportService.bundle();
     }
+
+    @GetMapping("/support/apps/{id}")
+    public SupportModels.AppSupportReport appSupport(@PathVariable String id) {
+        var app = applicationStateService.snapshot().applications().stream()
+                .filter(candidate -> candidate.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "App is no longer available. Refresh My Apps and try again."));
+        return supportService.appReport(app);
+    }
 }

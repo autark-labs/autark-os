@@ -24,6 +24,25 @@ import com.autarkos.testsupport.JpaTestRepositories;
 
 class SystemControllerTests {
 
+    @Test
+    void appSupportUsesTheCanonicalAppAndRejectsUnknownIds() {
+        var state = mock(ApplicationStateService.class);
+        var support = mock(SystemSupportService.class);
+        var app = mock(com.autarkos.apps.ApplicationView.class);
+        org.mockito.Mockito.when(app.id()).thenReturn("vaultwarden");
+        org.mockito.Mockito.when(state.snapshot()).thenReturn(new com.autarkos.apps.ApplicationState(java.util.List.of(app), Instant.now()));
+        var expected = new SupportModels.AppSupportReport(true, "Redacted report", Instant.now());
+        org.mockito.Mockito.when(support.appReport(app)).thenReturn(expected);
+        var controller = new SystemController(null, null, null, support, null, null, null, null, null, state, null);
+
+        assertThat(controller.appSupport("vaultwarden")).isSameAs(expected);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.appSupport("unknown"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("404");
+        verify(support).appReport(app);
+        org.mockito.Mockito.verifyNoMoreInteractions(support);
+    }
+
     @TempDir Path runtimeRoot;
 
     @ParameterizedTest
