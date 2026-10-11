@@ -1,3 +1,5 @@
+import axios from 'axios';
+import { JobsAPIClient } from '@/api/JobsAPIClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -16,6 +18,7 @@ import {
   useBackupReportRepository,
   useRestoreBackupMutation,
   useRestorePlanQuery,
+  useRestorePointQuery,
   useRunAppBackupMutation,
   useRunFullBackupMutation,
   useRunRoutineBackupMutation,
@@ -37,7 +40,6 @@ import {
   backupOperationForJob,
   backupOperationForRunningId,
   selectActiveBackupJob,
-  reportRestorePoints,
 } from './BackupsPage.logic';
 import { BackupColumnNavigatorWorkspace } from './BackupColumnNavigatorWorkspace';
 
@@ -47,8 +49,9 @@ function BackupsPage() {
   const applicationState = useApplicationStateRepository();
   const [backupReview, setBackupReview] = useState<BackupReviewRequest | null>(null);
   const [pendingOperation, setPendingOperation] = useState<string | null>(null);
-  const [restoreSelection, setRestoreSelection] = useState<{ pointId: number; targetAppId: string | null; phase: 'details' | 'confirm'; error: string | null } | null>(null);
+  const [restoreSelection, setRestoreSelection] = useState<{ pointId: number; targetAppId: string | null; phase: 'details' | 'confirm' | 'submitting' | 'unknown' | 'submitted'; error: string | null; jobId?: string } | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const restoreRequestRef = useRef(0);
   const restoreOriginRef = useRef<HTMLElement | null>(null);
   const backupJobsQuery = useAutarkOsJobsQuery();
   const recoveredActiveJob = selectActiveBackupJob(backupJobsQuery.data);
@@ -75,17 +78,22 @@ function BackupsPage() {
   const restoreBackupMutation = useRestoreBackupMutation();
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
   const report = backupReport.report;
-  const restorePoint = report && restoreSelection
-    ? reportRestorePoints(report).find(point => point.id === restoreSelection.pointId) ?? null : null;
-  const restorePlanQuery = useRestorePlanQuery(restorePoint, restoreSelection?.targetAppId ?? null);
+  const restorePointQuery = useRestorePointQuery(restoreSelection?.pointId ?? null);
+  const restorePoint = restorePointQuery.data ?? null;
+  const restorePlanQuery = useRestorePlanQuery(restorePoint, restoreSelection?.targetAppId ?? null, restoreSelection?.phase === 'confirm');
+  const submittedJob = backupJobsQuery.data?.find(job => job.jobId === restoreSelection?.jobId)
+    ?? (activeJob?.jobId === restoreSelection?.jobId ? activeJob : null);
   const restoreFlow: RestoreFlowState | null = restoreSelection ? {
     point: restorePoint,
     targetAppId: restoreSelection.targetAppId,
-    phase: !restorePoint ? 'unavailable' : restoreSelection.phase === 'details' ? 'details'
+    phase: (restoreSelection.phase === 'submitting' || restoreSelection.phase === 'unknown' || restoreSelection.phase === 'submitted') ? restoreSelection.phase
+      : restorePointQuery.isLoading ? 'loading' : !restorePoint ? 'unavailable' : restoreSelection.phase === 'details' ? 'details'
       : restorePlanQuery.isFetching ? 'planning' : restorePlanQuery.error ? 'plan_error' : 'confirm',
     plan: restorePlanQuery.isFetching || restorePlanQuery.error ? null : restorePlanQuery.data ?? null,
-    error: !restorePoint ? 'This restore point is no longer in the backup report. Refresh to check its availability.'
-      : restorePlanQuery.error ? apiErrorMessage(restorePlanQuery.error, 'Restore plan could not be loaded.') : restoreSelection.error,
+    job: submittedJob,
+    error: restoreSelection.error ?? (!restorePoint && !restorePointQuery.isLoading
+      ? apiErrorMessage(restorePointQuery.error, 'This restore point is no longer available.')
+      : restoreSelection.phase === 'confirm' && restorePlanQuery.error ? apiErrorMessage(restorePlanQuery.error, 'Restore plan could not be loaded.') : null),
   } : null;
   const appIconUrlById = useMemo(() => backupAppIconUrls(
     report?.apps ?? [],
@@ -174,6 +182,7 @@ function BackupsPage() {
   }
 
   function closeRestoreFlow() {
+    restoreRequestRef.current++;
     setRestoreSelection(null);
     window.setTimeout(() => restoreOriginRef.current?.focus(), 0);
   }
@@ -181,42 +190,67 @@ function BackupsPage() {
   function openRestore(point: RestorePoint, appId?: string | null) {
     if (restoreAvailability.disabled) return;
     rememberRestoreOrigin();
+    restoreRequestRef.current++;
     setRestoreSelection({ pointId: point.id, targetAppId: appId || null, phase: 'confirm', error: null });
   }
 
   function openRestorePointDetails(point: RestorePoint) {
     rememberRestoreOrigin();
+    restoreRequestRef.current++;
     setRestoreSelection({ pointId: point.id, targetAppId: null, phase: 'details', error: null });
   }
 
   function changeRestoreTarget(appId: string | null) {
     if (!restoreSelection) return;
+    restoreRequestRef.current++;
     setRestoreSelection({ ...restoreSelection, targetAppId: appId, phase: 'confirm', error: null });
-    if (appId === restoreSelection.targetAppId) void restorePlanQuery.refetch();
+    if (restoreSelection.phase === 'confirm' && appId === restoreSelection.targetAppId) void restorePlanQuery.refetch();
   }
 
   function retryRestorePlan() {
+    if (restoreSelection?.phase === 'unknown') {
+      void reconcileRestore(restoreSelection.jobId!, restoreRequestRef.current);
+      return;
+    }
     setRestoreSelection((current) => current ? { ...current, error: null } : current);
-    if (!restorePoint) void refreshBackupReport();
+    if (!restorePoint) void restorePointQuery.refetch();
     else void restorePlanQuery.refetch();
   }
 
-  async function executeRestore() {
-    if (restoreAvailability.disabled || !restoreFlow?.point || !restoreFlow?.plan || restoreFlow.phase !== 'confirm' || !restoreFlow.plan.executable) {
-      return;
-    }
-    const { point, targetAppId } = restoreFlow;
-    setPendingOperation(`restore-${point.id}`);
-    setRestoreSelection((current) => current ? { ...current, error: null } : current);
+  async function reconcileRestore(jobId: string, requestId: number) {
     try {
-      const result = await restoreBackupMutation.mutateAsync({ restorePointId: point.id, appId: targetAppId });
+      const job = await JobsAPIClient.get(jobId);
+      if (job.jobId !== jobId || job.type !== 'backup_restore') return;
+      acceptJob(job);
+      await backupJobsQuery.refetch();
+      if (restoreRequestRef.current === requestId) setRestoreSelection(current => current ? { ...current, phase: 'submitted', jobId: job.jobId, error: null } : current);
+    } catch {
+      // An unavailable Activity response cannot establish that submission failed.
+    }
+  }
+
+  async function executeRestore() {
+    if (restoreAvailability.disabled || !restoreFlow?.point || !restoreFlow?.plan || restoreFlow.phase !== 'confirm' || restoreFlow.error || !restoreFlow.plan.executable) return;
+    const { point, targetAppId, plan } = restoreFlow;
+    const requestId = restoreRequestRef.current;
+    setPendingOperation(`restore-${point.id}`);
+    setRestoreSelection(current => current ? { ...current, phase: 'submitting', error: null, jobId: plan.jobId } : current);
+    try {
+      const result = await restoreBackupMutation.mutateAsync({ restorePointId: point.id, appId: targetAppId, planId: plan.planId });
       acceptJob(result);
-      closeRestoreFlow();
+      if (restoreRequestRef.current === requestId) setRestoreSelection(current => current ? { ...current, phase: 'submitted', jobId: result.jobId } : current);
     } catch (restoreError) {
-      const notificationMessage = apiErrorMessage(restoreError, 'Restore could not be completed.');
-      setRestoreSelection((current) => current ? { ...current, error: notificationMessage } : current);
-      showActionNotification({ severity: 'error', title: 'Restore could not start', message: notificationMessage }, 'Restore could not start');
       setPendingOperation(null);
+      const unknownAcceptance = axios.isAxiosError(restoreError) && (!restoreError.response || restoreError.response.status >= 500);
+      if (unknownAcceptance) {
+        if (restoreRequestRef.current === requestId) setRestoreSelection(current => current ? { ...current, phase: 'unknown', error: null } : current);
+        showActionNotification({ severity: 'warning', title: 'Checking restore status', message: 'The submission response was lost. Check Activity before starting another restore.' }, 'Checking restore status');
+        await reconcileRestore(plan.jobId, requestId);
+      } else {
+        const notificationMessage = apiErrorMessage(restoreError, 'Restore could not be started.');
+        if (restoreRequestRef.current === requestId) setRestoreSelection(current => current ? { ...current, phase: 'confirm', error: notificationMessage } : current);
+        showActionNotification({ severity: 'error', title: 'Restore could not start', message: notificationMessage }, 'Restore could not start');
+      }
     }
   }
 

@@ -67,7 +67,7 @@ public class BackupService {
         this.backupVerificationService = backupArchiveService.verification();
         this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService, this::backupUnavailableReason, jobs);
         RestoreSimulationService restoreSimulationService = new RestoreSimulationService(backupContractService, this::backupRoot);
-        this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps, backupDestinationService::archiveAvailable);
+        this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps, backupDestinationService::archiveAvailable, this::backupUnavailableReason, this::restoreAppIdentity);
         this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, backupArchiveService, backupVerificationService, restorePlanner, managedApps, progress);
     }
 
@@ -247,6 +247,32 @@ public class BackupService {
         return "Included: " + (names.isEmpty() ? "none" : names) + "." + (exclusions.isEmpty() ? "" : " Excluded: " + String.join("; ", exclusions));
     }
 
+    public BackupModels.RestorePointPage restorePoints(Long beforeId, String appId) {
+        var records = backupRepository.archivePage(beforeId, appId == null || appId.isBlank() ? null : appId);
+        var items = records.stream().limit(50).map(RestorePoints::toDomain).toList();
+        return new BackupModels.RestorePointPage(items, records.size() > 50 ? items.getLast().id() : null);
+    }
+
+    public RestorePoint restorePoint(long id) {
+        return backupRepository.findById(id).map(RestorePoints::toDomain)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "This restore point was not found. Choose another archive."));
+    }
+
+    private List<String> restoreAppIdentity(InstalledApp app) {
+        var identity = new java.util.ArrayList<String>(List.of(app.appId(), app.appName(), app.runtimePath(), app.composeProject()));
+        installedAppRepository.ownershipFor(app.appId()).ifPresent(ownership -> {
+            identity.add(ownership.appInstanceId());
+            identity.add(ownership.autarkOsInstanceId());
+        });
+        managedApps.durableStorage(app, true).protectedPaths().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
+                .forEach(path -> identity.add(path.getKey() + "=" + path.getValue().toAbsolutePath().normalize()));
+        var destination = backupDestinationService.current();
+        identity.add(destination.configuredPath());
+        identity.add(destination.deviceIdentity());
+        return identity;
+    }
+
     public RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
         return recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.RESTORE_PLAN,
@@ -268,10 +294,10 @@ public class BackupService {
                 });
     }
 
-    public RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
+    public RestoreModels.RestoreResult restore(long restorePointId, String targetAppId, String planId) {
         return recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.RESTORE,
-                () -> restoreExecutor.restore(restorePointId, targetAppId));
+                () -> restoreExecutor.restore(restorePointId, targetAppId, planId));
     }
 
     /** Called by scheduled maintenance. Busy recovery work wins and cleanup retries later. */

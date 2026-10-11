@@ -132,12 +132,27 @@ class BackupDockerRehearsalTests {
             assertThat(archived).isEqualTo(fixture.compose.lastStoppedRecords);
             assertThat(fixture.records).hasContent(archived);
 
+            // Retained recovery data stays discoverable independently of the recent report.
+            for (int index = 0; index < 55; index++) {
+                fixture.points.save(RestorePoints.create("newer-app", "Newer app", "app", "manual", "newer-app",
+                        "/unrelated/archive-" + index, "completed", 1, "Newer backup", "", "cold_file", 1));
+            }
+            assertThat(fixture.points.recent(20)).noneMatch(row -> row.id() == checkpoint.id());
+            var firstPage = fixture.backups.restorePoints(null, null);
+            assertThat(firstPage.items()).hasSize(50);
+            assertThat(fixture.backups.restorePoints(firstPage.nextBeforeId(), null).items())
+                    .anyMatch(point -> point.id() == checkpoint.id());
+            assertThat(fixture.backups.restorePoints(null, "homepage").items())
+                    .anyMatch(point -> point.id() == checkpoint.id());
+            assertThat(fixture.backups.restorePoint(checkpoint.id()).id()).isEqualTo(checkpoint.id());
+            assertThat(fixture.backups.restorePlan(checkpoint.id(), "homepage").executable()).isFalse();
+
             // Restore requires a managed target. Re-register the same attested runtime and identity;
             // ownership recovery UX is covered separately, not simulated by copying archive files.
             fixture.register(false);
             Files.writeString(fixture.records, "changed-after-uninstall\n");
             assertThat(fixture.backups.restorePlan(checkpoint.id(), "homepage").executable()).isTrue();
-            assertThat(fixture.backups.restore(checkpoint.id(), "homepage").status()).isEqualTo("completed");
+            assertThat(fixture.backups.restore(checkpoint.id(), "homepage", fixture.backups.restorePlan(checkpoint.id(), "homepage").planId()).status()).isEqualTo("completed");
             assertThat(fixture.compose.recordsBeforeLastStart).isEqualTo(archived);
             fixture.assertWriterRunning();
             assertThat(fixture.installed.settingsFor("homepage").orElseThrow().backup().enabled()).isFalse();
@@ -155,7 +170,7 @@ class BackupDockerRehearsalTests {
             fixture.compose.failAfterNextStop = true;
 
             if (restore) {
-                assertThatThrownBy(() -> fixture.backups.restore(point.id(), "homepage"))
+                assertThatThrownBy(() -> fixture.backups.restore(point.id(), "homepage", fixture.backups.restorePlan(point.id(), "homepage").planId()))
                         .hasMessageContaining("No app data was changed");
             } else {
                 var result = fixture.backups.run("homepage");
@@ -292,7 +307,7 @@ class BackupDockerRehearsalTests {
             Files.writeString(records, "changed-after-backup\n");
             assertThat(compose.up(composeFile, project).successful()).isTrue();
             assertThat(backups.restorePlan(point.id(), "homepage").executable()).isTrue();
-            assertThat(backups.restore(point.id(), "homepage").status()).isEqualTo("completed");
+            assertThat(backups.restore(point.id(), "homepage", backups.restorePlan(point.id(), "homepage").planId()).status()).isEqualTo("completed");
             assertThat(compose.recordsBeforeLastStart).isEqualTo(archived);
             assertThat(Files.readString(records)).startsWith(archived).doesNotContain("changed-after-backup");
             assertWriterRunning();

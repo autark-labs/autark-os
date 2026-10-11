@@ -24,10 +24,17 @@ public final class RestoreModels {
             RestoreSimulationResult simulation,
             String restoreConfidence,
             boolean executable,
-            Instant plannedAt) {
+            Instant plannedAt,
+            String planId,
+            String jobId,
+            List<RestorePlanApp> apps,
+            List<String> blockedReasons) {
     }
 
-    public record RestoreRequest(String appId) {
+    public record RestorePlanApp(String appId, String appName, String status, String message) {
+    }
+
+    public record RestoreRequest(String appId, String planId) {
     }
 
     public record RestoreResult(
@@ -35,6 +42,8 @@ public final class RestoreModels {
             String status,
             String message,
             List<String> restoredAppIds,
+            List<String> failedAppIds,
+            List<String> unattemptedAppIds,
             List<String> logs,
             Instant completedAt) {
     }

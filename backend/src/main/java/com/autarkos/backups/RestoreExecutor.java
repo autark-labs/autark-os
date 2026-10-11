@@ -48,9 +48,9 @@ class RestoreExecutor {
         this.managedApps = managedApps;
     }
 
-    RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
+    RestoreModels.RestoreResult restore(long restorePointId, String targetAppId, String planId) {
         progress.start("validate_restore_point", "Validating restore point");
-        RestoreModels.RestorePlan plan = restorePlanner.restorePlan(restorePointId, targetAppId);
+        RestoreModels.RestorePlan plan = restorePlanner.requireReviewed(restorePointId, targetAppId, planId);
         if (!plan.executable()) {
             throw new InstallationException("This restore point cannot be restored. Review the restore plan for details.");
         }
@@ -60,8 +60,25 @@ class RestoreExecutor {
         List<InstalledApp> apps = restorePlanner.affectedApps(point, targetAppId);
         progress.complete("validate_restore_point", "Restore point and affected apps validated.");
         List<String> logs = new ArrayList<>();
-        for (InstalledApp app : apps) {
-            restoreApp(point, app, logs);
+        List<String> restored = new ArrayList<>();
+        for (int index = 0; index < apps.size(); index++) {
+            InstalledApp app = apps.get(index);
+            try {
+                restoreApp(point, app, logs);
+                restored.add(app.appId());
+            } catch (RuntimeException failure) {
+                progress.fail(userMessage(failure));
+                if (!"full".equals(plan.scope())) throw failure;
+                var remaining = apps.subList(index + 1, apps.size());
+                String restoredNames = apps.subList(0, index).stream().map(InstalledApp::appName).collect(java.util.stream.Collectors.joining(", "));
+                String unattemptedNames = remaining.stream().map(InstalledApp::appName).collect(java.util.stream.Collectors.joining(", "));
+                String message = "Restore from archive #" + point.id() + " stopped. Restored: " + (restoredNames.isEmpty() ? "none" : restoredNames)
+                        + ". Failed: " + app.appName() + ". Not attempted: " + (unattemptedNames.isEmpty() ? "none" : unattemptedNames)
+                        + ". Earlier successful restores were kept. " + userMessage(failure);
+                activityLogService.error("backup", "restore_partial_failure", "Restore stopped", message, app.appId(), failure);
+                return new RestoreModels.RestoreResult(point.id(), "failed", message, List.copyOf(restored), List.of(app.appId()),
+                        remaining.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+            }
         }
         String message = plan.scope().equals("full")
                 ? "Full restore completed for " + apps.size() + " app(s)."
@@ -69,7 +86,7 @@ class RestoreExecutor {
         progress.start("finish", "Recording restore result");
         activityLogService.success("backup", "restore_completed", message, String.join(", ", apps.stream().map(InstalledApp::appName).toList()), null);
         progress.complete("finish", "Restore history saved.");
-        return new RestoreModels.RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.COMPLETED, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+        return new RestoreModels.RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.COMPLETED, message, List.copyOf(restored), List.of(), List.of(), logs, Instant.now());
     }
 
     private void restoreApp(RestorePoint point, InstalledApp app, List<String> logs) {

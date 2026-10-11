@@ -83,7 +83,7 @@ class BackupServiceCanonicalAppTests {
         if (appId.equals("syncthing")) {
             assertThat(service.restorePlan(full.id(), appId).dryRunDetails()).contains("Declared paths: data");
         }
-        assertThat(service.restore(full.id(), appId).status()).isEqualTo("completed");
+        assertThat(service.restore(full.id(), appId, service.restorePlan(full.id(), appId).planId()).status()).isEqualTo("completed");
         assertThat(Files.readString(data)).isEqualTo("title: original\n");
         assertThat(Files.readString(syncedData)).isEqualTo(appId.equals("syncthing") ? "original document" : "changed document");
         assertThat(service.restorePlan(full.id(), "vaultwarden").executable()).isFalse();
@@ -238,7 +238,7 @@ class BackupServiceCanonicalAppTests {
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
         RestorePoint point = service.run("homepage").restorePoint();
 
-        RestoreModels.RestoreResult result = service.restore(point.id(), "homepage");
+        RestoreModels.RestoreResult result = service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId());
 
         assertThat(result.status()).as(String.join("\n", result.logs())).isEqualTo("completed");
         assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
@@ -265,7 +265,7 @@ class BackupServiceCanonicalAppTests {
                 fileOpsService,
                 composeExecutor);
 
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId()))
                 .hasMessageContaining("requested restore was rolled back").hasMessageContaining("could not resume");
         assertThat(fileOpsService.restoreCalls).hasSize(2);
         assertThat(fileOpsService.restoreCalls.getFirst()).isEqualTo("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
@@ -288,7 +288,7 @@ class BackupServiceCanonicalAppTests {
         FailingRollbackStopDockerComposeExecutor composeExecutor = new FailingRollbackStopDockerComposeExecutor();
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService, composeExecutor);
 
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId()))
                 .hasMessageContaining("could not restore the safety checkpoint");
         assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
         assertThat(composeExecutor.stopCalls).isEqualTo(2);
@@ -314,7 +314,7 @@ class BackupServiceCanonicalAppTests {
                 fileOpsService,
                 new FailingStartDockerComposeExecutor());
 
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId()))
                 .hasMessageContaining("Restore failed for Homepage")
                 .hasMessageContaining("requested archive could not be applied");
         assertThat(fileOpsService.restoreCalls).hasSize(2);
@@ -363,7 +363,7 @@ class BackupServiceCanonicalAppTests {
         RestorePoint point = service.run("homepage").restorePoint();
         fileOpsService.tamperWhenSafetyCheckpointIsCreated(point.path());
 
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId()))
                 .hasMessageContaining("integrity changed")
                 .hasMessageContaining("checksum")
                 .hasMessageContaining("immutable");
@@ -530,7 +530,7 @@ class BackupServiceCanonicalAppTests {
         var service = backupService(layout, installed, backups, catalog,
                 new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
 
-        assertThatThrownBy(() -> service.restore(point.id(), app.appId())).hasMessageContaining("stop");
+        assertThatThrownBy(() -> service.restore(point.id(), app.appId(), service.restorePlan(point.id(), app.appId()).planId())).hasMessageContaining("stop");
 
         assertThat(compose.stopCalls).isEqualTo(1);
         assertThat(compose.startCalls).isEqualTo(1);
@@ -626,7 +626,7 @@ class BackupServiceCanonicalAppTests {
         Files.writeString(data, "changed records");
         org.mockito.Mockito.doThrow(new IllegalStateException("History write failed"))
                 .when(installed).recordEvent(org.mockito.ArgumentMatchers.eq("homepage"), org.mockito.ArgumentMatchers.eq("restore_completed"), org.mockito.ArgumentMatchers.anyString());
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage")).hasMessageContaining("History write failed");
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId())).hasMessageContaining("History write failed");
         assertThat(data).hasContent("original records");
         assertThat(compose.running).isTrue();
         assertThat(compose.stopCalls).isEqualTo(2); // Backup and requested restore; no bookkeeping rollback.
@@ -652,7 +652,7 @@ class BackupServiceCanonicalAppTests {
         };
         var service = backupService(layout, installed, backups, catalog,
                 new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), compose);
-        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId()))
                 .hasMessageContaining("Running containers could not be confirmed").hasMessageContaining("could not resume");
     }
 
@@ -771,7 +771,7 @@ class BackupServiceCanonicalAppTests {
         var point = service.run("homepage").restorePoint();
         var job = jobs.start("backup_restore", point.id() + ":homepage",
                 java.util.List.of(com.autarkos.jobs.AutarkOsJobStep.pending("validate_restore_point", "Validating restore point")), () -> {
-                    var result = service.restore(point.id(), "homepage");
+                    var result = service.restore(point.id(), "homepage", service.restorePlan(point.id(), "homepage").planId());
                     return BackupJobs.outcome(result.status(), result.message(), jobs);
                 });
         jobs.runQueuedJobsNow();

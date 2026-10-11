@@ -1,12 +1,7 @@
 import { activeJobs } from '../../repositories/jobRepository.logic';
 import { formatLocalizedDateTime } from '@/lib/dateTime';
-import type { BackupReport, RestorePoint } from '@/types/backup';
+import type { RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
-
-export function reportRestorePoints(report: BackupReport): RestorePoint[] {
-  return [...new Map([...report.recentRestorePoints, ...report.apps.flatMap(app => app.restorePoints ?? [])]
-    .map(point => [point.id, point])).values()];
-}
 
 export function restorePointIncludesApp(point: RestorePoint, appId: string): boolean {
   return point.scope === 'full'

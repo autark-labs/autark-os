@@ -421,7 +421,7 @@ const activity = [{ id: 1, level: 'success', category: 'backup', action: 'backup
 
 const supportSummary = { status: 'ready_with_notes', headline: 'Diagnostics are ready', summary: 'One non-critical storage item can be reviewed.', redacted: true, backendHealth: 'healthy', dockerStatus: 'ready', tailscaleStatus: 'connected', serviceStatus: 'running', version, recentFailures: 0, findings: [{ id: 'storage-orphan', area: 'Storage', severity: 'warning', title: 'Unused data is available to review', message: 'Review the old import folder before cleanup.', actionLabel: 'Open storage', route: '/storage' }], unifiedIssues: systemSummary.issues, redactionRules: [{ id: 'tokens', label: 'Tokens', description: 'Secrets are redacted from support output.' }], commands: [{ id: 'doctor', label: 'Run doctor', description: 'Check core services.', command: 'autark-os doctor', destination: 'terminal' }], checkedAt: fixedAt };
 
-const restorePlan = { restorePointId: restorePoint.id, scope: 'app', source: 'automatic', targetAppId: 'vaultwarden', title: 'Restore Vaultwarden', summary: 'Restore Vaultwarden from its verified checkpoint.', affectedApps: [runtimeApp.appName], warnings: ['A fresh safety checkpoint is created first.'], steps: ['Stop Vaultwarden.', 'Restore the archive.', 'Start Vaultwarden.'], dryRunDetails: ['Archive contents match the app backup contract.'], verificationStatus: 'verified', verificationMessage: 'Archive checksum is verified.', simulation: { status: 'passed', message: 'The restore plan is ready.', details: ['Target storage is available.'], simulatedAt: fixedAt }, restoreConfidence: 'high', executable: true, plannedAt: fixedAt };
+const restorePlan = { jobId: 'restore-fixture', planId: 'review-fixture', apps: [{ appId: 'vaultwarden', appName: 'Vaultwarden', status: 'restorable', message: 'Ready to restore.' }], blockedReasons: [], restorePointId: restorePoint.id, scope: 'app', source: 'automatic', targetAppId: 'vaultwarden', title: 'Restore Vaultwarden', summary: 'Restore Vaultwarden from its verified checkpoint.', affectedApps: [runtimeApp.appName], warnings: ['A fresh safety checkpoint is created first.'], steps: ['Stop Vaultwarden.', 'Restore the archive.', 'Start Vaultwarden.'], dryRunDetails: ['Archive contents match the app backup contract.'], verificationStatus: 'verified', verificationMessage: 'Archive checksum is verified.', simulation: { status: 'passed', message: 'The restore plan is ready.', details: ['Target storage is available.'], simulatedAt: fixedAt }, restoreConfidence: 'high', executable: true, plannedAt: fixedAt };
 
 function defaultResponse(pathname: string, method: string, scenario: FixtureScenario) {
   const onboarding = scenario === 'onboarding' ? onboardingIncomplete : onboardingComplete;
@@ -515,6 +515,8 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
     ], blockedReasons: [], checkedAt: fixedAt,
   };
   if (pathname === '/api/backups') return backupReport;
+  if (pathname === '/api/backups/restore-points') return { items: backupReport.recentRestorePoints, nextBeforeId: null };
+  if (/^\/api\/backups\/restore-points\/\d+$/.test(pathname)) return backupReport.recentRestorePoints.find(point => point.id === Number(pathname.split('/').at(-1))) ?? null;
   if (pathname.includes('/api/backups/restore-points/') && pathname.endsWith('/plan')) return restorePlan;
   if (pathname.startsWith('/api/backups/')) return activeJob;
   if (pathname === '/api/discover/apps') return discoverApps;

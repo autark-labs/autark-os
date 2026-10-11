@@ -66,6 +66,21 @@ class BackupRepositoryTests {
         assertThat(repository.latestSuccessfulVerification()).map(RestorePointEntity::id).contains(success.id());
     }
 
+    @Test
+    void archivePagesRetainRemovedAppsBeyondTheRecentReportAndMatchFullMembership() {
+        var repository = repository();
+        var old = repository.save(RestorePoints.create("removed-app", "Removed app", "app", "manual", "removed-app", "/retained.zip", "completed", 1, "Retained"));
+        var full = repository.save(RestorePoints.create("__full__", "All apps", "full", "manual", "removed-app,homepage", "/full.zip", "completed", 1, "Full"));
+        for (int index = 0; index < 60; index++) repository.save(RestorePoints.create("homepage", "Homepage", "app", "manual", "homepage", "/new.zip", "completed", 1, "Newer"));
+        assertThat(repository.recent(20)).extracting(RestorePointEntity::id).doesNotContain(old.id());
+        var page = repository.archivePage(null, null);
+        assertThat(page).hasSize(51);
+        var next = repository.archivePage(page.get(49).id(), null);
+        assertThat(next).hasSize(12).extracting(RestorePointEntity::id).contains(old.id(), full.id());
+        assertThat(repository.archivePage(null, "removed-app")).extracting(RestorePointEntity::id).containsExactly(full.id(), old.id());
+        assertThat(repository.archivePage(null, "removed")).isEmpty();
+    }
+
     private BackupRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

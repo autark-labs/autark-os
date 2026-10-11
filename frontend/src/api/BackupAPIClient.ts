@@ -1,10 +1,20 @@
 import { httpClient } from './httpClient';
 import type { AutarkOsJob } from '@/types/jobs';
-import type { BackupDestination, BackupReport, RestorePlan, BackupPlan, BackupReviewRequest } from '@/types/backup';
+import type { BackupDestination, BackupReport, RestorePlan, BackupPlan, BackupReviewRequest, RestorePoint, RestorePointPage } from '@/types/backup';
 
 export const BackupAPIClient = {
   async report() {
     const response = await httpClient.get<BackupReport>('/api/backups');
+    return response.data;
+  },
+
+  async restorePoints(beforeId?: number, appId?: string | null) {
+    const response = await httpClient.get<RestorePointPage>('/api/backups/restore-points', { params: { beforeId, appId } });
+    return response.data;
+  },
+
+  async restorePoint(id: number) {
+    const response = await httpClient.get<RestorePoint>(`/api/backups/restore-points/${id}`);
     return response.data;
   },
 
@@ -53,8 +63,8 @@ export const BackupAPIClient = {
     return response.data;
   },
 
-  async restore(restorePointId: number, appId?: string | null) {
-    const response = await httpClient.post<AutarkOsJob>(`/api/backups/restore-points/${restorePointId}/restore`, { appId: appId || null });
+  async restore(restorePointId: number, planId: string, appId?: string | null) {
+    const response = await httpClient.post<AutarkOsJob>(`/api/backups/restore-points/${restorePointId}/restore`, { appId: appId || null, planId });
     return response.data;
   },
 };

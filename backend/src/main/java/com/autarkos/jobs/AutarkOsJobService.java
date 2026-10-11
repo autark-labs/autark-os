@@ -72,14 +72,27 @@ public class AutarkOsJobService {
     }
 
     public AutarkOsJob startWithJob(String type, String subjectId, List<AutarkOsJobStep> steps, Object parameters, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
+        return startWithId(null, type, subjectId, steps, parameters, operation);
+    }
+
+    /** Replay a reviewed request without repeating an already accepted destructive operation. */
+    public AutarkOsJob startReviewedOnce(String key, String type, String subjectId, List<AutarkOsJobStep> steps, Supplier<AutarkOsJobOutcome> operation) {
+        return startWithId(onceJobId("review:" + key), type, subjectId, steps, key, ignored -> operation.get());
+    }
+
+    private AutarkOsJob startWithId(String jobId, String type, String subjectId, List<AutarkOsJobStep> steps, Object parameters, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
         RequestSignature request = signature(steps, parameters);
         AutarkOsJob job;
         synchronized (jobStartTransition) {
+            if (jobId != null) {
+                var accepted = findById(jobId);
+                if (accepted.isPresent()) return accepted.get();
+            }
             Optional<AutarkOsJob> active = existingForRequest(type, subjectId, steps, parameters);
             if (active.isPresent()) {
                 return active.get();
             }
-            job = create(type, subjectId, steps);
+            job = jobId == null ? create(type, subjectId, steps) : create(jobId, type, subjectId, steps);
             activeRequests.put(job.jobId(), request);
             Runnable task = () -> run(job, operation);
             queuedTasks.put(job.jobId(), task);

@@ -1,3 +1,7 @@
+import { RefreshStatus } from '@/components/RefreshStatus';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { useRestorePointInventory, useRestorePointQuery } from '@/repositories/backupRepository';
+import { apiErrorMessage } from '@/api/httpClient';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useMemo, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -39,7 +43,6 @@ import type { AppBackupStatus, BackupReport, RestorePoint } from '@/types/backup
 import {
   type BackupOperationAvailability,
   backupStatusLabel,
-  reportRestorePoints,
   restorePointIncludesApp,
   formatBackupBytes,
   formatBackupDate,
@@ -94,15 +97,18 @@ export function BackupColumnNavigatorWorkspace({
   verifyAvailability,
 }: WorkspaceProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const restorePoints = useMemo(
-    () => reportRestorePoints(report)
-      .filter((point) => point.status === 'completed')
-      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
-    [report],
-  );
+  const requestedId = searchParams.get('backup');
+  const requestedNumber = Number(requestedId);
+  const requestedPoint = useRestorePointQuery(requestedId !== null && Number.isSafeInteger(requestedNumber) && requestedNumber > 0 ? requestedNumber : null);
+  const inventory = useRestorePointInventory(searchParams.get('app'));
+  const restorePoints = useMemo(() => [...new Map([
+    ...(inventory.data?.pages.flatMap(page => page.items) ?? []),
+    ...(requestedPoint.data ? [requestedPoint.data] : []),
+  ].map(point => [point.id, point])).values()].filter(point => point.status === 'completed')
+    .sort((left, right) => right.id - left.id), [inventory.data, requestedPoint.data]);
   const route = useMemo(
-    () => parseBackupNavigatorRoute(searchParams, report.apps, restorePoints),
-    [report.apps, restorePoints, searchParams],
+    () => parseBackupNavigatorRoute(searchParams, restorePoints),
+    [restorePoints, searchParams],
   );
   const directory = route.directory;
   const selectedApp = findApp(report.apps, directory);
@@ -110,7 +116,17 @@ export function BackupColumnNavigatorWorkspace({
     () => restorePoints.filter((point) => pointMatchesDirectory(point, directory)),
     [directory, restorePoints],
   );
-  const selectedPoint = directoryPoints.find((point) => point.id === route.restorePointId) ?? directoryPoints[0] ?? null;
+  const selectedPoint = requestedId === null ? directoryPoints[0] ?? null
+    : requestedPoint.data?.status === 'completed' && pointMatchesDirectory(requestedPoint.data, directory) ? requestedPoint.data : null;
+  const selectionUnavailable = requestedId !== null && !requestedPoint.isLoading && !selectedPoint;
+  const selectionNotice = requestedId !== null && !selectedPoint ? (
+    <div className="rounded-xl border border-border bg-card p-4 text-sm" role="status">
+      <p className="font-semibold">{requestedPoint.isLoading ? 'Loading selected restore point…' : 'Restore point unavailable'}</p>
+      {selectionUnavailable && <><p className="mt-2 text-muted-foreground">{requestedPoint.error ? apiErrorMessage(requestedPoint.error, 'The selected archive could not be loaded.') : 'This archive is missing or does not belong to this folder.'} Choose another archive from the list to continue.</p><ProjectDarkControlButton className="mt-3" onClick={() => chooseDirectory('all')} size="sm" type="button">Choose another archive</ProjectDarkControlButton></>}
+    </div>
+  ) : !selectedPoint && (inventory.isLoading || inventory.error || inventory.hasNextPage) ? (
+    <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">{inventory.isLoading ? 'Loading archive inventory…' : inventory.error ? 'Archive inventory is unavailable. Retry the archive list to continue.' : 'No matching archive is loaded yet. Load older archives to continue browsing.'}</p>
+  ) : null;
   const attentionMessage = backupAttentionMessage(report);
   const routineDisabled = routineBackupAvailability.disabled || !report.settings.automaticBackupsEnabled;
   const routineReason = routineBackupAvailability.disabled
@@ -171,7 +187,8 @@ export function BackupColumnNavigatorWorkspace({
             onCreateAppBackup={onCreateAppBackup}
             running={running}
           />
-          {directoryPoints.length ? (
+          {inventory.error && inventory.data && <RefreshStatus className="px-3" error={apiErrorMessage(inventory.error, 'Restore points could not refresh.')} onRefresh={() => void inventory.refetch()} refreshing={inventory.isFetching} showButton={false} updatedAt={new Date(inventory.dataUpdatedAt)} />}
+          {inventory.isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading restore points…</p> : inventory.error && !inventory.data ? <PageLoadError className="m-3" model={{ title: 'Restore points unavailable', message: apiErrorMessage(inventory.error, 'Restore points could not load.'), actionLabel: 'Retry archive list' }} onRetry={() => void inventory.refetch()} /> : directoryPoints.length ? (
             <RestoreFileList
               appIconUrlById={appIconUrlById}
               onSelect={selectRestorePoint}
@@ -179,45 +196,46 @@ export function BackupColumnNavigatorWorkspace({
               selectedPointId={selectedPoint?.id ?? null}
               timeZone={report.settings.timeZone}
             />
-          ) : <EmptyDirectory app={selectedApp} />}
+          ) : <EmptyDirectory app={selectedApp} hasMoreArchives={Boolean(inventory.hasNextPage)} />}
+          {inventory.hasNextPage && <ProjectDarkControlButton className="m-3 shrink-0" disabled={inventory.isFetchingNextPage} onClick={() => void inventory.fetchNextPage()} size="sm" type="button">{inventory.isFetchingNextPage ? 'Loading older archives…' : 'Load older archives'}</ProjectDarkControlButton>}
         </div>
 
         <aside className="hidden min-h-0 overflow-y-auto bg-slate-950/20 p-3 xl:block">
-          <PreviewSlot
+          {selectionNotice ?? <PreviewSlot
             app={selectedApp}
             appBackupAvailability={appBackupAvailability}
             appIconUrlById={appIconUrlById}
             onCreateAppBackup={onCreateAppBackup}
-            onOpenDetails={onOpenRestoreDetails}
-            onOpenRestorePlan={onOpenRestorePlan}
-            onVerify={onVerifyRestorePoint}
+            onOpenDetails={(point) => { selectRestorePoint(point.id); onOpenRestoreDetails(point); }}
+            onOpenRestorePlan={(point) => { selectRestorePoint(point.id); onOpenRestorePlan(point); }}
+            onVerify={(point) => { selectRestorePoint(point.id); onVerifyRestorePoint(point); }}
             point={selectedPoint}
             restoreAvailability={restoreAvailability}
             running={running}
             settings={report.settings}
             timeZone={report.settings.timeZone}
             verifyAvailability={verifyAvailability}
-          />
+          />}
         </aside>
       </section>
 
       <div className="xl:hidden">
-        <PreviewSlot
+        {selectionNotice ?? <PreviewSlot
           app={selectedApp}
           appBackupAvailability={appBackupAvailability}
           appIconUrlById={appIconUrlById}
           compact
           onCreateAppBackup={onCreateAppBackup}
-          onOpenDetails={onOpenRestoreDetails}
-          onOpenRestorePlan={onOpenRestorePlan}
-          onVerify={onVerifyRestorePoint}
+          onOpenDetails={(point) => { selectRestorePoint(point.id); onOpenRestoreDetails(point); }}
+          onOpenRestorePlan={(point) => { selectRestorePoint(point.id); onOpenRestorePlan(point); }}
+          onVerify={(point) => { selectRestorePoint(point.id); onVerifyRestorePoint(point); }}
           point={selectedPoint}
           restoreAvailability={restoreAvailability}
           running={running}
           settings={report.settings}
           timeZone={report.settings.timeZone}
           verifyAvailability={verifyAvailability}
-        />
+        />}
       </div>
     </div>
   );
@@ -317,12 +335,13 @@ function FolderColumn({
 }) {
   return (
     <aside className="min-h-0 overflow-y-auto bg-slate-950/30 p-3 xl:border-r xl:border-sky-300/15">
-      <div className="flex items-center justify-between px-2 pb-2"><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/65">Backup folders</p><span className="text-xs text-sky-100/65">{restorePoints.length} files</span></div>
+      <div className="flex items-center justify-between px-2 pb-2"><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/65">Backup folders</p><span className="text-xs text-sky-100/65">{restorePoints.length} loaded</span></div>
       <nav aria-label="Backup folders" className="grid gap-1">
-        <FolderButton active={directory === 'all'} count={restorePoints.length} icon={FolderOpen} label="All backups" onClick={() => onChooseDirectory('all')} />
-        <FolderButton active={directory === 'full'} count={restorePoints.filter((point) => point.scope === 'full').length} icon={FolderArchive} label="Full checkpoints" onClick={() => onChooseDirectory('full')} />
+        <FolderButton active={directory === 'all'} count={directory === 'all' ? restorePoints.length : null} icon={FolderOpen} label="All backups" onClick={() => onChooseDirectory('all')} />
+        <FolderButton active={directory === 'full'} count={directory === 'full' ? restorePoints.filter((point) => point.scope === 'full').length : null} icon={FolderArchive} label="Full checkpoints" onClick={() => onChooseDirectory('full')} />
         <p className="mt-3 px-2 text-xs font-semibold uppercase tracking-wide text-sky-100/65">App backups</p>
-        {apps.map((app) => <FolderButton app={app} appIconUrl={appIconUrlById[app.appId]} active={directory === appDirectoryKey(app.appId)} count={restorePoints.filter((point) => restorePointIncludesApp(point, app.appId)).length} icon={app.status === 'protected' ? Folder : CircleAlert} key={app.appId} label={app.appName} onClick={() => onChooseDirectory(appDirectoryKey(app.appId))} />)}
+        {apps.map((app) => <FolderButton app={app} appIconUrl={appIconUrlById[app.appId]} active={directory === appDirectoryKey(app.appId)} count={directory === appDirectoryKey(app.appId) ? restorePoints.filter((point) => restorePointIncludesApp(point, app.appId)).length : null} icon={app.status === 'protected' ? Folder : CircleAlert} key={app.appId} label={app.appName} onClick={() => onChooseDirectory(appDirectoryKey(app.appId))} />)}
+        {[...new Map(restorePoints.filter(point => point.scope !== 'full' && !apps.some(app => app.appId === point.appId)).map(point => [point.appId, point])).values()].map(point => <FolderButton active={directory === appDirectoryKey(point.appId)} count={directory === appDirectoryKey(point.appId) ? restorePoints.filter(item => restorePointIncludesApp(item, point.appId)).length : null} icon={Folder} key={point.appId} label={`${point.appName} (not currently managed)`} onClick={() => onChooseDirectory(appDirectoryKey(point.appId))} />)}
       </nav>
       {/* {attentionMessage && <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-400/5 p-3"><div className="flex items-center gap-2 text-amber-200"><CircleAlert className="size-3.5" /><span className="text-xs font-semibold">{attentionMessage}</span></div><p className="mt-1 text-xs leading-5 text-sky-100/60">Select an app folder to see its backup state and next action.</p></div>} */}
     </aside>
@@ -341,13 +360,13 @@ function FolderButton({
   active: boolean;
   app?: AppBackupStatus;
   appIconUrl?: string | null;
-  count: number;
+  count: number | null;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) {
   const needsAttention = Boolean(app && app.status !== 'protected');
-  return <button className={cn('flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 text-cyan-100', needsAttention && !active && 'text-amber-100/85')} onClick={onClick} type="button">{app ? <BackupAppIcon className={cn(active && 'ring-1 ring-cyan-300/40', needsAttention && 'ring-1 ring-amber-300/35')} iconUrl={appIconUrl} /> : <Icon className={cn('size-4 shrink-0 text-sky-100/55', active && 'text-cyan-200', needsAttention && 'text-amber-200')} />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{label}</span><span className="block truncate text-xs text-sky-100/65">{app ? backupStatusLabel(app.status) : `${count} ${count === 1 ? 'file' : 'files'}`}</span></span><span className="shrink-0 text-xs text-sky-100/65">{count}</span><ChevronRight className="size-3.5 shrink-0 text-sky-100/35" /></button>;
+  return <button className={cn('flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 text-cyan-100', needsAttention && !active && 'text-amber-100/85')} onClick={onClick} type="button">{app ? <BackupAppIcon className={cn(active && 'ring-1 ring-cyan-300/40', needsAttention && 'ring-1 ring-amber-300/35')} iconUrl={appIconUrl} /> : <Icon className={cn('size-4 shrink-0 text-sky-100/55', active && 'text-cyan-200', needsAttention && 'text-amber-200')} />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{label}</span><span className="block truncate text-xs text-sky-100/65">{app ? backupStatusLabel(app.status) : count === null ? 'Browse archives' : `${count} loaded`}</span></span><span className="shrink-0 text-xs text-sky-100/65">{count === null ? '' : `${count} loaded`}</span><ChevronRight className="size-3.5 shrink-0 text-sky-100/35" /></button>;
 }
 
 function DirectoryHeader({
@@ -369,7 +388,7 @@ function DirectoryHeader({
   const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app?.backupUnavailableReason || 'Review this app’s backup requirements before creating a restore point.';
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-sky-300/15 px-3 py-3">
-      <div className="min-w-0"><div className="flex min-w-0 items-center gap-1 text-xs text-sky-100/55"><HardDrive className="size-3.5 shrink-0" /><span className="truncate">{directoryPath(directory, app)}</span></div><p className="mt-1 text-sm font-semibold text-white">{directoryTitle(directory, app)} <span className="font-normal text-sky-100/50">· {fileCount} {fileCount === 1 ? 'file' : 'files'}</span></p></div>
+      <div className="min-w-0"><div className="flex min-w-0 items-center gap-1 text-xs text-sky-100/55"><HardDrive className="size-3.5 shrink-0" /><span className="truncate">{directoryPath(directory, app)}</span></div><p className="mt-1 text-sm font-semibold text-white">{directoryTitle(directory, app)} <span className="font-normal text-sky-100/50">· {fileCount} loaded</span></p></div>
       {app ? <DisabledAction disabled={disabled} reason={reason}><ProjectDarkControlButton disabled={disabled} onClick={() => onCreateAppBackup(app)} size="sm" type="button">{running === `app-${app.appId}` ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}{running === `app-${app.appId}` ? 'Backing up' : 'Back up this app'}</ProjectDarkControlButton></DisabledAction> : <span className="rounded-md border border-sky-300/20 bg-slate-800 px-2 py-1 text-xs text-sky-100/65">Newest first</span>}
     </div>
   );
@@ -437,7 +456,7 @@ function PreviewSlot({
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2">{point.scope === 'full' ? <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-800', tone.text)}>{point.verificationStatus === 'verified' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}</span> : <BackupAppIcon className="size-8 rounded-lg" iconUrl={appIconUrlById[point.appId]} />}<div className="min-w-0"><p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-white">{point.scope === 'full' ? 'Full checkpoint' : point.appName}</p><p className="mt-0.5 text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</p></div></div><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></div>
       <p className="mt-3 text-xs leading-5 text-sky-100/65">{point.scope === 'full' ? 'This file contains restore points for the apps included when it was created.' : `This file contains the backup data Autark-OS recorded for ${point.appName}.`} Review the plan before restoring anything.</p>
       <div className="mt-4 grid gap-2"><PreviewFact icon={point.scope === 'full' ? Layers3 : AppWindow} label="Restore scope" value={point.scope === 'full' ? 'Included apps' : point.appName} /><PreviewFact icon={point.verificationStatus === 'verified' ? CheckCircle2 : Clock3} label="Verification" value={verificationDetail(point)} /><PreviewFact icon={CalendarClock} label="Next scheduled backup" value={settings.nextRoutineRun ? formatBackupDate(settings.nextRoutineRun, timeZone) : settings.nextRunLabel || 'Not scheduled'} /></div>
-      <div className="mt-4 flex flex-wrap gap-2"><DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}><ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onOpenRestorePlan(point)} size="sm" type="button"><ArchiveRestore className="size-3.5" />Review restore plan</ProjectPrimaryButton></DisabledAction><DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}><ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} size="sm" type="button">{running === `verify-${point.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}{running === `verify-${point.id}` ? 'Verifying' : point.verificationStatus === 'verified' ? 'View verification' : 'Verify file'}</ProjectDarkControlButton></DisabledAction></div>
+      <div className="mt-4 flex flex-wrap gap-2"><DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}><ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onOpenRestorePlan(point)} size="sm" type="button"><ArchiveRestore className="size-3.5" />Review restore plan</ProjectPrimaryButton></DisabledAction><DisabledAction disabled={point.verificationStatus !== 'verified' && verifyAvailability.disabled} reason={verifyAvailability.reason}><ProjectDarkControlButton disabled={point.verificationStatus !== 'verified' && verifyAvailability.disabled} onClick={() => point.verificationStatus === 'verified' ? onOpenDetails(point) : onVerify(point)} size="sm" type="button">{running === `verify-${point.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}{running === `verify-${point.id}` ? 'Verifying' : point.verificationStatus === 'verified' ? 'View verification' : 'Verify file'}</ProjectDarkControlButton></DisabledAction></div>
       <div className="mt-2 flex flex-wrap gap-2"><ProjectDarkControlButton onClick={() => onOpenDetails(point)} size="sm" type="button">Details</ProjectDarkControlButton>{point.scope !== 'full' && selectedApp && <DisabledAction disabled={appBackupDisabled} reason={appBackupReason}><ProjectDarkControlButton disabled={appBackupDisabled} onClick={() => onCreateAppBackup(selectedApp)} size="sm" type="button"><Play className="size-3.5" />Back up again</ProjectDarkControlButton></DisabledAction>}</div>
     </section>
   );
@@ -447,9 +466,9 @@ function PreviewFact({ icon: Icon, label, value }: { icon: LucideIcon; label: st
   return <div className="flex items-center gap-2 rounded-lg border border-sky-300/15 bg-slate-950/30 px-2.5 py-2"><Icon className="size-3.5 shrink-0 text-sky-100/60" /><span className="min-w-0"><span className="block text-[0.65rem] text-slate-400">{label}</span><span className="block break-words text-xs leading-4 font-medium text-sky-50">{value}</span></span></div>;
 }
 
-function EmptyDirectory({ app }: { app: AppBackupStatus | null }) {
-  const description = app?.backupUnavailableReason || app?.message || 'Create a backup to add the first recovery file.';
-  return <div className="grid min-h-0 flex-1 place-items-center p-6 text-center"><div><Folder className="mx-auto size-5 text-sky-100/50" /><p className="mt-3 text-sm font-semibold text-white">{app ? `No backup files for ${app.appName}` : 'This folder is empty'}</p><p className="mt-1 max-w-xs text-sm leading-6 text-sky-100/60">{description}</p></div></div>;
+function EmptyDirectory({ app, hasMoreArchives }: { app: AppBackupStatus | null; hasMoreArchives: boolean }) {
+  const description = hasMoreArchives ? 'Load older archives to continue browsing this folder.' : app?.backupUnavailableReason || app?.message || 'Create a backup to add the first recovery file.';
+  return <div className="grid min-h-0 flex-1 place-items-center p-6 text-center"><div><Folder className="mx-auto size-5 text-sky-100/50" /><p className="mt-3 text-sm font-semibold text-white">{hasMoreArchives ? 'No matching archives loaded yet' : app ? `No backup files for ${app.appName}` : 'This folder is empty'}</p><p className="mt-1 max-w-xs text-sm leading-6 text-sky-100/60">{description}</p></div></div>;
 }
 
 function EmptyPreview({
@@ -495,13 +514,13 @@ function pointMatchesDirectory(point: RestorePoint, directory: DirectoryKey) {
 function directoryPath(directory: DirectoryKey, app: AppBackupStatus | null) {
   if (directory === 'all') return 'Backups';
   if (directory === 'full') return 'Backups / Full checkpoints';
-  return `Backups / App backups / ${app?.appName || 'App'}`;
+  return `Backups / App backups / ${app?.appName || directory.slice(4)}`;
 }
 
 function directoryTitle(directory: DirectoryKey, app: AppBackupStatus | null) {
   if (directory === 'all') return 'All backup files';
   if (directory === 'full') return 'Full checkpoints';
-  return `${app?.appName || 'App'} backups`;
+  return `${app?.appName || directory.slice(4)} backups`;
 }
 
 function groupPoints(points: RestorePoint[]): Array<readonly [string, RestorePoint[]]> {

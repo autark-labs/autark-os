@@ -126,7 +126,13 @@ export type BackupRunResult = {
   completedAt: string;
 };
 
+export type RestorePointPage = { items: RestorePoint[]; nextBeforeId: number | null };
+
 export type RestorePlan = {
+  jobId: string;
+  planId: string;
+  apps: { appId: string; appName: string; status: 'restorable' | 'missing' | 'blocked' | 'excluded'; message: string }[];
+  blockedReasons: string[];
   restorePointId: number;
   scope: 'full' | 'app' | string;
   source: string;
@@ -157,6 +163,8 @@ export type RestoreResult = {
   status: 'completed' | 'failed' | string;
   message: string;
   restoredAppIds: string[];
+  failedAppIds: string[];
+  unattemptedAppIds: string[];
   logs: string[];
   completedAt: string;
 };

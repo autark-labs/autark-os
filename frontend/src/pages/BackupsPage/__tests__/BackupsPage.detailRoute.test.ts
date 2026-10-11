@@ -1,38 +1,37 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import type { AppBackupStatus, RestorePoint } from '@/types/backup';
+import type { RestorePoint } from '@/types/backup';
 import {
   backupNavigatorLink,
   backupNavigatorSearchWithSelection,
   parseBackupNavigatorRoute,
 } from '../BackupsPage.detailRoute';
 
-const apps = [{ appId: 'vaultwarden' }] as AppBackupStatus[];
 const appRestorePoint = { appId: 'vaultwarden', id: 101, scope: 'app' } as RestorePoint;
 const fullRestorePoint = { appId: '__full__', id: 202, scope: 'full' } as RestorePoint;
 
 test('an app folder can select a full backup containing that exact app', () => {
   const point = { ...fullRestorePoint, includedAppIds: 'homepage, vaultwarden' };
-  assert.deepEqual(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), apps, [point]),
+  assert.deepEqual(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), [point]),
     { directory: 'app:vaultwarden', restorePointId: 202 });
   const unrelated = { ...point, includedAppIds: 'vaultwarden-other' };
-  assert.equal(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), apps, [unrelated]).restorePointId, null);
+  assert.equal(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), [unrelated]).restorePointId, null);
 });
 
 test('backup route selects a specific app folder and restore point', () => {
-  const route = parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=101'), apps, [appRestorePoint, fullRestorePoint]);
+  const route = parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=101'), [appRestorePoint, fullRestorePoint]);
 
   assert.deepEqual(route, { directory: 'app:vaultwarden', restorePointId: 101 });
 });
 
 test('a direct restore point link resolves the matching folder', () => {
-  const route = parseBackupNavigatorRoute(new URLSearchParams('backup=202'), apps, [appRestorePoint, fullRestorePoint]);
+  const route = parseBackupNavigatorRoute(new URLSearchParams('backup=202'), [appRestorePoint, fullRestorePoint]);
 
   assert.deepEqual(route, { directory: 'full', restorePointId: 202 });
 });
 
 test('backup route ignores a restore point outside the requested app folder', () => {
-  const route = parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), apps, [appRestorePoint, fullRestorePoint]);
+  const route = parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), [appRestorePoint, fullRestorePoint]);
 
   assert.deepEqual(route, { directory: 'app:vaultwarden', restorePointId: null });
 });

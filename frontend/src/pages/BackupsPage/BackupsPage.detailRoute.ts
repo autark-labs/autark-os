@@ -1,4 +1,4 @@
-import type { AppBackupStatus, RestorePoint } from '@/types/backup';
+import type { RestorePoint } from '@/types/backup';
 import { restorePointIncludesApp } from './BackupsPage.logic';
 
 export type BackupDirectoryKey = 'all' | 'full' | `app:${string}`;
@@ -10,18 +10,16 @@ type BackupNavigatorSelection = {
 
 export function parseBackupNavigatorRoute(
   searchParams: URLSearchParams,
-  apps: AppBackupStatus[],
   restorePoints: RestorePoint[],
 ): Required<BackupNavigatorSelection> {
   const requestedAppId = searchParams.get('app');
   const requestedRestorePoint = restorePointForId(restorePoints, searchParams.get('backup'));
-  const appExists = Boolean(requestedAppId && apps.some((app) => app.appId === requestedAppId));
-  const directory = appExists
+  const directory = requestedAppId
     ? appDirectoryKey(requestedAppId!)
     : searchParams.get('scope') === 'full'
       ? 'full'
       : requestedRestorePoint
-        ? directoryForRestorePoint(requestedRestorePoint, apps)
+        ? directoryForRestorePoint(requestedRestorePoint)
         : 'all';
   const restorePointId = requestedRestorePoint && pointMatchesDirectory(requestedRestorePoint, directory)
     ? requestedRestorePoint.id
@@ -61,11 +59,11 @@ function appDirectoryKey(appId: string): BackupDirectoryKey {
   return `app:${appId}`;
 }
 
-function directoryForRestorePoint(point: RestorePoint, apps: AppBackupStatus[]): BackupDirectoryKey {
+function directoryForRestorePoint(point: RestorePoint): BackupDirectoryKey {
   if (point.scope === 'full') {
     return 'full';
   }
-  return apps.some((app) => app.appId === point.appId) ? appDirectoryKey(point.appId) : 'all';
+  return appDirectoryKey(point.appId);
 }
 
 function pointMatchesDirectory(point: RestorePoint, directory: BackupDirectoryKey) {

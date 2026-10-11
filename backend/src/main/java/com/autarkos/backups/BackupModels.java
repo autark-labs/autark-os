@@ -85,6 +85,8 @@ public final class BackupModels {
             List<BackupPlanApp> apps, List<String> warnings, List<String> blockedReasons, Instant checkedAt) {
     }
 
+    public record RestorePointPage(List<RestorePoint> items, Long nextBeforeId) { }
+
     public record BackupRunRequest(String planId) {
     }
 

@@ -15,6 +15,8 @@ for (const width of [1440, 390]) {
     report.apps[0].restorePoints = [point];
     report.apps[0].latestBackup = point;
     await page.route('**/api/backups', route => route.fulfill({ json: report }));
+    await page.route(/\/api\/backups\/restore-points(?:\?.*)?$/, route => route.fulfill({ json: { items: [point], nextBeforeId: null } }));
+    await page.route('**/api/backups/restore-points/202', route => route.fulfill({ json: point }));
     await page.goto('/backups?app=vaultwarden&backup=202');
     await expect(page.locator('p:visible').filter({ hasText: /^Full checkpoint$/ }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /checkpoint-.*\.autark-backup/i })).toBeVisible();

@@ -197,19 +197,21 @@ class BackupControllerTests {
                 42L,
                 "completed",
                 "Restore completed for Vaultwarden.",
-                List.of("vaultwarden"),
+                List.of("vaultwarden"), List.of(), List.of(),
                 List.of("Restored managed files."),
                 Instant.parse("2026-06-21T12:00:00Z"));
-        when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
+        when(backupService.restore(42L, "vaultwarden", restoreReview())).thenReturn(result);
 
-        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden"));
+        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden", restoreReview()));
 
         assertThat(job.type()).isEqualTo("backup_restore");
         assertThat(job.subjectId()).isEqualTo("42:vaultwarden");
+        assertThat(job.jobId()).isEqualTo(AutarkOsJobService.onceJobId(
+                "review:" + RestorePlanner.reviewKey(42L, "vaultwarden", restoreReview())));
         assertThat(job.status()).isEqualTo("queued");
         assertThat(job.steps()).extracting(AutarkOsJobStep::id)
                 .containsExactly("validate_restore_point");
-        verify(backupService, never()).restore(42L, "vaultwarden");
+        verify(backupService, never()).restore(42L, "vaultwarden", restoreReview());
         verify(applicationStateService, times(1)).invalidate();
 
         jobService.runQueuedJobsNow();
@@ -218,7 +220,7 @@ class BackupControllerTests {
         assertThat(completed.status()).isEqualTo("succeeded");
         assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
                 .containsExactly("succeeded");
-        verify(backupService).restore(42L, "vaultwarden");
+        verify(backupService).restore(42L, "vaultwarden", restoreReview());
         verify(applicationStateService, times(2)).invalidate();
     }
 
@@ -233,12 +235,12 @@ class BackupControllerTests {
                 42L,
                 "warning",
                 "Data was restored for Vaultwarden, but Autark-OS could not restart it.",
-                List.of("vaultwarden"),
+                List.of("vaultwarden"), List.of(), List.of(),
                 List.of("Restored managed files.", "Autark-OS could not start Vaultwarden: port 8080 is already in use."),
                 Instant.parse("2026-06-21T12:00:00Z"));
-        when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
+        when(backupService.restore(42L, "vaultwarden", restoreReview())).thenReturn(result);
 
-        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden"));
+        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden", restoreReview()));
 
         jobService.runQueuedJobsNow();
 
@@ -249,6 +251,37 @@ class BackupControllerTests {
                 .containsExactly("failed");
         assertThat(completed.steps().getFirst().message()).contains("could not restart");
     }
+
+    @Test
+    void replayingAnAcceptedRestoreReturnsTheSameJobEvenAfterCompletion() {
+        var backups = mock(BackupService.class);
+        var jobs = jobService();
+        var controller = new BackupController(backups, jobs, mock(ApplicationStateService.class), mock(BackupPlanService.class));
+        var request = new RestoreModels.RestoreRequest("homepage", restoreReview());
+        when(backups.restore(42L, "homepage", restoreReview())).thenReturn(new RestoreModels.RestoreResult(42L,
+                "completed", "Restored Homepage from archive #42", List.of("homepage"), List.of(), List.of(), List.of(), Instant.now()));
+        var first = controller.restore(42L, request);
+        assertThat(controller.restore(42L, request).jobId()).isEqualTo(first.jobId());
+        jobs.runQueuedJobsNow();
+        var replay = controller.restore(42L, request);
+        assertThat(replay.jobId()).isEqualTo(first.jobId());
+        assertThat(replay.status()).isEqualTo("succeeded");
+        verify(backups, times(1)).restore(42L, "homepage", restoreReview());
+    }
+
+    @Test
+    void archiveDetailsAreMetadataOnlyAndDoNotRunVerificationOrRestorePlanning() {
+        var backups = mock(BackupService.class);
+        var controller = new BackupController(backups, jobService(), mock(ApplicationStateService.class), mock(BackupPlanService.class));
+        controller.restorePoint(42L);
+        verify(backups).restorePoint(42L);
+        verify(backups, never()).verify(42L);
+        verify(backups, never()).restorePlan(42L, null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.restore(42L, new RestoreModels.RestoreRequest(null, null)))
+                .hasMessageContaining("Review the restore plan");
+    }
+
+    private String restoreReview() { return "a".repeat(64) + "." + "12345678-1234-1234-1234-123456789012"; }
 
     private BackupModels.BackupRunRequest reviewed() {
         return new BackupModels.BackupRunRequest("reviewed-plan");

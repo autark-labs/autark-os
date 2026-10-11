@@ -85,6 +85,16 @@ public class BackupController {
         return job;
     }
 
+    @GetMapping("/restore-points")
+    public BackupModels.RestorePointPage restorePoints(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) String appId) {
+        return backupService.restorePoints(beforeId, appId);
+    }
+
+    @GetMapping("/restore-points/{id}")
+    public RestorePoint restorePoint(@PathVariable long id) {
+        return backupService.restorePoint(id);
+    }
+
     @GetMapping("/restore-points/{id}/plan")
     public RestoreModels.RestorePlan restorePlan(@PathVariable long id, @RequestParam(required = false) String appId) {
         return backupService.restorePlan(id, appId);
@@ -103,11 +113,12 @@ public class BackupController {
     }
 
     @PostMapping("/restore-points/{id}/restore")
-    public AutarkOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreModels.RestoreRequest request) {
-        String appId = request == null ? null : request.appId();
-        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), java.util.List.of(AutarkOsJobStep.pending("validate_restore_point", "Validating restore point")), () -> {
+    public AutarkOsJob restore(@PathVariable long id, @RequestBody RestoreModels.RestoreRequest request) {
+        RestorePlanner.requireReviewToken(request == null ? null : request.planId());
+        String appId = request.appId();
+        AutarkOsJob job = jobService.startReviewedOnce(RestorePlanner.reviewKey(id, appId, request.planId()), AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), java.util.List.of(AutarkOsJobStep.pending("validate_restore_point", "Validating restore point")), () -> {
             try {
-                var result = backupService.restore(id, appId);
+                var result = backupService.restore(id, appId, request.planId());
                 return BackupJobs.outcome(result.status(), result.message(), jobService);
             } finally {
                 invalidateApplicationState();

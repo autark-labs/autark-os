@@ -1,15 +1,14 @@
 import { backupSafetyWarnings } from '../../lib/backupSafety';
-import type { AppBackupStatus, RestorePlan, RestorePoint } from '@/types/backup';
+import type { AppBackupStatus, RestorePoint } from '@/types/backup';
 
 /**
  * @param {import('@/types/backup').RestorePoint} point
  * @param {Array<{ appId: string; appName: string }>} apps
- * @param {import('@/types/backup').RestorePlan | null} plan
  */
-export function restorePointDetails(point: RestorePoint, apps: AppBackupStatus[] = [], plan: RestorePlan | null = null) {
+export function restorePointDetails(point: RestorePoint, apps: AppBackupStatus[] = []) {
   const includedIds = point.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean);
   const includedApps = point.scope === 'full'
-    ? apps.filter((app) => includedIds.includes(app.appId)).map((app) => app.appName)
+    ? includedIds.map(id => apps.find(app => app.appId === id)?.appName ?? `${id} (not currently managed)`)
     : [point.appName].filter(Boolean);
   const verification = point.verificationStatus === 'verified'
     ? `Verified with ${point.restoreConfidence || 'unknown'} confidence.`
@@ -25,8 +24,7 @@ export function restorePointDetails(point: RestorePoint, apps: AppBackupStatus[]
     verification,
     checksum: point.integrityBaselineSha256 || point.checksumSha256 || 'No immutable checksum recorded',
     location: point.path,
-    restoreSummary: plan?.summary || 'Open restore to preview the exact restore steps.',
-    warnings: plan?.warnings?.length ? plan.warnings : defaultWarnings(point),
+    warnings: defaultWarnings(point),
   };
 }
 

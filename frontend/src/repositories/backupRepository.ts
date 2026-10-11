@@ -1,5 +1,6 @@
+import axios from 'axios';
 import { useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import type { BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
@@ -11,6 +12,8 @@ import { recommendedActionQueryKeys } from './recommendedActionRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
+  archive: (appId: string | null) => ['backups', 'archive', appId] as const,
+  point: (id: number | null) => ['backups', 'point', id] as const,
   report: ['backups', 'report'] as const,
   plan: (point: RestorePoint | null, appId: string | null) => ['backups', 'plan', point?.id, appId, point?.verifiedAt, point?.verificationStatus] as const,
 };
@@ -92,18 +95,37 @@ export function useRunRoutineBackupMutation() {
   });
 }
 
-export function useRestorePlanQuery(point: RestorePoint | null, appId: string | null) {
+export function useRestorePointInventory(appId: string | null) {
+  return useInfiniteQuery({
+    queryKey: backupQueryKeys.archive(appId),
+    queryFn: ({ pageParam }) => BackupAPIClient.restorePoints(pageParam, appId),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (page) => page.nextBeforeId ?? undefined,
+  });
+}
+
+export function useRestorePointQuery(id: number | null) {
+  const query = useQuery({
+    queryKey: backupQueryKeys.point(id),
+    queryFn: () => BackupAPIClient.restorePoint(id!),
+    enabled: id !== null,
+    retry: false,
+  });
+  return { ...query, data: axios.isAxiosError(query.error) && query.error.response?.status === 404 ? undefined : query.data };
+}
+
+export function useRestorePlanQuery(point: RestorePoint | null, appId: string | null, enabled = true) {
   return useQuery({
     queryKey: backupQueryKeys.plan(point, appId),
     queryFn: () => BackupAPIClient.restorePlan(point!.id, appId),
-    enabled: Boolean(point),
+    enabled: enabled && Boolean(point),
   });
 }
 
 export function useRestoreBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob, unknown, { restorePointId: number; appId?: string | null }>({
-    mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restore(restorePointId, appId),
+  return useMutation<AutarkOsJob, unknown, { restorePointId: number; planId: string; appId?: string | null }>({
+    mutationFn: ({ restorePointId, planId, appId }) => BackupAPIClient.restore(restorePointId, planId, appId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
