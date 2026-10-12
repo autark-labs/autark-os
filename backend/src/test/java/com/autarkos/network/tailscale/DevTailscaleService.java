@@ -13,6 +13,9 @@ public class DevTailscaleService extends TailscaleService {
     }
 
     @Override
+    public TailscaleConnectGuide connectGuide() { return TailscaleConnectGuide.defaults(); }
+
+    @Override
     public TailscaleStatus status() {
         return new TailscaleStatus(
                 true,
@@ -54,7 +57,7 @@ public class DevTailscaleService extends TailscaleService {
 
 
     @Override
-    public TailscaleServeResult disableHttps(int httpsPort) {
+    public TailscaleServeResult disableHttps(int httpsPort, int expectedLocalPort) {
         String privateUrl = httpsPort == 443 ? "https://" + DEV_DNS : "https://" + DEV_DNS + ":" + httpsPort;
         return new TailscaleServeResult(
                 true,

@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { DeviceAccessReport, DeviceTrustMetadata, DeviceTrustUpdateRequest, NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleServeResult, TailscaleStatus } from '@/types/network';
+import type { DeviceAccessReport, DeviceTrustMetadata, DeviceTrustUpdateRequest, NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
 
 export const NetworkAPIClient = {
   async tailscaleStatus() {
@@ -29,11 +29,6 @@ export const NetworkAPIClient = {
 
   async privateAccessReconciliation() {
     const response = await httpClient.get<PrivateAccessReconciliationReport>('/api/network/private-access/reconciliation');
-    return response.data;
-  },
-
-  async removeStalePrivateAccess(port: number) {
-    const response = await httpClient.delete<TailscaleServeResult>(`/api/network/private-access/stale/${port}`);
     return response.data;
   },
 

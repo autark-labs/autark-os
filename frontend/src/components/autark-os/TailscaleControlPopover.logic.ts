@@ -1,5 +1,8 @@
 type TailscaleStatus = {
   connected?: boolean;
+  magicDnsReady?: boolean | null;
+  httpsReady?: boolean | null;
+  serveReady?: boolean | null;
   deviceName?: string | null;
   dnsName?: string | null;
   installed?: boolean;
@@ -17,12 +20,12 @@ export function tailscaleControlView(
   reconciliation: PrivateLinkReconciliation | null | undefined,
 ) {
   const mock = status?.state === 'dev' || status?.state === 'mocked_dev' || status?.message?.toLowerCase().includes('mock') || false;
-  const connected = Boolean(status?.connected || mock);
+  const connected = Boolean(status?.connected);
   const installed = Boolean(status?.installed);
-  const magicDnsReady = connected && Boolean(status?.dnsName || mock);
-  const privateLinksReady = reconciliation ? (reconciliation.apps || []).filter((app) => app.status === 'healthy').length : null;
-  const httpsReady = connected && Boolean(status?.dnsName || (privateLinksReady ?? 0) > 0 || mock);
-  const serveReady = connected && Boolean((privateLinksReady ?? 0) > 0 || mock);
+  const magicDnsReady = connected && status?.magicDnsReady === true;
+  const privateLinksReady = !status || !reconciliation ? null : !connected ? 0 : (reconciliation.apps || []).filter((app) => app.status === 'healthy').length;
+  const httpsReady = connected && status?.httpsReady === true;
+  const serveReady = connected && status?.serveReady === true && (privateLinksReady ?? 0) > 0;
 
   if (mock) {
     return {
@@ -69,7 +72,7 @@ export function tailscaleControlView(
     serveReady: false,
     summary: !status ? 'Tailscale status is unavailable. Check again to retry.' : 'Your apps still work on your home network. Sign in to use private links from trusted devices.',
     title: !status ? 'Tailscale status unavailable' : installed ? 'Tailscale not signed in' : 'Tailscale missing',
-    tone: installed ? 'amber' : 'red',
+    tone: reconciliation?.apps?.length === 0 ? 'neutral' : installed ? 'amber' : 'red',
   };
 }
 
@@ -88,8 +91,7 @@ export function tailscaleControlActions(status: TailscaleStatus | null | undefin
   }
 
   return [
-    { id: 'signin', label: 'Sign in', href: 'https://login.tailscale.com/start', external: true, enabled: true },
-    { id: 'access', label: 'Setup instructions', href: '/access', external: false, enabled: true },
+    { id: 'signin', label: 'Connect this host', href: '/access?tab=advanced', external: false, enabled: true },
     { id: 'refresh', label: 'Check again', enabled: true },
   ];
 }

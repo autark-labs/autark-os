@@ -404,7 +404,7 @@ const onboardingComplete = {
 
 const onboardingIncomplete = { ...onboardingComplete, status: 'in_progress', currentStep: 1, completedSteps: ['welcome'] };
 
-const networkStatus = { installed: true, connected: true, state: 'Running', message: 'Tailscale is connected.', deviceName: 'fixture-server', dnsName: 'fixture-server.fixture.ts.net', tailnetIps: ['100.64.0.10'], tailnetName: 'fixture.ts.net', loginName: 'fixture@example.com' };
+const networkStatus = { magicDnsReady: true, httpsReady: true, serveReady: true, installed: true, connected: true, state: 'Running', message: 'Tailscale is connected.', deviceName: 'fixture-server', dnsName: 'fixture-server.fixture.ts.net', tailnetIps: ['100.64.0.10'], tailnetName: 'fixture.ts.net', loginName: 'fixture@example.com' };
 
 const reconciliation = {
   status: 'healthy', headline: 'Private links are ready', summary: 'Configured private links match the managed app access settings.',

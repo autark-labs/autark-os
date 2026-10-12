@@ -23,7 +23,13 @@ public class PortAllocator {
 
     public RuntimeModels.ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest) {
         List<String> resolvedPorts = resolvePorts(manifest, null);
-        return new RuntimeModels.ResolvedRuntimeConfiguration(resolvedPorts, accessUrl(manifest, resolvedPorts));
+        String mode = InstallCustomizationResolver.accessMode(manifest, null);
+        String url = accessUrl(manifest, resolvedPorts);
+        if (mode.equals("network") || mode.equals("local-and-private")) {
+            url = com.autarkos.network.HostAddress.withHost(url, com.autarkos.network.HostAddress.lanAddress());
+        }
+        return new RuntimeModels.ResolvedRuntimeConfiguration(resolvedPorts, Map.of(), url, null, Map.of(), Map.of(),
+                mode.contains("private"), com.autarkos.marketplace.install.models.InstallModels.BackupPolicy.defaults(), mode);
     }
 
     public List<String> resolvePorts(ApplicationManifest manifest, InstallOptionsRequest.PortOptions options) {

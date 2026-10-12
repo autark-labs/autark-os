@@ -4,6 +4,7 @@ import type { AppRuntimeView } from '@/types/app';
 export type NetworkNodeStatus = 'connected' | 'warning' | 'neutral';
 
 export type NetworkIssueView = {
+  appId?: string;
   id: string;
   label: string;
   message: string;
@@ -31,6 +32,7 @@ export type ReachabilityZoneId = 'local' | 'lan' | 'tailnet' | 'public';
 export type ReachabilityTypeFilter = 'managed' | 'attention';
 
 export type ReachabilityService = {
+  reviewHref?: string;
   id: string;
   type: 'managed-app';
   app: AppRuntimeView | null;

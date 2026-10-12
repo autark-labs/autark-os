@@ -18,6 +18,9 @@ export function settingsFromFormValues(app: AppRuntimeView, values: ApplicationS
   return {
     ...currentSettings,
     autoRepairEnabled: values.autoRepairEnabled,
+    desiredAccessMode: values.desiredAccessMode,
+    tailscaleEnabled: ['private', 'local-and-private'].includes(values.desiredAccessMode),
+    privateAccessRequirement: ['private', 'local-and-private'].includes(values.desiredAccessMode) ? 'required' : 'disabled',
     accessUrl,
     backup: {
       enabled: values.backupEnabled,
@@ -31,6 +34,7 @@ export function settingsFromFormValues(app: AppRuntimeView, values: ApplicationS
 
 export function settingsImpactFromPlan(plan: AppSettingsChangePlan): ApplicationSettingsImpact {
   return {
+    planId: plan.planId,
     blockedReasons: plan.blockedReasons,
     changes: plan.changes,
     headline: plan.headline,
@@ -38,7 +42,7 @@ export function settingsImpactFromPlan(plan: AppSettingsChangePlan): Application
     restartRequired: Boolean(plan.restartRequired || plan.redeployRequired),
     saveAllowed: plan.saveAllowed,
     summary: plan.summary || plan.headline,
-    warnings: [...plan.warnings, ...plan.blockedReasons],
+    warnings: plan.warnings,
   };
 }
 

@@ -369,8 +369,8 @@ public class AppLifecycleService {
         activityWarning(eventPrefix + "repair_started", "Repair started for " + app.appName(), before.message() + ". " + repairPlanLabel(before), app.appId());
         if (repairingPrivateAccess) {
             try {
-                AppActionResult result = enablePrivateAccess(appId);
-                logs.addAll(result.logs() == null ? List.of() : result.logs());
+                repairPrivateAccess(app);
+                logs.add("The existing private access configuration was repaired and verified.");
             } catch (RuntimeException exception) {
                 saveRepairState(app, automatic ? "guardian_repair_failed" : "manual_repair_failed");
                 repository.recordEvent(app.appId(), eventPrefix + "repair_failed", failureReason(exception));
@@ -414,21 +414,19 @@ public class AppLifecycleService {
         return new AppActionResult(app.appId(), "repair", status, message, refresh(app), logs, Instant.now());
     }
 
-    public AppRuntimeView updateSettings(String appId, InstallModels.InstallSettings settings) {
+    public AppRuntimeView updateSettings(String appId, InstallModels.InstallSettings settings, String planId) {
         return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE,
-                () -> updateSettingsUnlocked(appId, settings));
+                () -> updateSettingsUnlocked(appId, settings, planId, false));
     }
 
-    private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings) {
+    private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings, String planId, boolean repairPrivate) {
         InstalledApp app = requireManagedApp(appId, "update settings for");
         managedApps.durableStorage(app, true);
         DockerInventorySnapshot inventory = requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
-        String defaultAccessUrl = app.accessUrl();
-        InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(defaultAccessUrl));
+        InstallModels.InstallSettings current = observedSettings(app, inventory);
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
-        catalogService.findById(appId).ifPresent(manifest -> InstallCustomizationResolver.accessMode(manifest,
-                new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode())));
+        validateAccessChange(appId, current, sanitized);
         InstallModels.AppSettingsChangePlan plan = settingsPolicy.settingsChangePlan(app, current, sanitized);
         repository.recordEvent(app.appId(), "settings_change_planned", plan.summary());
         activityInfo("settings_change_planned", "Settings change planned for " + app.appName(), plan.summary(), app.appId());
@@ -437,23 +435,37 @@ public class AppLifecycleService {
             activityWarning("settings_change_blocked", "Settings change blocked for " + app.appName(), String.join(" ", plan.blockedReasons()), app.appId());
             throw new InstallationException(String.join(" ", plan.blockedReasons()));
         }
+        if (!repairPrivate) {
+            requireSettingsReview(planId);
+            if (!settingsReviewFingerprint(app, current, sanitized).equals(planId.substring(0, 64))) {
+                throw new InstallationException("The app or requested settings changed. Review the settings plan again before applying it.");
+            }
+        }
         // Validate ports and runtime before removing a private link or editing Compose.
         SettingsRedeploy redeploy = plan.redeployRequired() ? prepareSettingsRedeploy(app, sanitized, inventory) : null;
         repository.recordEvent(app.appId(), "settings_apply_started", "Applying settings change for " + app.appName() + ".");
         activityInfo("settings_apply_started", "Applying settings for " + app.appName(), plan.summary(), app.appId());
-        boolean privateChange = current.tailscaleEnabled() != sanitized.tailscaleEnabled()
+        boolean privateChange = repairPrivate || (plan.redeployRequired() && sanitized.tailscaleEnabled()) || current.tailscaleEnabled() != sanitized.tailscaleEnabled()
                 || (current.tailscaleEnabled() && !Objects.equals(current.expectedLocalPort(), sanitized.expectedLocalPort()));
         Integer privatePort = privateChange ? (current.tailscaleEnabled()
                 ? privateAccessStateResolver.resolve(app.appId(), current, current.accessUrl()).expectedHttpsPort()
                 : AppPrivateAccessPorts.selectHttpsPort(app.appId(), sanitized.expectedLocalPort(), repository)) : null;
+        if (repairPrivate && Objects.equals(privatePort, sanitized.expectedLocalPort())) {
+            privatePort = AppPrivateAccessPorts.selectHttpsPort(appId, sanitized.expectedLocalPort(), repository);
+        }
         if (privateChange && privatePort == null) throw new InstallationException("Check this app's private access before changing settings.");
+        Integer previousPrivateTarget = privateChange ? previousPrivateTarget(current, privatePort) : null;
         AppSettingsCheckpoint checkpoint = new AppSettingsCheckpoint(app, current,
                 redeploy == null ? null : redeploy.previousCompose(), redeploy != null && redeploy.running(),
-                redeploy == null ? List.of() : redeploy.previousContainers(), privatePort, privateChange);
+                redeploy == null ? List.of() : redeploy.previousContainers(), privatePort, privateChange, previousPrivateTarget, sanitized.expectedLocalPort());
         repository.beginSettingsChange(appId, encodeSettingsCheckpoint(checkpoint));
         try {
+            if (privateChange && previousPrivateTarget != null) {
+                var removed = tailscaleService.disableHttps(privatePort, previousPrivateTarget);
+                if (!removed.configured()) throw new InstallationException("The owned private link could not be changed. No other mapping was removed.");
+            }
             if (current.tailscaleEnabled() && !sanitized.tailscaleEnabled()) {
-                TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
+                TailscaleServeResult disableResult = new TailscaleServeResult(true, null, "Owned private link removed.", List.of());
                 sanitized = new InstallModels.InstallSettings(
                         sanitized.accessUrl(),
                         null,
@@ -490,6 +502,7 @@ public class AppLifecycleService {
             }
             if (plan.redeployRequired()) {
                 safeRedeployForSettings(app, redeploy);
+                verifySettingsRuntime(app, sanitized, redeploy);
                 app = new InstalledApp(
                         app.appId(),
                         app.appName(),
@@ -530,25 +543,73 @@ public class AppLifecycleService {
             return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings recovery required",
                     reason, false, false, false, false, List.of(), List.of(), List.of(reason));
         }
-        InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
+        InstallModels.InstallSettings current = observedSettings(app, inventory);
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
         try {
-            catalogService.findById(appId).ifPresent(manifest -> InstallCustomizationResolver.accessMode(manifest,
-                    new InstallOptionsRequest.AccessOptions(sanitized.tailscaleEnabled(), sanitized.desiredAccessMode())));
+            validateAccessChange(appId, current, sanitized);
         } catch (InstallationException exception) {
             return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Access change unavailable",
                     exception.getMessage(), false, false, false, false, List.of(), List.of(), List.of(exception.getMessage()));
         }
         InstallModels.AppSettingsChangePlan plan = settingsPolicy.settingsChangePlan(app, current, sanitized);
-        if (plan.saveAllowed() && plan.redeployRequired()) {
+        if (plan.saveAllowed()) {
             try {
-                prepareSettingsRedeploy(app, sanitized, inventory);
+                if (plan.redeployRequired()) prepareSettingsRedeploy(app, sanitized, inventory);
+                boolean privateChange = current.tailscaleEnabled() != sanitized.tailscaleEnabled()
+                        || (sanitized.tailscaleEnabled() && plan.redeployRequired());
+                if (privateChange) {
+                    Integer port = current.tailscaleEnabled() ? privateAccessStateResolver.resolve(appId, current, current.accessUrl()).expectedHttpsPort()
+                            : AppPrivateAccessPorts.selectHttpsPort(appId, sanitized.expectedLocalPort(), repository);
+                    if (port == null) throw new InstallationException("The private endpoint could not be determined.");
+                    previousPrivateTarget(current, port);
+                }
             } catch (InstallationException exception) {
                 return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings change unavailable",
                         exception.getMessage(), false, false, false, false, plan.changes(), plan.warnings(), List.of(exception.getMessage()));
             }
         }
-        return plan;
+        return plan.withPlanId(settingsReviewFingerprint(app, current, sanitized) + "." + java.util.UUID.randomUUID());
+    }
+
+    private InstallModels.InstallSettings observedSettings(InstalledApp app, DockerInventorySnapshot inventory) {
+        var current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
+        var manifest = catalogService.findById(app.appId()).orElse(null);
+        var containers = inventory.ownedContainersFor(app.appId(), app.composeProject());
+        String observed = runtimeStatusResolver.accessUrl(app, manifest, containers);
+        return settingsPolicy.normalizeSettings(current, app, manifest, observed);
+    }
+
+    public static void requireSettingsReview(String planId) {
+        if (planId == null || !planId.matches("[0-9a-f]{64}\\.[0-9a-f-]{36}")) {
+            throw new InstallationException("Review the settings plan before applying this change.");
+        }
+    }
+
+    private void validateAccessChange(String appId, InstallModels.InstallSettings current, InstallModels.InstallSettings requested) {
+        boolean scopeChanged = current.tailscaleEnabled() != requested.tailscaleEnabled()
+                || com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl()) != com.autarkos.network.HostAddress.isLoopbackUrl(requested.accessUrl());
+        if (scopeChanged) catalogService.findById(appId).ifPresent(manifest -> InstallCustomizationResolver.accessMode(manifest,
+                new InstallOptionsRequest.AccessOptions(requested.tailscaleEnabled(), requested.desiredAccessMode())));
+    }
+
+    private String settingsReviewFingerprint(InstalledApp app, InstallModels.InstallSettings current, InstallModels.InstallSettings requested) {
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                    .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+            var ownership = repository.ownershipFor(app.appId()).orElseThrow(() -> new InstallationException("App ownership could not be confirmed."));
+            byte[] intent = mapper.writeValueAsBytes(java.util.Arrays.asList(app.appId(), app.runtimePath(), app.composeProject(),
+                    ownership.appInstanceId(), ownership.autarkOsInstanceId(), readCompose(composeFile(app)),
+                    settingsIntent(current), settingsIntent(requested)));
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(intent));
+        } catch (java.io.IOException | java.security.NoSuchAlgorithmException exception) {
+            throw new InstallationException("The settings review could not be recorded.", exception);
+        }
+    }
+
+    private List<Object> settingsIntent(InstallModels.InstallSettings settings) {
+        return java.util.Arrays.asList(settings.accessUrl(), settings.privateAccessUrl(), settings.tailscaleEnabled(),
+                settings.storageSubfolders(), settings.backup(), settings.desiredAccessMode(), settings.expectedLocalPort(),
+                settings.expectedProtocol(), settings.autoRepairEnabled());
     }
 
     private SettingsRedeploy prepareSettingsRedeploy(
@@ -620,15 +681,22 @@ public class AppLifecycleService {
                 if (!previousRuntimeRestored) throw new InstallationException("Docker did not confirm the previous containers and port mappings.");
             }
             if (checkpoint.privateChange()) {
-                Integer previousPort = checkpoint.settings().expectedLocalPort() != null ? checkpoint.settings().expectedLocalPort()
-                        : AppPrivateAccessPorts.portFromUrl(firstPresent(checkpoint.settings().accessUrl(), app.accessUrl()));
-                if (checkpoint.settings().tailscaleEnabled() && previousPort == null) throw new InstallationException("The previous private link target is unknown.");
-                var result = checkpoint.settings().tailscaleEnabled()
-                        ? tailscaleService.serveHttps(previousPort, checkpoint.privatePort())
-                        : tailscaleService.disableHttps(checkpoint.privatePort());
-                if (!result.configured()) throw new InstallationException("The previous private access configuration could not be restored.");
-                verifySettingsPrivateMapping(checkpoint.privatePort(), checkpoint.settings().tailscaleEnabled()
-                        ? previousPort : null);
+                // Remove only this attempt's exact proxy; never overwrite an unknown replacement.
+                tailscaleService.invalidateServeConfig();
+                var live = tailscaleService.serveConfig();
+                if (!live.available()) throw new InstallationException("Private link recovery could not be inspected.");
+                var mapping = live.mappings().stream().filter(item -> Objects.equals(item.servePort(), checkpoint.privatePort())).toList();
+                String url = tailscaleService.privateUrlForPort(checkpoint.privatePort());
+                if (!mapping.isEmpty() && !(checkpoint.previousPrivateLocalPort() != null && mapping.size() == 1
+                        && mapping.getFirst().matchesNodeProxy(url, checkpoint.previousPrivateLocalPort()))) {
+                    var removed = tailscaleService.disableHttps(checkpoint.privatePort(), checkpoint.proposedPrivateLocalPort());
+                    if (!removed.configured()) throw new InstallationException("Private link recovery could not remove the attempted mapping safely.");
+                }
+                if (checkpoint.previousPrivateLocalPort() != null) {
+                    var restored = tailscaleService.serveHttps(checkpoint.previousPrivateLocalPort(), checkpoint.privatePort());
+                    if (!restored.configured()) throw new InstallationException("The previous private link could not be restored.");
+                }
+                verifySettingsPrivateMapping(checkpoint.privatePort(), checkpoint.previousPrivateLocalPort());
             }
             repository.commitSettingsChange(app, checkpoint.settings());
         } catch (RuntimeException exception) {
@@ -672,8 +740,7 @@ public class AppLifecycleService {
         var config = tailscaleService.serveConfig();
         boolean matches = config.available() && (localPort == null
                 ? config.mappings().stream().noneMatch(mapping -> Objects.equals(mapping.servePort(), privatePort))
-                : config.mappings().stream().anyMatch(mapping -> Objects.equals(mapping.servePort(), privatePort)
-                        && Objects.equals(mapping.targetPort(), localPort)));
+                : config.mappings().stream().anyMatch(mapping -> mapping.matchesNodeProxy(tailscaleService.privateUrlForPort(privatePort), localPort)));
         if (!matches) throw new InstallationException("Tailscale did not confirm the expected private link configuration.");
     }
 
@@ -708,96 +775,39 @@ public class AppLifecycleService {
         }
     }
 
-    public AppActionResult enablePrivateAccess(String appId) {
-        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> enablePrivateAccessUnlocked(appId));
+    private void repairPrivateAccess(InstalledApp app) {
+        var current = observedSettings(app, requireFreshMutationInventory(app));
+        if (!current.tailscaleEnabled()) throw new InstallationException("Review app settings to enable private access first.");
+        updateSettingsUnlocked(app.appId(), current, null, true);
     }
 
-    private AppActionResult enablePrivateAccessUnlocked(String appId) {
-        InstalledApp app = requireManagedApp(appId, "enable private access for");
-        requireFreshMutationInventory(app);
-        assertNoPendingSettingsRecovery(app);
-        AppRuntimeView view = refresh(app);
-        String accessUrl = firstPresent(view.accessUrl(), view.settings() == null ? null : view.settings().accessUrl(), app.accessUrl());
-        Integer localPort = AppPrivateAccessPorts.portFromUrl(accessUrl);
-        if (localPort == null) {
-            throw new InstallationException("Autark-OS could not find a local browser port for " + app.appName() + ".");
+    private Integer previousPrivateTarget(InstallModels.InstallSettings current, int privatePort) {
+        var status = tailscaleService.status();
+        if (!status.connected()) throw new InstallationException("Connect this server to Tailscale before changing private access.");
+        tailscaleService.invalidateServeConfig();
+        var config = tailscaleService.serveConfig();
+        if (!config.available()) throw new InstallationException("Private links could not be inspected. Retry the access check before changing settings.");
+        var existing = config.mappings().stream().filter(mapping -> Objects.equals(mapping.servePort(), privatePort)).toList();
+        if (existing.isEmpty()) return null;
+        Integer localPort = current.expectedLocalPort() != null ? current.expectedLocalPort() : AppPrivateAccessPorts.portFromUrl(current.accessUrl());
+        if (existing.size() != 1 || !current.tailscaleEnabled() || current.privateAccessUrl() == null || localPort == null
+                || !existing.getFirst().matchesNodeProxy(current.privateAccessUrl(), localPort)) {
+            throw new InstallationException("This private endpoint has a mapping whose ownership cannot be confirmed. Autark-OS will leave it unchanged. Review private links in Access.");
         }
-
-        int privateHttpsPort = AppPrivateAccessPorts.selectHttpsPort(app.appId(), localPort, repository);
-        TailscaleServeResult serveResult = tailscaleService.serveHttps(localPort, privateHttpsPort);
-        if (!serveResult.configured()) {
-            repository.recordEvent(app.appId(), "private_access_failed", serveResult.message());
-            activityWarning("private_access_failed", "Private link failed for " + app.appName(), serveResult.message(), app.appId());
-            throw new InstallationException(serveResult.message());
-        }
-
-        InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(accessUrl));
-        InstallModels.InstallSettings updated = new InstallModels.InstallSettings(
-                accessUrl,
-                serveResult.privateUrl(),
-                true,
-                current.storageSubfolders(),
-                current.backup(),
-                com.autarkos.network.HostAddress.isLoopbackUrl(accessUrl) ? "private" : "local-and-private",
-                firstPresent(current.privateAccessRequirement(), "optional"),
-                localPort,
-                "http",
-                current.lastAccessCheckAt(),
-                current.lastSuccessfulAccessAt(),
-                Instant.now(),
-                "private_access_enabled",
-                current.autoRepairEnabled());
-        repository.saveSettings(app.appId(), updated);
-        String message = app.appName() + " is available through its private HTTPS link. Use Open app to connect.";
-        repository.recordEvent(app.appId(), "private_access_enabled", message);
-        activitySuccess("private_access_enabled", "Private link ready for " + app.appName(), message, app.appId());
-        return new AppActionResult(app.appId(), "private-access", "completed", message, refresh(app), serveResult.output(), Instant.now());
+        return localPort;
     }
 
-    public AppActionResult disablePrivateAccess(String appId) {
-        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> disablePrivateAccessUnlocked(appId));
-    }
-
-    private AppActionResult disablePrivateAccessUnlocked(String appId) {
-        InstalledApp app = requireManagedApp(appId, "disable private access for");
-        requireFreshMutationInventory(app);
-        assertNoPendingSettingsRecovery(app);
-        InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-        TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
-        InstallModels.InstallSettings updated = new InstallModels.InstallSettings(
-                firstPresent(current.accessUrl(), app.accessUrl()),
-                null,
-                false,
-                current.storageSubfolders(),
-                current.backup(),
-                com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl()) ? "local" : "network",
-                "disabled",
-                current.expectedLocalPort(),
-                current.expectedProtocol(),
-                current.lastAccessCheckAt(),
-                current.lastSuccessfulAccessAt(),
-                Instant.now(),
-                "private_access_disabled",
-                current.autoRepairEnabled());
-        repository.saveSettings(app.appId(), updated);
-        repository.recordEvent(app.appId(), "private_access_disabled", "Removed private HTTPS link for " + app.appName() + ".");
-        activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Autark-OS turned off private access for this app.", app.appId());
-        return new AppActionResult(app.appId(), "private-access-disable", "completed", app.appName() + " is no longer available through a private Tailscale link.", refresh(app), disableResult.output(), Instant.now());
-    }
-
-    private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallModels.InstallSettings settings) {
-        String localUrl = firstPresent(settings.accessUrl(), app.accessUrl());
-        Integer port = privateAccessStateResolver.resolve(app.appId(), settings, localUrl).expectedHttpsPort();
-        if (port == null) {
-            return new TailscaleServeResult(true, settings.privateAccessUrl(), "No private HTTPS port was stored for this app.", List.of("No private HTTPS port was stored for this app."));
+    private void verifySettingsRuntime(InstalledApp app, InstallModels.InstallSettings requested, SettingsRedeploy redeploy) {
+        if (!redeploy.running()) return;
+        var containers = requireFreshMutationInventory(app).ownedContainersFor(app.appId(), app.composeProject());
+        if (containers.size() != redeploy.previousContainers().size() || containers.stream().anyMatch(container -> !"running".equalsIgnoreCase(container.state()))) {
+            throw new InstallationException("Docker did not confirm that the updated app is running.");
         }
-        TailscaleServeResult result = tailscaleService.disableHttps(port);
-        if (!result.configured()) {
-            repository.recordEvent(app.appId(), "private_access_disable_failed", result.message());
-            activityWarning("private_access_disable_failed", "Private link removal failed for " + app.appName(), result.message(), app.appId());
-            throw new InstallationException(result.message());
+        String observed = runtimeStatusResolver.publishedAccessUrl(containers, requested.expectedLocalPort(), requested.expectedLocalPort()).orElse(null);
+        if (!Objects.equals(AppPrivateAccessPorts.portFromUrl(observed), requested.expectedLocalPort())
+                || com.autarkos.network.HostAddress.isLoopbackUrl(observed) != com.autarkos.network.HostAddress.isLoopbackUrl(requested.accessUrl())) {
+            throw new InstallationException("Docker did not confirm the reviewed dashboard port and access scope.");
         }
-        return result;
     }
 
     private boolean shouldRepairPrivateAccess(AppHealthSnapshot snapshot) {

@@ -218,6 +218,7 @@ export type AppRuntimeView = {
 };
 
 export type AppSettingsChangePlan = {
+  planId: string;
   appId: string;
   appName: string;
   impact: 'database_only' | 'restart_required' | 'redeploy_required' | 'data_migration_required' | 'manual' | string;

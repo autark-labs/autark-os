@@ -1,4 +1,7 @@
 export type TailscaleStatus = {
+  magicDnsReady?: boolean | null;
+  httpsReady?: boolean | null;
+  serveReady?: boolean | null;
   installed: boolean;
   connected: boolean;
   state: string;
@@ -11,6 +14,7 @@ export type TailscaleStatus = {
 };
 
 export type TailscaleConnectGuide = {
+  enrollmentUrl?: string | null;
   headline: string;
   summary: string;
   steps: string[];
@@ -142,13 +146,6 @@ export type PrivateAccessReconciliationReport = {
   apps: PrivateAccessReconciliationItem[];
   staleMappings: PrivateAccessStaleMapping[];
   checkedAt: string;
-};
-
-export type TailscaleServeResult = {
-  configured: boolean;
-  privateUrl: string | null;
-  message: string;
-  output: string[];
 };
 
 export type SystemSetupCheck = {

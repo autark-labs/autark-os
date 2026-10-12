@@ -8,7 +8,8 @@ public record TailscaleConnectGuide(
         List<String> steps,
         String installUrl,
         String connectCommand,
-        String advancedNote) {
+        String advancedNote,
+        String enrollmentUrl) {
 
     public static TailscaleConnectGuide defaults() {
         return new TailscaleConnectGuide(
@@ -18,9 +19,11 @@ public record TailscaleConnectGuide(
                         "Create or sign in to a Tailscale account.",
                         "Install Tailscale on the Autark-OS host if it is not installed yet.",
                         "Run the connect command on this host and approve the login in your browser.",
-                        "Return here once Autark-OS shows as connected."),
+                        "Enable MagicDNS and HTTPS certificates in the DNS settings of the Tailscale admin console.",
+                        "Return to Access and refresh to check this host and its private app links."),
                 "https://tailscale.com/download",
                 "tailscale up",
-                "Advanced users can later switch to reusable auth keys or OAuth-created keys for unattended setup.");
+                "Run this command on the Autark-OS host, not on the phone or laptop used to view this guide.",
+                null);
     }
 }

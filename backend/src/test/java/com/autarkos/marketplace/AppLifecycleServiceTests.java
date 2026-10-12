@@ -142,11 +142,11 @@ class AppLifecycleServiceTests {
                 java.util.Map.of(), new InstallModels.BackupPolicy(true, "weekly", 3));
         assertThat(service.settingsChangePlan("vaultwarden", changedCadence).blockedReasons())
                 .anyMatch(reason -> reason.contains("shared by all apps"));
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", changedCadence))
+        assertThatThrownBy(() -> applySettings("vaultwarden", changedCadence))
                 .hasMessageContaining("shared by all apps");
         var participation = new InstallModels.InstallSettings("http://localhost:8090", null, false,
                 java.util.Map.of(), new InstallModels.BackupPolicy(false, "hourly", 5));
-        service.updateSettings("vaultwarden", participation);
+        applySettings("vaultwarden", participation);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().backup())
                 .isEqualTo(new InstallModels.BackupPolicy(false, "hourly", 5));
     }
@@ -165,14 +165,21 @@ class AppLifecycleServiceTests {
         assertThat(app.recentEvents()).hasSize(1);
     }
 
+    private AppRuntimeView applySettings(String appId, InstallModels.InstallSettings settings) {
+        var plan = service.settingsChangePlan(appId, settings);
+        if (!plan.saveAllowed()) throw new com.autarkos.marketplace.install.InstallationException(String.join(" ", plan.blockedReasons()));
+        return service.updateSettings(appId, settings, plan.planId());
+    }
+
     @Test
     void httpsAppPrivateToggleDoesNotBlockUnrelatedPreferenceEdits() {
         var currentCatalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         when(lifecycleCatalog.findById("vaultwarden")).thenReturn(currentCatalog.findById("vaultwarden"));
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up", "127.0.0.1:8090->80/tcp"));
-        service.enablePrivateAccess("vaultwarden");
-        service.disablePrivateAccess("vaultwarden");
+        // A legacy server-only installation stays server-only until its owner changes access.
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults(), "local", "disabled", 8090, "http", null, null, null, null, true));
         var current = repository.settingsFor("vaultwarden").orElseThrow();
         assertThat(current.tailscaleEnabled()).isFalse();
         assertThat(current.privateAccessRequirement()).isEqualTo("disabled");
@@ -182,7 +189,7 @@ class AppLifecycleServiceTests {
                 current.expectedProtocol(), null, null, null, null, current.autoRepairEnabled());
 
         assertThat(service.settingsChangePlan("vaultwarden", preferences).saveAllowed()).isTrue();
-        var updated = service.updateSettings("vaultwarden", preferences);
+        var updated = applySettings("vaultwarden", preferences);
         assertThat(updated.settings().backup().frequency()).isEqualTo(current.backup().frequency());
         assertThat(updated.settings().tailscaleEnabled()).isFalse();
     }
@@ -221,7 +228,7 @@ class AppLifecycleServiceTests {
             assertThatThrownBy(() -> service.start("vaultwarden"))
                     .isInstanceOf(RecoveryOperationConflictException.class)
                     .hasMessageContaining("already creating an app backup");
-            assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+            assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                     .isInstanceOf(RecoveryOperationConflictException.class);
             assertThat(composeExecutor.upCalled).isFalse();
 
@@ -786,8 +793,8 @@ class AppLifecycleServiceTests {
     void refreshExposesDesiredAndObservedAccessState() {
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.desiredAccess().mode()).isEqualTo("local");
-        assertThat(app.desiredAccess().label()).isEqualTo("Only this device");
+        assertThat(app.desiredAccess().mode()).isEqualTo("network");
+        assertThat(app.desiredAccess().label()).isEqualTo("Your home network");
         assertThat(app.desiredAccess().expectedLocalPort()).isEqualTo(8090);
         assertThat(app.desiredAccess().expectedProtocol()).isEqualTo("http");
         assertThat(app.observedAccess().localUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
@@ -1015,7 +1022,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void updateSettingsPersistsValidatedUserPreferences() {
-        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
+        AppRuntimeView app = applySettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 true,
@@ -1054,7 +1061,7 @@ class AppLifecycleServiceTests {
                 Instant.parse("2026-06-11T00:00:00Z")));
         ManagedAppTestContract.writeAll(repository, runtimeLayout, identity);
 
-        AppRuntimeView app = service.updateSettings("obsidian-livesync", new InstallModels.InstallSettings(
+        AppRuntimeView app = applySettings("obsidian-livesync", new InstallModels.InstallSettings(
                 "http://localhost:5984",
                 null,
                 false,
@@ -1078,7 +1085,7 @@ class AppLifecycleServiceTests {
         assertThat(plan.saveAllowed()).isFalse();
         assertThat(plan.dataMigrationRequired()).isTrue();
         assertThat(plan.blockedReasons()).anyMatch(reason -> reason.contains("guarded data migration"));
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
+        assertThatThrownBy(() -> applySettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
@@ -1097,7 +1104,7 @@ class AppLifecycleServiceTests {
         try (var occupied = new java.net.ServerSocket(0)) {
             var requested = InstallModels.InstallSettings.defaults("http://localhost:" + occupied.getLocalPort());
             assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
-            assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+            assertThatThrownBy(() -> applySettings("vaultwarden", requested))
                     .isInstanceOf(InstallationException.class);
         }
         assertThat(tailscaleService.disableCalled).isFalse();
@@ -1113,18 +1120,18 @@ class AppLifecycleServiceTests {
         var requested = InstallModels.InstallSettings.defaults("http://localhost:19090");
         composeExecutor.observationFails = true;
         assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
-                .hasMessageContaining("Previous application state is retained");
+        assertThatThrownBy(() -> applySettings("vaultwarden", requested))
+                .hasMessageContaining("Docker is unavailable");
         composeExecutor.observationFails = false;
         composeExecutor.containers = List.of();
         assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+        assertThatThrownBy(() -> applySettings("vaultwarden", requested))
                 .hasMessageContaining("cannot confirm");
         composeExecutor.containers = List.of(
                 new RuntimeModels.DockerContainerStatus("web", "web", "running", "", "Up", ""),
                 new RuntimeModels.DockerContainerStatus("db", "db", "exited", "", "Exited", ""));
         assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+        assertThatThrownBy(() -> applySettings("vaultwarden", requested))
                 .hasMessageContaining("partly running");
         assertThat(composeExecutor.upCalled).isFalse();
         assertThat(Files.readString(compose)).isEqualTo(original);
@@ -1154,23 +1161,24 @@ class AppLifecycleServiceTests {
                 "http://localhost:" + oldPort, app.installedAt()));
         var real = new com.autarkos.marketplace.install.ProcessDockerComposeExecutor(new com.autarkos.system.SystemCommandRunner());
         composeExecutor.realObservation = real;
+        updateRehearsalProject(app, project);
         try {
             var initial = real.up(compose, project);
             assertThat(initial.successful()).withFailMessage(String.join("\n", initial.output())).isTrue();
             var client = java.net.http.HttpClient.newHttpClient();
             var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + oldPort))
                     .timeout(java.time.Duration.ofSeconds(5)).build();
-            assertThat(client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).body()).contains("preserved-settings-data");
+            assertThat(awaitHttpBody(client, request)).contains("preserved-settings-data");
             composeExecutor.upBehavior = (path, call) -> {
                 var result = real.up(path, project);
                 assertThat(result.successful()).isTrue();
                 return call == 1 ? new RuntimeModels.DockerComposeResult(1, List.of("injected failure after real Compose apply")) : result;
             };
-            assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:" + newPort)))
+            assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:" + newPort)))
                     .hasMessageContaining("previous containers are running again");
             assertThat(composeExecutor.upCalls).isEqualTo(2);
             assertThat(compose).hasContent(original);
-            assertThat(client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).body()).contains("preserved-settings-data");
+            assertThat(awaitHttpBody(client, request)).contains("preserved-settings-data");
             assertThat(data.resolve("index.html")).hasContent("preserved-settings-data");
             assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
         } finally {
@@ -1179,23 +1187,123 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "AUTARK_SETTINGS_DOCKER_REHEARSAL", matches = "1")
+    void realDockerReviewedPrivateAndLanBindingsPreserveData() throws Exception {
+        String project = "autark-uf07-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        Path data = runtimeRoot.resolve("access-rehearsal-data");
+        Files.createDirectories(data);
+        Files.writeString(data.resolve("index.html"), "preserved-access-data");
+        int port;
+        try (var socket = new java.net.ServerSocket(0)) { port = socket.getLocalPort(); }
+        Files.writeString(compose, "services:\n  vaultwarden:\n    image: freshrss/freshrss:1.29.1\n"
+                + "    entrypoint: [php, -S, '0.0.0.0:80', -t, /data]\n    ports:\n      - '127.0.0.1:" + port + ":80'\n"
+                + "    volumes:\n      - '" + data + ":/data:ro'\n");
+        InstalledApp app = repository.findAppById("vaultwarden").orElseThrow();
+        repository.save(new InstalledApp(app.appId(), app.appName(), app.status(), app.runtimePath(), project,
+                "http://localhost:" + port, app.installedAt()));
+        var real = new com.autarkos.marketplace.install.ProcessDockerComposeExecutor(new com.autarkos.system.SystemCommandRunner());
+        composeExecutor.realObservation = real;
+        updateRehearsalProject(app, project);
+        composeExecutor.upBehavior = (path, call) -> real.up(path, project);
+        var client = java.net.http.HttpClient.newHttpClient();
+        try {
+            assertThat(real.up(compose, project).successful()).isTrue();
+            for (String mode : List.of("local-and-private", "private", "network")) {
+                var requested = new InstallModels.InstallSettings("http://localhost:" + port, null, !mode.equals("network"),
+                        java.util.Map.of(), InstallModels.BackupPolicy.defaults(), mode, "optional", port, "http", null, null, null, null, true);
+                AppRuntimeView result = applySettings("vaultwarden", requested);
+                assertThat(result.desiredAccess().mode()).isEqualTo(mode);
+                String ports = real.containers(compose, project).getFirst().ports();
+                assertThat(ports).contains((mode.equals("private") ? "127.0.0.1:" : "0.0.0.0:") + port + "->80/tcp");
+                var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + port))
+                        .timeout(java.time.Duration.ofSeconds(5)).build();
+                assertThat(awaitHttpBody(client, request)).contains("preserved-access-data");
+                if (!mode.equals("network")) assertThat(result.observedAccess().privateLinkStatus()).isEqualTo("verified");
+                assertThat(data.resolve("index.html")).hasContent("preserved-access-data");
+            }
+        } finally {
+            assertThat(real.down(compose, project).successful()).isTrue();
+        }
+    }
+
+    private void updateRehearsalProject(InstalledApp app, String project) throws Exception {
+        Path metadata = Path.of(app.runtimePath()).resolve(com.autarkos.marketplace.install.AppRuntimeMetadataWriter.METADATA_FILE);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var node = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(Files.readString(metadata));
+        node.put("composeProject", project);
+        Files.writeString(metadata, mapper.writeValueAsString(node));
+    }
+
+    private String awaitHttpBody(java.net.http.HttpClient client, java.net.http.HttpRequest request) throws Exception {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(8).toNanos();
+        java.io.IOException last = null;
+        while (System.nanoTime() < deadline) {
+            try { return client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).body(); }
+            catch (java.io.IOException starting) { last = starting; Thread.sleep(100); }
+        }
+        throw last == null ? new java.io.IOException("Fixture did not become ready") : last;
+    }
+
+    @Test
+    void settingsApplyRejectsChangedRequestAndChangedComposeAfterReview() throws Exception {
+        var requested = InstallModels.InstallSettings.defaults("http://localhost:19090");
+        var plan = service.settingsChangePlan("vaultwarden", requested);
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden",
+                InstallModels.InstallSettings.defaults("http://localhost:19091"), plan.planId()))
+                .hasMessageContaining("Review the settings plan again");
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        Files.writeString(compose, Files.readString(compose) + "# changed since review\n");
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested, plan.planId()))
+                .hasMessageContaining("Review the settings plan again");
+        assertThat(composeExecutor.upCalled).isFalse();
+    }
+
+    @Test
+    void successfulComposeCommandWithoutRequestedBindingRollsBack() {
+        composeExecutor.upBehavior = (path, call) -> new RuntimeModels.DockerComposeResult(0, List.of("command succeeded"));
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("previous containers are running again");
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().expectedLocalPort()).isEqualTo(8090);
+    }
+
+    @Test
+    void repairPreservesLegacyLanAndPrivateScopeWithoutRedeploy() throws Exception {
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
+                "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults(), "private", "optional", 8090, "http",
+                null, null, null, null, true));
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        String before = Files.readString(compose);
+        assertThat(service.repair("vaultwarden").ok()).isTrue();
+        assertThat(composeExecutor.upCalled).isFalse();
+        assertThat(compose).hasContent(before);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().desiredAccessMode()).isEqualTo("local-and-private");
+        assertThat(service.getApp("vaultwarden").accessUrl()).contains(com.autarkos.network.HostAddress.lanAddress());
+    }
+
+    @Test
     void localProtocolChangesAreBlockedWithoutChangingRuntime() {
         var requested = InstallModels.InstallSettings.defaults("https://localhost:8090");
         assertThat(service.settingsChangePlan("vaultwarden", requested).blockedReasons())
                 .anyMatch(reason -> reason.contains("protocol"));
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested)).hasMessageContaining("protocol");
+        assertThatThrownBy(() -> applySettings("vaultwarden", requested)).hasMessageContaining("protocol");
         assertThat(composeExecutor.upCalled).isFalse();
         assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
     }
 
     @Test
     void privateRollbackFailureKeepsCheckpointForNormalRepair() {
+        tailscaleService.lastLocalPort = 8090;
+        tailscaleService.lastHttpsPort = 12890;
         repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
                 java.util.Map.of(), InstallModels.BackupPolicy.defaults()));
         composeExecutor.upBehavior = (path, call) -> new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("result"));
         tailscaleService.failServe = true;
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("Use Repair");
         assertThat(repository.settingsRecoveryFor("vaultwarden")).isPresent();
         assertThat(service.settingsChangePlan("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")).saveAllowed()).isFalse();
@@ -1210,7 +1318,7 @@ class AppLifecycleServiceTests {
         Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
         String original = Files.readString(compose);
         composeExecutor.upBehavior = (path, call) -> { throw new AssertionError("simulated process exit"); };
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .isInstanceOf(AssertionError.class);
         assertThat(repository.settingsRecoveryFor("vaultwarden")).isPresent();
         assertThat(service.getApp("vaultwarden").state()).isEqualTo(ApplicationRuntimeState.DEGRADED);
@@ -1229,25 +1337,30 @@ class AppLifecycleServiceTests {
                 "autark-os-vaultwarden", "vaultwarden", state, "", state, "0.0.0.0:8090->80/tcp"));
         var originalSettings = InstallModels.InstallSettings.defaults("http://localhost:8090");
         repository.saveSettings("vaultwarden", originalSettings);
+        service.getApp("vaultwarden");
+        originalSettings = repository.settingsFor("vaultwarden").orElseThrow();
+        var originalAppUrl = repository.findAppById("vaultwarden").orElseThrow().accessUrl();
         try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + runtimeLayout.databasePath());
                 var statement = connection.createStatement()) {
             statement.execute("create trigger reject_test_port before update on installed_app_settings when NEW.expected_local_port = 19090 begin select raise(abort, 'injected settings failure'); end");
         }
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("previous container configuration was restored");
         assertThat(composeExecutor.upCalls).isEqualTo("running".equals(state) ? 2 : 0);
         assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
-        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo(originalAppUrl);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow()).isEqualTo(originalSettings);
     }
 
     @Test
     void failedRedeployRestoresPrivateLinkRemovedBySettingsChange() {
+        tailscaleService.lastLocalPort = 8090;
+        tailscaleService.lastHttpsPort = 12890;
         repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
                 java.util.Map.of(), InstallModels.BackupPolicy.defaults()));
         composeExecutor.upBehavior = (path, call) -> new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("result"));
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("previous containers are running again");
         assertThat(tailscaleService.disableCalled).isTrue();
         assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
@@ -1273,7 +1386,7 @@ class AppLifecycleServiceTests {
             return new RuntimeModels.DockerComposeResult(0, List.of("restored"));
         };
 
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("previous containers are running again");
         assertThat(composeExecutor.upCalls).isEqualTo(2);
         assertThat(compose).hasContent(original);
@@ -1285,7 +1398,7 @@ class AppLifecycleServiceTests {
     @Test
     void failedSettingsRollbackReportsRecoveryFailureInsteadOfFileRestorationSuccess() {
         composeExecutor.failUpOutput = List.of("Docker unavailable");
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("recovery could not be confirmed").hasMessageContaining("My Apps");
         assertThat(composeExecutor.upCalls).isEqualTo(2);
         assertThat(repository.eventsFor("vaultwarden", 20)).extracting(event -> event.type())
@@ -1298,7 +1411,7 @@ class AppLifecycleServiceTests {
             if (call == 1) throw new IllegalStateException("Docker command interrupted");
             return new RuntimeModels.DockerComposeResult(0, List.of("restored"));
         };
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("previous containers are running again")
                 .hasCauseInstanceOf(IllegalStateException.class);
         assertThat(composeExecutor.upCalls).isEqualTo(2);
@@ -1311,7 +1424,7 @@ class AppLifecycleServiceTests {
                     "autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up", "0.0.0.0:19090->80/tcp"));
             return new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("command result"));
         };
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("recovery could not be confirmed");
         assertThat(composeExecutor.upCalls).isEqualTo(2);
     }
@@ -1327,7 +1440,7 @@ class AppLifecycleServiceTests {
             }
             return new RuntimeModels.DockerComposeResult(1, List.of("partial apply failed"));
         };
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("recovery could not be confirmed");
         assertThat(composeExecutor.upCalls).isEqualTo(1);
     }
@@ -1338,7 +1451,7 @@ class AppLifecycleServiceTests {
             if (call == 2) composeExecutor.observationFails = true;
             return new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("command result"));
         };
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+        assertThatThrownBy(() -> applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .hasMessageContaining("recovery could not be confirmed");
         assertThat(composeExecutor.upCalls).isEqualTo(2);
     }
@@ -1347,7 +1460,7 @@ class AppLifecycleServiceTests {
     void portChangeKeepsAPausedAppPaused() throws Exception {
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited", "0.0.0.0:8090->80/tcp"));
-        var updated = service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090"));
+        var updated = applySettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090"));
         assertThat(composeExecutor.upCalled).isFalse();
         assertThat(updated.state()).isEqualTo(ApplicationRuntimeState.STOPPED);
         assertThat(updated.accessUrl()).isEqualTo("http://localhost:19090");
@@ -1370,7 +1483,7 @@ class AppLifecycleServiceTests {
                 "Up 1 second (healthy)",
                 "0.0.0.0:19090->80/tcp"));
 
-        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
+        AppRuntimeView app = applySettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
                 null,
                 false,
@@ -1378,7 +1491,7 @@ class AppLifecycleServiceTests {
                 InstallModels.BackupPolicy.defaults()));
 
         assertThat(plan.redeployRequired()).isTrue();
-        assertThat(app.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":19090");
+        assertThat(app.accessUrl()).isEqualTo("http://localhost:19090");
         assertThat(composeExecutor.upCalled).isTrue();
         assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"))).contains("19090:80");
         assertThat(repository.eventsFor("vaultwarden", 10))
@@ -1396,7 +1509,7 @@ class AppLifecycleServiceTests {
                 "Up 1 second (healthy)",
                 "0.0.0.0:19090->80/tcp"));
 
-        service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
+        applySettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
                 null,
                 false,
@@ -1409,25 +1522,15 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void enablePrivateAccessCreatesTailscaleServeLinkAndPersistsIt() {
-        AppActionResult result = service.enablePrivateAccess("vaultwarden");
-
-        assertThat(result.status()).isEqualTo("completed");
-        assertThat(result.message()).contains("Vaultwarden").doesNotContain("https://", "example.ts.net");
+    void reviewedPrivateAccessChangesDashboardBindingAndPersistsVerifiedLink() {
+        var result = applySettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, true,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults(), "private", "optional", 8090, "http", null, null, null, null, true));
         assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
         assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(8090);
-        assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
-        assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
-        assertThat(result.app().desiredAccess().mode()).isEqualTo("local-and-private");
-        assertThat(result.app().observedAccess().privateLinkStatus()).isEqualTo("verified");
-        assertThat(result.app().accessRoute().primaryOpenUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
-        assertThat(result.app().accessRoute().backendTargetUrl()).isEqualTo("http://127.0.0.1:8090");
-        assertThat(repository.settingsFor("vaultwarden").orElseThrow().lastRepairStatus()).isEqualTo("private_access_enabled");
-        assertThat(repository.eventsFor("vaultwarden", 5))
-                .extracting(event -> event.type())
-                .contains("private_access_enabled");
-        assertThat(repository.eventsFor("vaultwarden", 5))
-                .allSatisfy(event -> assertThat(event.message()).doesNotContain("https://", "example.ts.net"));
+        assertThat(result.settings().tailscaleEnabled()).isTrue();
+        assertThat(result.desiredAccess().mode()).isEqualTo("private");
+        assertThat(result.observedAccess().privateLinkStatus()).isEqualTo("verified");
+        assertThat(result.accessRoute().localUrl()).startsWith("http://localhost:");
     }
 
     @Test
@@ -1622,8 +1725,10 @@ class AppLifecycleServiceTests {
         boolean failServe;
 
         @Override
-        public TailscaleServeResult disableHttps(int httpsPort) {
+        public TailscaleServeResult disableHttps(int httpsPort, int expectedLocalPort) {
             disableCalled = true;
+            lastLocalPort = 0;
+            lastHttpsPort = 0;
             return new TailscaleServeResult(true, null, "Private link removed.", List.of());
         }
 
@@ -1637,7 +1742,7 @@ class AppLifecycleServiceTests {
 
         @Override
         public TailscaleStatus status() {
-            return new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.example.ts.net", List.of("100.64.0.1"), "example.ts.net", "owner");
+            return new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.example.ts.net", List.of("100.64.0.1"), "example.ts.net", "owner", true, true, true);
         }
 
         @Override
@@ -1687,8 +1792,25 @@ class AppLifecycleServiceTests {
                 containers = startingContainer();
             }
             if (!transitionToStarting) containers = containers.stream().map(container -> new RuntimeModels.DockerContainerStatus(
-                    container.name(), container.service(), "running", "healthy", "Up (healthy)", container.ports())).toList();
+                    container.name(), container.service(), "running", "healthy", "Up (healthy)", publishedPorts(composeFile, container))).toList();
             return new RuntimeModels.DockerComposeResult(0, List.of("started " + projectName));
+        }
+
+        private String publishedPorts(Path composeFile, RuntimeModels.DockerContainerStatus container) {
+            try {
+                java.util.Map<?, ?> document = new org.yaml.snakeyaml.Yaml().load(Files.readString(composeFile));
+                var services = (java.util.Map<?, ?>) document.get("services");
+                var service = services == null ? null : (java.util.Map<?, ?>) services.get(container.service());
+                if (service == null || !(service.get("ports") instanceof List<?> ports)) return container.ports();
+                return ports.stream().map(Object::toString).map(port -> {
+                    String[] parts = port.split(":");
+                    String host = parts.length == 3 ? parts[0] : "0.0.0.0";
+                    String target = parts[parts.length - 1];
+                    return host + ":" + parts[parts.length - 2] + "->" + target + (target.contains("/") ? "" : "/tcp");
+                }).collect(java.util.stream.Collectors.joining(", "));
+            } catch (Exception exception) {
+                throw new AssertionError(exception);
+            }
         }
 
         @Override

@@ -67,11 +67,11 @@ technical:
     - label: Backup
       value: Stops the app to copy its managed data folders
     - label: Access
-      value: LAN and Tailscale dashboard
+      value: Private dashboard; LAN sync and discovery ports
 access:
   kind: multi-port
   privateDashboard: true
-  defaultMode: local-and-private
+  defaultMode: private
   privateAccessRecommended: true
   requiresFirstRunSetup: true
   notes:

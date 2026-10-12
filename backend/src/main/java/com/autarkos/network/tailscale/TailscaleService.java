@@ -24,8 +24,6 @@ public class TailscaleService {
 
     private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(8);
     private static final Duration SERVE_CONFIG_CACHE_TTL = Duration.ofSeconds(3);
-    private static final Pattern TEXT_FIELD = Pattern.compile("\"%s\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
-    private static final Pattern ARRAY_FIELD = Pattern.compile("\"%s\"\\s*:\\s*\\[(.*?)\\]", Pattern.DOTALL);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final CommandRunner commandRunner;
     private volatile TailscaleServeConfig cachedServeConfig;
@@ -43,30 +41,65 @@ public class TailscaleService {
         if (result.missingCommand()) {
             return TailscaleStatus.notInstalled();
         }
-        if (!result.successful()) {
-            return TailscaleStatus.notConnected("Tailscale is installed but this device is not connected yet.");
+        JsonNode root = readStatus(result);
+        JsonNode self = root.path("Self");
+        String backendState = jsonText(root, "BackendState");
+        if (!"Running".equalsIgnoreCase(backendState)) {
+            String message = switch (backendState) {
+                case "NeedsLogin" -> "Sign in to Tailscale on this host.";
+                case "NeedsMachineAuth" -> "Approve this host in your Tailscale account.";
+                case "Stopped" -> "Tailscale is stopped on this host.";
+                default -> "Tailscale is not connected on this host yet.";
+            };
+            return TailscaleStatus.notConnected(message);
         }
-        String body = String.join("\n", result.output());
-        String self = object(body, "Self");
-        String backendState = text(body, "BackendState");
-        boolean connected = "Running".equalsIgnoreCase(backendState) || !text(self, "DNSName").isBlank();
-        if (!connected) {
-            return TailscaleStatus.notConnected("Tailscale is installed but waiting for sign in.");
-        }
-        return new TailscaleStatus(
-                true,
-                true,
-                "connected",
-                "Autark-OS is connected to your tailnet.",
-                text(self, "HostName"),
-                text(self, "DNSName"),
-                ips(self, "TailscaleIPs"),
-                text(body, "MagicDNSSuffix"),
-                text(body, "User"));
+        String dnsName = jsonText(self, "DNSName");
+        JsonNode tailnet = root.path("CurrentTailnet");
+        Boolean dnsReady = tailnet.path("MagicDNSEnabled").isBoolean()
+                ? tailnet.path("MagicDNSEnabled").asBoolean() && !dnsName.isBlank() : null;
+        Boolean httpsReady = root.has("CertDomains")
+                ? array(root, "CertDomains").stream().anyMatch(domain -> domain.equalsIgnoreCase(dnsName.replaceFirst("\\.$", ""))) : null;
+        TailscaleServeConfig serve = serveConfig();
+        Boolean serveReady = serve.available() ? !serve.mappings().isEmpty() : null;
+        String userId = self.path("UserID").asText("");
+        return new TailscaleStatus(true, true, "connected", "Autark-OS is connected to your tailnet.",
+                jsonText(self, "HostName"), dnsName, array(self, "TailscaleIPs"),
+                firstPresent(jsonText(tailnet, "Name"), jsonText(root, "MagicDNSSuffix")),
+                jsonText(root.path("User").path(userId), "LoginName"), dnsReady, httpsReady, serveReady);
     }
 
     public TailscaleConnectGuide connectGuide() {
-        return TailscaleConnectGuide.defaults();
+        TailscaleConnectGuide guide = TailscaleConnectGuide.defaults();
+        CommandResult result = commandRunner.run("tailscale", "status", "--json");
+        if (result.missingCommand()) return guide;
+        JsonNode root = readStatus(result);
+        String enrollmentUrl = null;
+        if ("NeedsLogin".equals(jsonText(root, "BackendState"))) {
+            String candidate = jsonText(root, "AuthURL");
+            try {
+                java.net.URI uri = java.net.URI.create(candidate);
+                if ("https".equalsIgnoreCase(uri.getScheme()) && "login.tailscale.com".equalsIgnoreCase(uri.getHost())
+                        && uri.getUserInfo() == null && uri.getPort() == -1 && uri.getPath().startsWith("/a/")) {
+                    enrollmentUrl = candidate;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // An unrecognized enrollment URL is never returned to the browser.
+            }
+        }
+        return new TailscaleConnectGuide(guide.headline(), guide.summary(), guide.steps(), guide.installUrl(),
+                guide.connectCommand(), guide.advancedNote(), enrollmentUrl);
+    }
+
+    private JsonNode readStatus(CommandResult result) {
+        try {
+            JsonNode root = objectMapper.readTree(String.join("\n", result.output()));
+            if (root != null && root.isObject() && !jsonText(root, "BackendState").isBlank()
+                    && (result.successful() || "NeedsLogin".equals(jsonText(root, "BackendState")))) return root;
+        } catch (IOException ignored) {
+            // Keep raw command output and enrollment tokens out of the API error.
+        }
+        throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                "Autark-OS could not read Tailscale status. Check Tailscale on this host and retry.");
     }
 
     public TailscaleServeResult serveHttps(int localPort) {
@@ -81,8 +114,18 @@ public class TailscaleService {
         if (!status.connected()) {
             return new TailscaleServeResult(false, null, "Sign in to Tailscale on this device before Autark-OS can create a private HTTPS link.", List.of());
         }
-        if (status.dnsName() == null || status.dnsName().isBlank()) {
+        if (!Boolean.TRUE.equals(status.magicDnsReady()) || !Boolean.TRUE.equals(status.httpsReady())) {
             return new TailscaleServeResult(false, null, "Enable MagicDNS and HTTPS certificates in Tailscale before Autark-OS can create this private HTTPS link.", List.of());
+        }
+        invalidateServeConfig();
+        var before = serveConfig();
+        if (!before.available()) return new TailscaleServeResult(false, null, "Private links could not be inspected. No mapping was changed.", List.of());
+        var existing = before.mappings().stream().filter(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort)).toList();
+        if (!existing.isEmpty()) {
+            if (existing.size() == 1 && existing.getFirst().matchesNodeProxy(privateUrl(status, httpsPort), localPort)) {
+                return new TailscaleServeResult(true, privateUrl(status, httpsPort), "The expected private HTTPS link is already configured.", List.of());
+            }
+            return new TailscaleServeResult(false, null, "This HTTPS endpoint has another mapping. Autark-OS left it unchanged; review private links in Access.", List.of());
         }
         String target = "http://127.0.0.1:" + localPort;
         CommandResult result = commandRunner.run("tailscale", "serve", "--bg", "--https=" + httpsPort, target);
@@ -105,6 +148,11 @@ public class TailscaleService {
             return cachedServeConfig;
         }
 
+        if (!statusResult.successful() || !parseServeConfig(statusResult, "tailscale serve status --json").available()) {
+            cachedServeConfig = TailscaleServeConfig.unavailable("unavailable",
+                    "Autark-OS could not inspect this host's private links. Retry the access check.", statusResult.output());
+            return cachedServeConfig;
+        }
         CommandResult configResult = commandRunner.run("tailscale", "serve", "get-config", "--all");
         List<TailscaleServeConfig> available = new ArrayList<>();
         if (statusResult.successful()) {
@@ -146,7 +194,7 @@ public class TailscaleService {
         cachedServeConfig = null;
     }
 
-    public TailscaleServeResult disableHttps(int httpsPort) {
+    public TailscaleServeResult disableHttps(int httpsPort, int expectedLocalPort) {
         TailscaleStatus status = status();
         String privateUrl = status.connected() && status.dnsName() != null && !status.dnsName().isBlank()
                 ? privateUrl(status, httpsPort)
@@ -164,6 +212,10 @@ public class TailscaleService {
         TailscaleServeConfig before = serveConfig();
         if (before.available() && before.mappings().stream().noneMatch(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort))) {
             return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was already removed.", List.of("No live Tailscale Serve handler exists on HTTPS port " + httpsPort + "."));
+        }
+        var existing = before.mappings().stream().filter(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort)).toList();
+        if (!before.available() || existing.size() != 1 || !existing.getFirst().matchesNodeProxy(privateUrl, expectedLocalPort)) {
+            return new TailscaleServeResult(false, privateUrl, "The private link's ownership could not be confirmed. No mapping was removed.", List.of());
         }
         CommandResult result = commandRunner.run("tailscale", "serve", "--https=" + httpsPort, "off");
         if (result.successful()) {
@@ -210,8 +262,7 @@ public class TailscaleService {
         invalidateServeConfig();
         TailscaleServeConfig config = serveConfig();
         boolean verified = config.available() && config.mappings().stream().anyMatch(mapping ->
-                java.util.Objects.equals(mapping.servePort(), httpsPort)
-                        && java.util.Objects.equals(mapping.targetPort(), localPort));
+                mapping.matchesNodeProxy(privateUrl(status, httpsPort), localPort));
         if (!verified) {
             List<String> details = new ArrayList<>(output);
             details.addAll(config.output());
@@ -248,6 +299,9 @@ public class TailscaleService {
     private TailscaleServeConfig parseServeConfig(CommandResult result, String source) {
         try {
             JsonNode root = objectMapper.readTree(String.join("\n", result.output()));
+            // The CLI serializes a nil ServeConfig as JSON null on a clean host.
+            if (root != null && root.isNull()) root = objectMapper.createObjectNode();
+            if (root == null || !root.isObject()) throw new IOException("Expected Serve configuration object");
             List<TailscaleServeMapping> mappings = new ArrayList<>();
             collectServeMappings(root.path("services"), mappings);
             collectServeMappings(root.path("Services"), mappings);
@@ -255,6 +309,17 @@ public class TailscaleService {
             collectEndpointMappings(root.path("Endpoints"), null, mappings);
             collectNodeWebMappings(root.path("Web"), root.path("TCP"), mappings);
             collectNodeWebMappings(root.path("web"), root.path("tcp"), mappings);
+            collectOpaqueTcpMappings(root.path("TCP"), mappings);
+            collectOpaqueTcpMappings(root.path("tcp"), mappings);
+            collectServeMappings(root.path("Foreground"), mappings);
+            JsonNode funnel = root.path("AllowFunnel");
+            if (funnel.isObject()) funnel.fields().forEachRemaining(entry -> {
+                if (entry.getValue().asBoolean(false)) {
+                    Integer port = portFromEndpoint(entry.getKey());
+                    mappings.replaceAll(mapping -> java.util.Objects.equals(mapping.servePort(), port)
+                            ? new TailscaleServeMapping("public-funnel", mapping.endpoint(), mapping.servePort(), mapping.target(), mapping.targetPort()) : mapping);
+                }
+            });
             return new TailscaleServeConfig(true, "available", "Read Tailscale Serve configuration from " + source + ".", mappings, result.output(), Instant.now());
         } catch (IOException exception) {
             return TailscaleServeConfig.unavailable("parse_failed", "Autark-OS could not parse Tailscale Serve configuration.", result.output());
@@ -273,6 +338,11 @@ public class TailscaleService {
                 endpoints = service.getValue().path("Endpoints");
             }
             collectEndpointMappings(endpoints, service.getKey(), mappings);
+            List<TailscaleServeMapping> nested = new ArrayList<>();
+            collectNodeWebMappings(service.getValue().path("Web"), service.getValue().path("TCP"), nested);
+            collectOpaqueTcpMappings(service.getValue().path("TCP"), nested);
+            nested.forEach(mapping -> mappings.add(new TailscaleServeMapping(service.getKey(), mapping.endpoint(),
+                    mapping.servePort(), mapping.target(), mapping.targetPort())));
         }
     }
 
@@ -308,7 +378,8 @@ public class TailscaleService {
             if (handlers.isMissingNode()) {
                 handlers = webServer.getValue().path("handlers");
             }
-            if (!handlers.isObject()) {
+            if (!handlers.isObject() || handlers.isEmpty()) {
+                mappings.add(new TailscaleServeMapping(null, "https://" + webServer.getKey(), servePort, "Unmanaged handler", null));
                 continue;
             }
             Iterator<Map.Entry<String, JsonNode>> routes = handlers.fields();
@@ -317,13 +388,23 @@ public class TailscaleService {
                 String target = firstPresent(
                         jsonText(route.getValue(), "Proxy"),
                         jsonText(route.getValue(), "proxy"));
-                if (target.isBlank()) {
-                    continue;
-                }
-                String endpoint = "https://" + webServer.getKey() + normalizedRoute(route.getKey());
+                if (target.isBlank()) target = "Unmanaged handler";
+                JsonNode listener = tcpNode.path(String.valueOf(servePort));
+                boolean https = listener.path("HTTPS").asBoolean(false) || listener.path("https").asBoolean(false);
+                String endpoint = (https ? "https://" : "http://") + webServer.getKey() + normalizedRoute(route.getKey());
                 mappings.add(new TailscaleServeMapping(null, endpoint, servePort, target, portFromTarget(target)));
             }
         }
+    }
+
+    private void collectOpaqueTcpMappings(JsonNode tcpNode, List<TailscaleServeMapping> mappings) {
+        if (!tcpNode.isObject()) return;
+        tcpNode.fields().forEachRemaining(listener -> {
+            Integer port = parsePort(listener.getKey());
+            if (port != null && mappings.stream().noneMatch(mapping -> java.util.Objects.equals(mapping.servePort(), port))) {
+                mappings.add(new TailscaleServeMapping(null, "tcp:" + port, port, "Unmanaged listener", null));
+            }
+        });
     }
 
     private Integer httpsPortFromTcp(JsonNode tcpNode, String webHost) {
@@ -397,92 +478,21 @@ public class TailscaleService {
 
     public List<TailscaleDevice> devices() {
         CommandResult result = commandRunner.run("tailscale", "status", "--json");
-        if (!result.successful()) {
-            return List.of();
+        if (result.missingCommand()) return List.of();
+        JsonNode root = readStatus(result);
+        if (!"Running".equalsIgnoreCase(jsonText(root, "BackendState"))) return List.of();
+        List<TailscaleDevice> devices = new ArrayList<>();
+        JsonNode self = root.path("Self");
+        if (self.isObject()) devices.add(deviceFromNode(nodeId(self, "self"), self, true));
+        JsonNode peers = root.path("Peer");
+        if (peers.isObject()) {
+            peers.fields().forEachRemaining(entry -> devices.add(deviceFromNode(entry.getKey(), entry.getValue(), false)));
         }
-        try {
-            JsonNode root = objectMapper.readTree(String.join("\n", result.output()));
-            List<TailscaleDevice> devices = new ArrayList<>();
-            JsonNode self = root.path("Self");
-            if (!self.isMissingNode() && self.isObject()) {
-                devices.add(deviceFromNode(nodeId(self, "self"), self, true));
-            }
-            JsonNode peers = root.path("Peer");
-            if (peers.isObject()) {
-                peers.fields().forEachRemaining(entry -> devices.add(deviceFromNode(entry.getKey(), entry.getValue(), false)));
-            }
-            return devices.stream()
-                    .sorted(Comparator.comparing((TailscaleDevice device) -> !device.self())
-                            .thenComparing(device -> !device.online())
-                            .thenComparing(device -> safeLower(device.name())))
-                    .toList();
-        } catch (IOException exception) {
-            return List.of();
-        }
-    }
-
-    private String object(String body, String field) {
-        int fieldIndex = body.indexOf("\"" + field + "\"");
-        if (fieldIndex < 0) {
-            return "";
-        }
-        int start = body.indexOf('{', fieldIndex);
-        if (start < 0) {
-            return "";
-        }
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int index = start; index < body.length(); index++) {
-            char current = body.charAt(index);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (current == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (current == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (inString) {
-                continue;
-            }
-            if (current == '{') {
-                depth++;
-            } else if (current == '}') {
-                depth--;
-                if (depth == 0) {
-                    return body.substring(start, index + 1);
-                }
-            }
-        }
-        return "";
-    }
-
-    private String text(String body, String field) {
-        Matcher matcher = Pattern.compile(TEXT_FIELD.pattern().formatted(Pattern.quote(field))).matcher(body);
-        if (!matcher.find()) {
-            return "";
-        }
-        return matcher.group(1)
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
-    }
-
-    private List<String> ips(String body, String field) {
-        Matcher matcher = Pattern.compile(ARRAY_FIELD.pattern().formatted(Pattern.quote(field)), Pattern.DOTALL).matcher(body);
-        if (!matcher.find()) {
-            return List.of();
-        }
-        List<String> values = new ArrayList<>();
-        Matcher valuesMatcher = Pattern.compile("\"((?:\\\\.|[^\"])*)\"").matcher(matcher.group(1));
-        while (valuesMatcher.find()) {
-            values.add(valuesMatcher.group(1));
-        }
-        return values;
+        return devices.stream()
+                .sorted(Comparator.comparing((TailscaleDevice device) -> !device.self())
+                        .thenComparing(device -> !device.online())
+                        .thenComparing(device -> safeLower(device.name())))
+                .toList();
     }
 
     private TailscaleDevice deviceFromNode(String id, JsonNode node, boolean self) {

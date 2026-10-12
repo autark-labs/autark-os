@@ -71,9 +71,16 @@ final class PrivateAccessStateResolver {
             return state(true, "verified", "Private link verified in dev mode", "Development mode is simulating the expected Serve mapping.", null, expectedUrl, expectedUrl, localPort, httpsPort, null, config, "Development mode bypassed live Tailscale Serve inspection.", Instant.now());
         }
 
+        if (!Boolean.TRUE.equals(tailscale.magicDnsReady()) || !Boolean.TRUE.equals(tailscale.httpsReady())) {
+            return state(true, "waiting", "Private HTTPS readiness is not confirmed",
+                    "Check MagicDNS and HTTPS certificates in the Tailscale host guide before using this private link.",
+                    "Check Tailscale", expectedUrl, null, localPort, httpsPort, null, config,
+                    "The host has not confirmed DNS and certificate support.", null);
+        }
+
         TailscaleServeMapping exact = config.mappings().stream()
                 .filter(mapping -> servePortMatches(mapping, httpsPort, expectedUrl))
-                .filter(mapping -> Objects.equals(mapping.targetPort(), localPort))
+                .filter(mapping -> mapping.matchesNodeProxy(expectedUrl, localPort))
                 .findFirst()
                 .orElse(null);
         if (exact != null) {
@@ -85,7 +92,7 @@ final class PrivateAccessStateResolver {
                 .findFirst()
                 .orElse(null);
         if (endpoint != null) {
-            return state(true, "mismatched", "Private link points to a different local port", "Expected local port " + localPort + ", but Tailscale Serve points to " + friendlyPort(endpoint.targetPort()) + ".", "Repair private link", expectedUrl, null, localPort, httpsPort, endpoint, config, "The HTTPS endpoint exists, but its target local port does not match.", null);
+            return state(true, "mismatched", "Private link points to a different local port", "Expected local port " + localPort + ", but Tailscale Serve points to " + friendlyPort(endpoint.targetPort()) + ". Its ownership cannot be confirmed; Autark-OS will leave it unchanged.", "Review private links", expectedUrl, null, localPort, httpsPort, endpoint, config, "The HTTPS endpoint exists, but its target local port does not match.", null);
         }
 
         TailscaleServeMapping targetElsewhere = config.mappings().stream()
@@ -93,7 +100,7 @@ final class PrivateAccessStateResolver {
                 .findFirst()
                 .orElse(null);
         if (targetElsewhere != null) {
-            return state(true, "mismatched", "Private link uses a different HTTPS endpoint", "Tailscale Serve reaches this app, but not through the expected private HTTPS port.", "Repair private link", expectedUrl, null, localPort, httpsPort, targetElsewhere, config, "A live mapping targets the app port, but its HTTPS endpoint does not match.", null);
+            return state(true, "mismatched", "Private link uses a different HTTPS endpoint", "Tailscale Serve reaches this app, but not through the expected private HTTPS port.", "Review private links", expectedUrl, null, localPort, httpsPort, targetElsewhere, config, "A live mapping targets the app port, but its HTTPS endpoint does not match.", null);
         }
         return state(true, "missing", "Private link is missing", "Tailscale Serve does not currently expose this app's expected local port.", "Repair private link", expectedUrl, null, localPort, httpsPort, null, config, "No live mapping targets the expected app port and HTTPS endpoint.", null);
     }

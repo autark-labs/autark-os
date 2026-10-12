@@ -1,18 +1,11 @@
+import axios from 'axios';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { AlertTriangle, CheckCircle2, Container, HelpCircle, KeyRound, Loader2, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Container, HelpCircle, KeyRound, Loader2, RotateCcw, Save, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { SettingsChangeReview } from '@/components/autark-os/SettingsChangeReview';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +29,7 @@ import type {
 import { applicationActionRestriction, operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationSettingsTabProps = {
-  actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onSaveSettings' | 'onSettingsPlanRequest' | 'onSetPrivateNetworkAccess'>;
+  actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onSaveSettings' | 'onSettingsPlanRequest'>;
   item: ApplicationSurfaceItem;
   loadingAction: ApplicationSettingsAction | null;
 };
@@ -45,15 +38,16 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const { settings: projectSettings } = useProjectSettings();
   const settingsRestriction = applicationActionRestriction(item, 'settings');
   const editable = item.settings.canEdit && !settingsRestriction.disabled;
-  const { autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort } = item.settings;
+  const { autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort, desiredAccessMode } = item.settings;
   // Parent dirty-state updates and runtime polling replace the item object.
   // Reconcile changed persisted values through RHF without replacing dirty fields.
   const initialValues = useMemo(() => ({
+    desiredAccessMode,
     autoRepairEnabled,
     backupEnabled,
     backupRetention,
     localPort: expectedLocalPort,
-  }), [autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort]);
+  }), [autoRepairEnabled, backupEnabled, backupRetention, expectedLocalPort, desiredAccessMode]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingImpact, setPendingImpact] = useState<ApplicationSettingsImpact | null>(null);
   const [pendingValues, setPendingValues] = useState<ApplicationSettingsFormValues | null>(null);
@@ -70,10 +64,9 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const values = useWatch({ control }) as ApplicationSettingsFormValues;
   const planning = loadingAction === 'planning';
   const saving = loadingAction === 'saving' || isSubmitting;
-  const accessChanging = loadingAction === 'private_access';
   const operationBusy = operationBlocksManagement(item.operation);
-  const busy = planning || saving || accessChanging || operationBusy;
-  const privateNetwork = privateNetworkStatus(item, accessChanging);
+  const busy = planning || saving || operationBusy;
+  const privateNetwork = privateNetworkStatus(item);
 
   const onDirtyChange = actions.onDirtyChange;
   useEffect(() => {
@@ -123,14 +116,17 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
     }
 
     try {
-      await actions.onSaveSettings(item.id, pendingValues);
+      await actions.onSaveSettings(item.id, pendingValues, pendingImpact!.planId);
       reset(pendingValues, { keepDirtyValues: false });
       setPendingImpact(null);
       setPendingValues(null);
       setConfirmOpen(false);
-    } catch {
-      setPlanError('Autark-OS could not save these settings. Review the notification and try again.');
-      setConfirmOpen(false);
+    } catch (error) {
+      const responseLost = axios.isAxiosError(error) && !error.response;
+      setPlanError(responseLost
+        ? 'The response was lost. Check Activity; retrying this review retrieves the accepted job.'
+        : 'Autark-OS could not save these settings. Review the notification and try again.');
+      if (!responseLost) setConfirmOpen(false);
     }
   };
 
@@ -193,28 +189,22 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         <FieldSet className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
           <SettingsSectionHeader icon={KeyRound} status={privateNetwork.status} title="Access" />
 
-          <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={!editable || busy} orientation="horizontal">
-            <FieldContent>
-              <SettingLabel
-                explanation="When this is on, Autark-OS serves the app across your Tailscale private network with a stable HTTPS link. Turning it off removes that private network route and keeps local access unchanged."
-                inputId="private-network-access"
-                label="Private network"
-              />
-              <FieldDescription className="text-sky-100/60">{privateNetwork.description} Changes apply immediately.</FieldDescription>
-              {item.settings.privateAccessUrl && (
-                <p className="truncate font-mono text-xs text-sky-50/80">{item.settings.privateAccessUrl}</p>
-              )}
-            </FieldContent>
-            <div className="flex shrink-0 items-center gap-2">
-              {accessChanging && <Loader2 className="size-4 animate-spin text-cyan-200" />}
-              <Switch
-                checked={item.settings.tailscaleEnabled}
-                disabled={!editable || busy}
-                id="private-network-access"
-                onCheckedChange={(checked) => void actions.onSetPrivateNetworkAccess(item.id, checked)}
-              />
-            </div>
-          </Field>
+          <Controller control={control} name="desiredAccessMode" render={({ field }) => (
+            <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2">
+              <FieldLabel htmlFor="app-access-mode">App reachability</FieldLabel>
+              <Select value={field.value} onValueChange={field.onChange} disabled={!editable || busy}>
+                <SelectTrigger id="app-access-mode"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">This server</SelectItem>
+                  <SelectItem value="network">Home network / LAN</SelectItem>
+                  <SelectItem value="private">Private only / Tailscale</SelectItem>
+                  <SelectItem value="local-and-private">LAN + private</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>Private only removes the LAN dashboard binding. LAN + private keeps both. Save reviews the restart and recovery consequences before applying.</FieldDescription>
+              <p className="text-xs text-muted-foreground">{privateNetwork.description}</p>
+            </Field>
+          )} />
         </FieldSet>
 
         <FieldSet className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
@@ -251,9 +241,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <p className="mt-1 text-xs leading-5 text-sky-100/60">
               {operationBusy
                 ? 'Settings are paused while Autark-OS finishes the current app action.'
-                : accessChanging
-                  ? 'Settings are paused while Autark-OS updates private network access.'
-                  : 'Save checks impact first. Autark-OS will warn before restarting containers.'}
+                : 'Save checks impact first. Autark-OS will warn before restarting containers.'}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -284,33 +272,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         </div>
       </form>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pendingImpact?.headline || 'Save app settings?'}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingImpact?.summary || 'Autark-OS will apply the selected settings.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {pendingImpact && (
-            <div className="grid gap-3 text-sm">
-              <SettingsImpactAlert impact={pendingImpact} />
-            </div>
-          )}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={busy || pendingImpact?.saveAllowed === false} onClick={(event) => {
-              event.preventDefault();
-              void confirmSave();
-            }}>
-              {saving ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <CheckCircle2 data-icon="inline-start" />}
-              Save settings
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SettingsChangeReview open={confirmOpen} onOpenChange={setConfirmOpen} plan={pendingImpact} busy={busy} cancelDisabled={saving} error={planError} onConfirm={() => void confirmSave()} />
     </TooltipProvider>
   );
 }
@@ -422,45 +384,7 @@ function NumberField({
   );
 }
 
-function SettingsImpactAlert({ impact }: { impact: ApplicationSettingsImpact }) {
-  const tone = impact.saveAllowed === false || impact.restartRequired || impact.redeployRequired
-    ? 'border-orange-400 bg-orange-200 text-orange-950'
-    : 'border-emerald-300 bg-emerald-200 text-emerald-950';
-  const textTone = impact.saveAllowed === false || impact.restartRequired || impact.redeployRequired ? 'text-orange-900' : 'text-emerald-900';
-
-  return (
-    <Alert className={tone}>
-      {impact.saveAllowed === false || impact.restartRequired || impact.redeployRequired ? <AlertTriangle /> : <CheckCircle2 />}
-      <AlertTitle>{impact.headline || (impact.restartRequired || impact.redeployRequired ? 'Restart required' : 'Safe to save')}</AlertTitle>
-      <AlertDescription className={textTone}>
-        {impact.changes.length > 0 && (
-          <ul className="list-inside list-disc">
-            {impact.changes.map((change) => <li key={change}>{change}</li>)}
-          </ul>
-        )}
-        {impact.warnings.length > 0 && (
-          <ul className="mt-2 list-inside list-disc">
-            {impact.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-          </ul>
-        )}
-        {impact.blockedReasons.length > 0 && (
-          <ul className="mt-2 list-inside list-disc">
-            {impact.blockedReasons.map((reason) => <li key={reason}>{reason}</li>)}
-          </ul>
-        )}
-      </AlertDescription>
-    </Alert>
-  );
-}
-
-function privateNetworkStatus(item: ApplicationSurfaceItem, accessChanging: boolean) {
-  if (accessChanging) {
-    return {
-      description: 'Autark-OS is updating the private network route.',
-      status: 'Updating',
-    };
-  }
-
+function privateNetworkStatus(item: ApplicationSurfaceItem) {
   if (!item.settings.tailscaleEnabled) {
     return {
       description: 'This app is only available through its local link.',

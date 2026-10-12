@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import type { AppRuntimeView } from '@/types/app';
-import type { TailscaleStatus } from '@/types/network';
-import { buildReachabilityServices } from '../NetworkPage.logic';
+import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
+import { buildNetworkIssues, buildReachabilityServices } from '../NetworkPage.logic';
 
 test('reachability services include managed app icon URLs', () => {
   const services = buildReachabilityServices({
@@ -70,4 +70,20 @@ test('reachability services prefer saved desired access mode before URL heuristi
 
   assert.equal(services.find((service) => service.id === 'gitea')?.zone, 'lan');
   assert.equal(services.find((service) => service.id === 'homepage')?.zone, 'local');
+});
+
+
+test('waiting private-app evidence stays visible once when DNS or HTTPS is unavailable', () => {
+  const issues = buildNetworkIssues({
+    checks: [{ id: 'private-apps', status: 'warning', message: 'Private apps waiting' }],
+    appChecks: [{ id: 'serve-vaultwarden', status: 'neutral', message: 'HTTPS unavailable' }],
+  } as NetworkDiagnosticsReport, {
+    apps: [{ appId: 'vaultwarden', appName: 'Vaultwarden', status: 'waiting', message: 'HTTPS unavailable', actionLabel: 'Connect this server' }],
+    staleMappings: [{ id: 'unassigned', servePort: 8443 }],
+  } as PrivateAccessReconciliationReport);
+  assert.equal(issues.length, 2);
+  assert.equal(issues[0].appId, 'vaultwarden');
+  assert.equal(issues[0].message, 'HTTPS unavailable');
+  assert.equal(issues[0].actionLabel, 'Connect this server');
+  assert.equal(issues[1].label, 'Unassigned link on port 8443');
 });

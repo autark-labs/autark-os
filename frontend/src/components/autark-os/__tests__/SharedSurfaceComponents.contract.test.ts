@@ -106,7 +106,7 @@ test('active pages delegate status and metadata badges to the shared semantic pr
   for (const page of pages) {
     const content = source(page);
     assert.doesNotMatch(content, /from ['"]@\/components\/ui\/badge['"]/);
-    assert.match(content, /(StatusBadge|MetadataBadge|semanticStatusVariants|AppCardName|DisabledAction)/, `${page} should use a shared semantic visual primitive`);
+    assert.match(content, /(StatusBadge|MetadataBadge|semanticStatusVariants|AppCardName|DisabledAction|ContextChip)/, `${page} should use a shared semantic visual primitive`);
   }
 });
 

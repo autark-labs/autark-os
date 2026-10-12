@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { AppActionResult, AppReliabilitySummary, AppSettingsChangePlan, AppTelemetry, InstallSettings, UninstallPlan } from '@/types/app';
+import type { AppReliabilitySummary, AppSettingsChangePlan, AppTelemetry, InstallSettings, UninstallPlan } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
@@ -31,18 +31,8 @@ export const InstalledAppsAPIClient = {
     return response.data;
   },
 
-  async enablePrivateAccess(appId: string) {
-    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/private-access/enable`);
-    return response.data;
-  },
-
-  async disablePrivateAccess(appId: string) {
-    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/private-access/disable`);
-    return response.data;
-  },
-
-  async updateSettings(appId: string, settings: InstallSettings) {
-    const response = await httpClient.put<AutarkOsJob>(`/api/apps/${appId}/settings`, settings);
+  async updateSettings(appId: string, settings: InstallSettings, planId: string) {
+    const response = await httpClient.put<AutarkOsJob>(`/api/apps/${appId}/settings`, settings, { headers: { 'X-Autark-Plan-Id': planId } });
     return response.data;
   },
 

@@ -222,35 +222,13 @@ class InstalledAppsControllerTests {
     }
 
     @Test
-    void privateAccessMutationInvalidatesCanonicalAppStateImmediately() {
-        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
-        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        InstalledAppsController controller = new InstalledAppsController(
-                lifecycleService,
-                metricsService,
-                applicationStateService,
-                jobService());
-        AppRuntimeView app = appRuntimeView("vaultwarden");
-        var refreshedState = applicationStateWith(app);
-        AppActionResult result = new AppActionResult(
-                "vaultwarden",
-                "private-access",
-                "completed",
-                "Vaultwarden is available privately.",
-                app,
-                List.of(),
-                Instant.parse("2026-06-21T12:00:00Z"));
-        when(lifecycleService.enablePrivateAccess("vaultwarden")).thenReturn(result);
-        when(applicationStateService.snapshot()).thenReturn(refreshedState);
-
-        AppActionResult returned = controller.enablePrivateAccess("vaultwarden");
-
-        assertThat(returned.applicationState()).isEqualTo(refreshedState);
-        verify(applicationStateService).invalidate();
-        verify(applicationStateService).snapshot();
-        verify(applicationStateService, never()).refreshInBackground();
+    void settingsMutationRequiresAnExplicitReview() {
+        var controller = new InstalledAppsController(mock(AppLifecycleService.class), mock(MonitoringMetricsService.class), mock(ApplicationStateService.class), jobService());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.updateSettings("gitea", InstallModels.InstallSettings.defaults("http://localhost:3000"), null))
+                .hasMessageContaining("Review the settings plan");
     }
+
+    private String settingsReview() { return "a".repeat(64) + ".12345678-1234-1234-1234-123456789012"; }
 
     @ParameterizedTest
     @ValueSource(strings = {"local", "network"})
@@ -269,11 +247,12 @@ class InstalledAppsControllerTests {
         InstallModels.InstallSettings settings = new InstallModels.InstallSettings(
                 "http://localhost:3000", null, false, Map.of(), InstallModels.BackupPolicy.defaults(),
                 mode, "disabled", 3000, "http", checkedAt, checkedAt, checkedAt, "ready", true);
-        when(lifecycleService.updateSettings("gitea", settings)).thenReturn(app);
+        when(lifecycleService.updateSettings("gitea", settings, settingsReview())).thenReturn(app);
 
         var mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(MockMvcRequestBuilders.put("/api/apps/gitea/settings")
                 .contentType("application/json")
+                .header("X-Autark-Plan-Id", settingsReview())
                 .content("""
                         {"accessUrl":"http://localhost:3000","tailscaleEnabled":false,"storageSubfolders":{},
                          "backup":{"enabled":true,"frequency":"daily","retention":7},
@@ -288,10 +267,10 @@ class InstalledAppsControllerTests {
         AutarkOsJob returned = jobs.list().getFirst();
         assertThat(returned.type()).isEqualTo("save_app_settings");
         assertThat(returned.status()).isEqualTo("queued");
-        assertThat(controller.updateSettings("gitea", settings).jobId()).isEqualTo(returned.jobId());
-        verify(lifecycleService, never()).updateSettings("gitea", settings);
+        assertThat(controller.updateSettings("gitea", settings, settingsReview()).jobId()).isEqualTo(returned.jobId());
+        verify(lifecycleService, never()).updateSettings("gitea", settings, settingsReview());
         jobs.runQueuedJobsNow();
-        verify(lifecycleService).updateSettings("gitea", settings);
+        verify(lifecycleService).updateSettings("gitea", settings, settingsReview());
         assertThat(jobs.findById(returned.jobId()).orElseThrow().status()).isEqualTo("succeeded");
         verify(applicationStateService).invalidate();
         verify(applicationStateService, never()).refreshInBackground();

@@ -99,8 +99,20 @@ public class InstallCustomizationResolver {
     public static String accessMode(ApplicationManifest manifest, InstallOptionsRequest.AccessOptions access) {
         String mode = access == null ? null : access.mode();
         if (mode == null || mode.isBlank()) {
-            mode = manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired() ? "private"
-                    : access != null && Boolean.TRUE.equals(access.tailscaleEnabled()) ? "local-and-private" : "network";
+            if (access != null && access.tailscaleEnabled() != null) {
+                mode = manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired()
+                        ? access.tailscaleEnabled() ? "private" : "local"
+                        : access.tailscaleEnabled() ? "local-and-private" : "network";
+            } else if (manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired()) {
+                mode = "private";
+            } else {
+                // Catalog "local" means LAN; runtime "local" means this server only.
+                mode = switch (manifest.access().defaultMode()) {
+                    case "local" -> "network";
+                    case "none" -> "local";
+                    default -> manifest.access().defaultMode();
+                };
+            }
         }
         if (!List.of("local", "network", "private", "local-and-private").contains(mode)) {
             throw new InstallationException("Choose this server, home network, or private access.");
@@ -108,7 +120,9 @@ public class InstallCustomizationResolver {
         if (manifest.access().privateDashboard() && (mode.equals("network") || mode.equals("local-and-private"))) {
             throw new InstallationException(manifest.name() + " dashboard must stay on this server or private Tailscale devices.");
         }
-        if (manifest.usage().privateHttpsRequired()) return "private";
+        if (manifest.usage().privateHttpsRequired() && !mode.equals("private")) {
+            throw new InstallationException(manifest.name() + " requires private HTTPS access. Choose Private HTTPS.");
+        }
         if (manifest.runtime().network().equalsIgnoreCase("host") && (mode.equals("local") || mode.equals("private"))) {
             throw new InstallationException("This app uses host networking and cannot enforce server-only dashboard access.");
         }

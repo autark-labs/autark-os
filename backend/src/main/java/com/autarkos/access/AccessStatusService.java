@@ -67,7 +67,7 @@ public class AccessStatusService {
         if ("verified".equals(route.privateLinkStatus()) && hasText(route.privateUrl())) {
             return "private_ready";
         }
-        if (application.runtime().desiredAccess() != null && application.runtime().desiredAccess().privateAccessRequired()) {
+        if (application.runtime().desiredAccess() != null && List.of("private", "local-and-private").contains(application.runtime().desiredAccess().mode())) {
             return "waiting".equals(route.privateLinkStatus()) ? "private_waiting" : "private_needs_setup";
         }
         return hasText(route.localUrl()) ? "local_ready" : "not_ready";
@@ -76,7 +76,7 @@ public class AccessStatusService {
     public AccessStatus status() {
         List<ManagedAccessApp> apps = appViews.get();
         TailscaleStatus status = tailscaleStatus.get();
-        AccessTailscaleStatus tailscale = tailscale(status, apps);
+        AccessTailscaleStatus tailscale = tailscale(status);
         List<AccessAppStatus> appStatuses = apps.stream()
                 .map(this::appStatus)
                 .toList();
@@ -85,17 +85,15 @@ public class AccessStatusService {
         return new AccessStatus(mode(tailscale, apps), serverLanUrl.get(), tailscale, appStatuses, issues, actions, clock.get());
     }
 
-    private AccessTailscaleStatus tailscale(TailscaleStatus status, List<ManagedAccessApp> apps) {
+    private AccessTailscaleStatus tailscale(TailscaleStatus status) {
         boolean mock = "dev".equalsIgnoreCase(status.state());
-        boolean magicDnsReady = status.connected() && hasText(status.dnsName());
-        boolean privateAppReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
         return new AccessTailscaleStatus(
                 status.installed(),
                 status.connected(),
                 clean(status.dnsName(), status.deviceName()),
-                magicDnsReady,
-                magicDnsReady,
-                mock || privateAppReady,
+                status.magicDnsReady(),
+                status.httpsReady(),
+                status.serveReady(),
                 mock ? "mock" : status.installed() ? "real" : "unavailable");
     }
 
@@ -114,7 +112,8 @@ public class AccessStatusService {
             return "mocked_dev";
         }
         boolean privateReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
-        if (privateReady && tailscale.signedIn() && tailscale.magicDnsReady()) {
+        if (privateReady && tailscale.signedIn() && Boolean.TRUE.equals(tailscale.magicDnsReady())
+                && Boolean.TRUE.equals(tailscale.httpsReady()) && Boolean.TRUE.equals(tailscale.serveReady())) {
             return "private_ready";
         }
         if (privateAccessRequested(apps)) {
@@ -141,6 +140,8 @@ public class AccessStatusService {
             appendAppAccessIssues(issues, apps);
             return issues;
         }
+        appendAppAccessIssues(issues, apps);
+        if (!issues.isEmpty()) return issues;
         if (!status.installed()) {
             issues.add(AutarkOsIssueFactory.accessIssue(
                     "tailscale-not-installed",
@@ -149,7 +150,7 @@ public class AccessStatusService {
                     "tailscale_not_installed",
                     "Tailscale is not installed",
                     "Private links need Tailscale installed and signed in on the Autark-OS host.",
-                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access")));
+                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access?tab=advanced")));
         } else if (!status.connected()) {
             issues.add(AutarkOsIssueFactory.accessIssue(
                     "tailscale-not-signed-in",
@@ -158,8 +159,8 @@ public class AccessStatusService {
                     "tailscale_not_signed_in",
                     "Sign in to Tailscale",
                     "Private links are configured, but this host is not signed in to Tailscale yet.",
-                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access")));
-        } else if (!tailscale.magicDnsReady()) {
+                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access?tab=advanced")));
+        } else if (!Boolean.TRUE.equals(tailscale.magicDnsReady())) {
             issues.add(AutarkOsIssueFactory.accessIssue(
                     "tailscale-magicdns-not-ready",
                     "tailscale",
@@ -167,9 +168,14 @@ public class AccessStatusService {
                     "tailscale_magicdns_not_ready",
                     "Tailscale DNS is not ready",
                     "Private links need this host to have a Tailscale DNS name.",
-                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access")));
+                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access?tab=advanced")));
+        } else if (!Boolean.TRUE.equals(tailscale.httpsReady())) {
+            issues.add(AutarkOsIssueFactory.accessIssue(
+                    "tailscale-https-not-ready", "tailscale", "warning", "tailscale_https_not_ready",
+                    "Private HTTPS needs attention",
+                    "Autark-OS has not confirmed certificate support for this host. Check Tailscale HTTPS settings.",
+                    AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access?tab=advanced")));
         }
-        appendAppAccessIssues(issues, apps);
         return issues;
     }
 
@@ -177,8 +183,8 @@ public class AccessStatusService {
         List<AutarkOsAction> actions = new ArrayList<>();
         if ("mock".equals(tailscale.mode())) {
             actions.add(AutarkOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics"));
-        } else if (privateAccessRequested(apps) && (!status.installed() || !status.connected() || !tailscale.magicDnsReady())) {
-            actions.add(AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access"));
+        } else if (privateAccessRequested(apps) && (!status.installed() || !status.connected() || !Boolean.TRUE.equals(tailscale.magicDnsReady()) || !Boolean.TRUE.equals(tailscale.httpsReady()))) {
+            actions.add(AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access?tab=advanced"));
         }
         apps.stream()
                 .filter(app -> hasText(app.localUrl()) || hasText(app.privateUrl()))

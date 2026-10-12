@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  acknowledgePendingReachability,
-  applyPendingReachability,
   filterReachabilityServices,
-  removePendingReachabilityForToken,
-  removeServiceProcessingForToken,
   settingsForReachabilityZone,
 } from '../NetworkPage.reachability';
 import type { ReachabilityService } from '../NetworkPage.types';
@@ -43,19 +39,6 @@ describe('NetworkPage reachability helpers', () => {
       .toEqual([managedService, attentionService]);
   });
 
-  it('shows an optimistic zone only until its matching canonical result settles', () => {
-    const pending = { vaultwarden: { acknowledged: false, token: 3, zone: 'tailnet' as const } };
-    expect(applyPendingReachability([managedService], pending)).toMatchObject([
-      { zone: 'tailnet', statusLabel: 'Processing' },
-    ]);
-
-    const acknowledged = acknowledgePendingReachability(pending, 'vaultwarden', 3);
-    expect(acknowledged.vaultwarden.acknowledged).toBe(true);
-    expect(removePendingReachabilityForToken(acknowledged, 'vaultwarden', 2)).toBe(acknowledged);
-    expect(removePendingReachabilityForToken(acknowledged, 'vaultwarden', 3)).toEqual({});
-    expect(removeServiceProcessingForToken({ vaultwarden: 3 }, 'vaultwarden', 2)).toEqual({ vaultwarden: 3 });
-  });
-
   it('builds LAN settings that turn off private access while preserving safe defaults', () => {
     const app = {
       appId: 'vaultwarden',
@@ -74,4 +57,10 @@ describe('NetworkPage reachability helpers', () => {
       tailscaleEnabled: false,
     });
   });
+  it('keeps private-only distinct from the explicit LAN plus private selection', () => {
+    const app = { settings: { backup: { enabled: true, frequency: 'hourly', retention: 7 } } } as never;
+    expect(settingsForReachabilityZone(app, 'tailnet')).toMatchObject({ desiredAccessMode: 'private', tailscaleEnabled: true, privateAccessRequirement: 'required', backup: { frequency: 'hourly' } });
+    expect(settingsForReachabilityZone(app, 'lan-and-private')).toMatchObject({ desiredAccessMode: 'local-and-private', tailscaleEnabled: true });
+  });
+
 });

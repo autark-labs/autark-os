@@ -20,7 +20,7 @@ test(`app settings preserve edits and show job recovery at ${width}px`, async ({
   await page.route('**/api/jobs', route => route.fulfill({ json: submitted ? [job()] : [] }));
   await page.route('**/api/jobs/settings-recovery-test', route => route.fulfill({ json: job() }));
   await page.route('**/api/apps/vaultwarden/settings-plan', route => route.fulfill({ json: {
-    appId: 'vaultwarden', appName: 'Vaultwarden', impact: 'redeploy_required', headline: 'App configuration change',
+    planId: 'reviewed-settings', appId: 'vaultwarden', appName: 'Vaultwarden', impact: 'redeploy_required', headline: 'App configuration change',
     summary: 'Running apps restart; paused apps stay paused.', saveAllowed: true, redeployRequired: true,
     restartRequired: false, dataMigrationRequired: false, changes: ['Change port'], warnings: [], blockedReasons: [],
   } }));

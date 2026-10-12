@@ -7,14 +7,14 @@ import { statusTone } from './extensions/NetworkPage.theme';
 import type { NetworkIssueView } from './extensions/NetworkPage.types';
 import { EmptyState, NetworkInset, NetworkPanel } from './NetworkPage.shared';
 
-export function NetworkIssuesPanel({ issues, onReviewPrivateLinks, onReviewServices }: { issues: NetworkIssueView[]; onReviewPrivateLinks: () => void; onReviewServices: () => void }) {
+export function NetworkIssuesPanel({ issues, stale, onReviewPrivateLinks, onReviewServices }: { issues: NetworkIssueView[]; stale?: boolean; onReviewPrivateLinks: () => void; onReviewServices: (appId?: string) => void }) {
   return (
     <NetworkPanel
       description="Only items that need attention appear here."
       title="Issues to review"
     >
         {issues.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="No network issues found" text="Autark-OS does not see any private access problems right now." />
+          <EmptyState icon={CheckCircle2} title={stale ? 'Issue checks are stale' : 'No network issues found'} text={stale ? 'Refresh failed. The last check found no issues; current status is unknown.' : 'Autark-OS does not see any private access problems right now.'} />
         ) : (
           issues.map((issue) => (
             <NetworkInset className="flex gap-3 p-4" key={issue.id}>
@@ -30,12 +30,12 @@ export function NetworkIssuesPanel({ issues, onReviewPrivateLinks, onReviewServi
                 {issue.detail && <span className="mt-1 block text-xs text-sky-100/70">{issue.detail}</span>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {issue.source === 'app' || issue.id.startsWith('stale-') ? (
-                    <ProjectPrimaryButton onClick={issue.id.startsWith('stale-') ? onReviewPrivateLinks : onReviewServices} size="sm" type="button">
-                      {issue.id.startsWith('stale-') ? 'Review unused links' : 'Review services'}
+                    <ProjectPrimaryButton onClick={issue.id.startsWith('stale-') ? onReviewPrivateLinks : () => onReviewServices(issue.appId)} size="sm" type="button">
+                      {issue.id.startsWith('stale-') ? 'Review unused links' : issue.appId ? 'Review app' : 'Review services'}
                     </ProjectPrimaryButton>
                   ) : (
                     <ProjectDarkControlButton asChild size="sm">
-                      <Link to="/diagnostics">Open diagnostics</Link>
+                      <Link to={issue.actionLabel?.toLowerCase().includes('connect') ? '/access?tab=advanced' : '/diagnostics'}>{issue.actionLabel?.toLowerCase().includes('connect') ? 'Connect this host' : 'Open diagnostics'}</Link>
                     </ProjectDarkControlButton>
                   )}
                   {issue.actionLabel && <span className="text-xs text-sky-100/55">{issue.actionLabel}</span>}

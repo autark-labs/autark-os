@@ -2,7 +2,6 @@ package com.autarkos.network.api;
 
 import java.util.List;
 
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,7 +19,6 @@ import com.autarkos.network.diagnostics.NetworkDiagnosticsReport;
 import com.autarkos.network.diagnostics.NetworkDiagnosticsService;
 import com.autarkos.network.tailscale.TailscaleConnectGuide;
 import com.autarkos.network.tailscale.TailscaleDevice;
-import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
@@ -68,11 +66,6 @@ public class NetworkController {
     @GetMapping("/private-access/reconciliation")
     public AccessModels.PrivateAccessReconciliationReport privateAccessReconciliation() {
         return privateAccessReconciliationService.report();
-    }
-
-    @DeleteMapping("/private-access/stale/{port}")
-    public TailscaleServeResult removeStalePrivateAccess(@PathVariable int port) {
-        return privateAccessReconciliationService.removeStaleMapping(port);
     }
 
     @GetMapping("/tailscale/connect-guide")

@@ -37,15 +37,11 @@ test('reachability cards support keyboard details and non-drag access changes', 
   assert.match(matrix, /dragEnabled/);
 });
 
-test('new reachability operations cannot be cleared by an older timeout', () => {
+test('reachability pending follows jobs instead of a local completion timer', () => {
   const page = source('src/pages/NetworkPage/NetworkPage.tsx');
-  const reachability = source('src/pages/NetworkPage/extensions/NetworkPage.reachability.ts');
-
-  assert.match(page, /processingServiceTokens/);
-  assert.match(page, /setServiceProcessingToken\(current, service\.id, pendingToken\)/);
-  assert.match(page, /removeServiceProcessingForToken\(current, service\.id, pendingToken\)/);
-  assert.match(reachability, /if \(current\[serviceId\] !== token\) return current;/);
-  assert.match(page, /loadingServiceIds/);
+  assert.match(page, /useAutarkOsJobsQuery/);
+  assert.match(page, /application.operation.kind/);
+  assert.doesNotMatch(page, /processingServiceTokens|20000/);
 });
 
 test('Access no longer duplicates private-access setup guidance in the page body', () => {

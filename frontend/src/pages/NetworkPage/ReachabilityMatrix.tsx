@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { applicationDeepLinkForManagedApp } from '@/pages/ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { CheckCircle2, CircleAlert, Copy, ExternalLink, GripVertical, Lock, Router, Server, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { DragEvent } from 'react';
@@ -78,7 +80,7 @@ export function ReachabilityMatrix({
   loadingServiceIds: Record<string, boolean>;
   onCopyLink: (serviceId: string, linkKind: 'local' | 'private', url: string | null) => void;
   onFocusService: (service: ReachabilityService) => void;
-  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
+  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId | 'lan-and-private') => void;
 }) {
   const [draggedServiceId, setDraggedServiceId] = useState<string | null>(null);
   const [activeDropZone, setActiveDropZone] = useState<ReachabilityZoneId | null>(null);
@@ -273,7 +275,7 @@ function ReachabilityCard({
   onDragEnd?: () => void;
   onDragStart?: (event: DragEvent<HTMLElement>, service: ReachabilityService) => void;
   onFocusService: (service: ReachabilityService) => void;
-  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
+  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId | 'lan-and-private') => void;
   service: ReachabilityService;
 }) {
   const statusTone = reachabilityStatusTone(service.status);
@@ -347,6 +349,9 @@ function ReachabilityCard({
               />
             </div>
             <SecurityPostureToggleGroup loading={loading} onMoveService={onMoveService} service={service} />
+            {service.issue && <ProjectDarkControlButton asChild size="sm">
+              <Link to={service.reviewHref || applicationDeepLinkForManagedApp(service.id, { panel: 'manage' })}>Review app</Link>
+            </ProjectDarkControlButton>}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
@@ -370,7 +375,7 @@ function MobileReachabilityZone({
   loadingServiceIds: Record<string, boolean>;
   onCopyLink: (serviceId: string, linkKind: 'local' | 'private', url: string | null) => void;
   onFocusService: (service: ReachabilityService) => void;
-  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
+  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId | 'lan-and-private') => void;
   serviceCount: number;
   services: ReachabilityService[];
   zone: Zone;
@@ -453,7 +458,7 @@ function SecurityPostureToggleGroup({
   service,
 }: {
   loading: boolean;
-  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
+  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId | 'lan-and-private') => void;
   service: ReachabilityService;
 }) {
   const reason = 'Autark-OS is already updating this service.';
@@ -461,28 +466,29 @@ function SecurityPostureToggleGroup({
     <DisabledAction disabled={loading} reason={reason}>
       <ToggleGroup
         aria-label={`Security posture for ${service.label}`}
-        className="mt-3 grid w-full grid-cols-3 rounded-lg border border-cyan-200/20 bg-cyan-950/60 p-1"
+        className="mt-3 grid w-full grid-cols-4 rounded-lg border border-cyan-200/20 bg-cyan-950/60 p-1"
         disabled={loading}
         onValueChange={(value) => {
-          if (!value || value === service.zone) {
+          if (!value) {
             return;
           }
-          onMoveService(service, value as ReachabilityZoneId);
+          onMoveService(service, value as ReachabilityZoneId | 'lan-and-private');
         }}
         spacing={1}
         type="single"
-        value={service.zone}
+        value={service.app?.settings?.desiredAccessMode === 'local-and-private' ? 'lan-and-private' : service.zone}
         variant="outline"
       >
         <SecurityPostureToggleItem value="local">Server</SecurityPostureToggleItem>
         <SecurityPostureToggleItem value="lan">Home</SecurityPostureToggleItem>
         <SecurityPostureToggleItem value="tailnet">Private</SecurityPostureToggleItem>
+        <SecurityPostureToggleItem value="lan-and-private">LAN + private</SecurityPostureToggleItem>
       </ToggleGroup>
     </DisabledAction>
   );
 }
 
-function SecurityPostureToggleItem({ children, value }: { children: string; value: ReachabilityZoneId }) {
+function SecurityPostureToggleItem({ children, value }: { children: string; value: ReachabilityZoneId | 'lan-and-private' }) {
   return (
     <ToggleGroupItem
       className={cn(

@@ -28,7 +28,7 @@ import {
 } from './OnboardingWizard.logic';
 
 type OnboardingWizardProps = {
-  onComplete: () => void;
+  onComplete: (connectTailscale: boolean) => void;
 };
 
 const starterApps = betaScope.apps.filter((app) => app.starter);
@@ -155,7 +155,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       await persistDraft(6);
       await persistSetupProgress(draft.privateAccessChoice);
       await SystemAPIClient.completeOnboarding();
-      onComplete();
+      onComplete(draft.privateAccessChoice === 'setup-now' && !state.tailscaleConnected);
     } catch (saveError) {
       setError(apiErrorMessage(saveError, 'Setup could not be saved.'));
     } finally {
@@ -290,7 +290,7 @@ function AccessStep({ draft, onChange, state }: { draft: OnboardingDraft; onChan
       </div>
       <div className="rounded-xl border border-sky-400/25 bg-slate-800 p-4 text-sm leading-6 text-slate-300">
         <p>Local setup URL: <span className="font-semibold text-white">{state.doctor.lanUrl}</span></p>
-        {draft.privateAccessChoice === 'setup-now' && <p className="mt-2">{accessGroup?.message || 'Autark-OS will guide private links after setup.'}</p>}
+        {draft.privateAccessChoice === 'setup-now' && <p className="mt-2">{accessGroup?.message || 'Private access is optional.'} After setup, Autark-OS will open this host’s connection guide.</p>}
         {draft.privateAccessChoice === 'local-only' && <p className="mt-2">Local-only setup is supported. You can configure private access from Access later.</p>}
         {draft.privateAccessChoice === 'already-connected' && <p className="mt-2">{state.tailscaleConnected ? 'Autark-OS sees Tailscale connected.' : 'Autark-OS does not see Tailscale connected yet; local access remains available.'}</p>}
       </div>

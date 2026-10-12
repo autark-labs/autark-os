@@ -236,14 +236,18 @@ public class ApplicationInventoryService {
                     AutarkOsAction.route("open-backups-" + runtime.appId(), "Open backups", "/backups")));
         }
         if (runtime.observedAccess() != null && runtime.desiredAccess() != null
-                && runtime.desiredAccess().privateAccessRequired()
+                && (runtime.desiredAccess().privateAccessRequired() || List.of("private", "local-and-private").contains(runtime.desiredAccess().mode()))
                 && !"verified".equals(runtime.observedAccess().privateLinkStatus())) {
             String status = runtime.observedAccess().privateLinkStatus();
             issues.add(AutarkOsIssueFactory.accessIssue(
                     "private-access-" + runtime.appId(), runtime.appId(), "waiting".equals(status) ? "info" : "warning",
                     "private_access_" + status, runtime.appName() + " private link needs setup",
                     healthDetail(runtime),
-                    AutarkOsAction.post("repair-private-" + runtime.appId(), "Repair private link", "/api/apps/" + runtime.appId() + "/private-access/repair", false, false)));
+                    "waiting".equals(status)
+                            ? AutarkOsAction.route("connect-private-" + runtime.appId(), "Connect this server", "/access?tab=advanced")
+                            : "mismatched".equals(status) || "unknown".equals(status)
+                                    ? AutarkOsAction.route("review-private-" + runtime.appId(), "Review private links", "/access?tab=advanced")
+                                    : AutarkOsAction.post("repair-private-" + runtime.appId(), "Repair private link", "/api/apps/" + runtime.appId() + "/repair", false, false)));
         }
         return List.copyOf(issues);
     }

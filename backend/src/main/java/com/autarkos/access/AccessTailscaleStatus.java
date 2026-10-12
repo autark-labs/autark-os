@@ -4,8 +4,8 @@ public record AccessTailscaleStatus(
         boolean installed,
         boolean signedIn,
         String hostname,
-        boolean magicDnsReady,
-        boolean httpsReady,
-        boolean serveReady,
+        Boolean magicDnsReady,
+        Boolean httpsReady,
+        Boolean serveReady,
         String mode) {
 }

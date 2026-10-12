@@ -1,7 +1,5 @@
 package com.autarkos.marketplace.install;
 
-import static com.autarkos.marketplace.install.AppPrivateAccessPorts.portFromUrl;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -11,11 +9,9 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.apps.ApplicationViews;
-import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.tailscale.TailscaleServeConfig;
 import com.autarkos.network.tailscale.TailscaleServeMapping;
-import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
@@ -23,13 +19,11 @@ import com.autarkos.network.tailscale.TailscaleStatus;
 public class PrivateAccessReconciliationService {
 
     private final ApplicationStateService applicationStateService;
-    private final MarketplaceCatalogService catalogService;
     private final TailscaleService tailscaleService;
     private final PrivateAccessStateResolver stateResolver;
 
-    public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
+    public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, TailscaleService tailscaleService, InstalledAppRepository repository) {
         this.applicationStateService = applicationStateService;
-        this.catalogService = catalogService;
         this.tailscaleService = tailscaleService;
         this.stateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
     }
@@ -39,23 +33,15 @@ public class PrivateAccessReconciliationService {
         List<AppRuntimeView> privateApps = runtimeApps().stream()
                 .filter(this::wantsPrivateAccess)
                 .toList();
-        if (privateApps.isEmpty()) {
-            return new AccessModels.PrivateAccessReconciliationReport(
-                    "healthy",
-                    "No private app links to verify",
-                    "Apps will appear here after private access is enabled.",
-                    List.of(),
-                    List.of(),
-                    Instant.now());
-        }
         if (!status.installed()) {
-            return unavailableReport("warning", "Install Tailscale to verify private links", "Autark-OS cannot inspect private app links until Tailscale is installed.", privateApps, status);
+            return unavailableReport(privateApps.isEmpty() ? "optional" : "warning", "Install Tailscale to verify private links", "Autark-OS cannot inspect private app links until Tailscale is installed.", privateApps, status);
         }
         if (!status.connected()) {
-            return unavailableReport("warning", "Connect Tailscale to verify private links", "Autark-OS cannot inspect private app links until this device is connected.", privateApps, status);
+            return unavailableReport(privateApps.isEmpty() ? "optional" : "warning", "Connect Tailscale to verify private links", "Autark-OS cannot inspect private app links until this device is connected.", privateApps, status);
         }
 
         TailscaleServeConfig config = tailscaleService.serveConfig();
+        if (!config.available()) return unavailableReport("unavailable", "Private links could not be checked", config.message(), privateApps, status);
         List<AccessModels.PrivateAccessReconciliationItem> items = privateApps.stream()
                 .map(app -> reconcile(app, status, config))
                 .toList();
@@ -66,36 +52,10 @@ public class PrivateAccessReconciliationService {
                 warning ? "warning" : "healthy",
                 warning ? "Some private links need review" : "Private links are verified",
                 healthy + " of " + items.size() + " private app link(s) match Tailscale Serve."
-                        + (staleMappings.isEmpty() ? "" : " " + staleMappings.size() + " stale mapping(s) may be left over."),
+                        + (staleMappings.isEmpty() ? "" : " " + staleMappings.size() + " unassigned mapping(s) need review."),
                 items,
                 staleMappings,
                 Instant.now());
-    }
-
-    public TailscaleServeResult removeStaleMapping(int httpsPort) {
-        if (httpsPort < 1 || httpsPort > 65535) {
-            throw new InstallationException("Private access port must be between 1 and 65535.");
-        }
-        if (!knownAutarkOsPorts().contains(httpsPort)) {
-            throw new InstallationException("Autark-OS does not recognize this as one of its managed app ports.");
-        }
-        TailscaleStatus tailscale = tailscaleService.status();
-        TailscaleServeConfig config = tailscale.connected()
-                ? tailscaleService.serveConfig()
-                : TailscaleServeConfig.unavailable("not_connected", "Tailscale is not connected.", List.of());
-        boolean appStillExpectsPort = runtimeApps().stream()
-                .filter(this::wantsPrivateAccess)
-                .map(app -> stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config).expectedHttpsPort())
-                .filter(Objects::nonNull)
-                .anyMatch(port -> port == httpsPort);
-        if (appStillExpectsPort) {
-            throw new InstallationException("This private link still belongs to an installed app. Use Repair or turn private access off from the app instead.");
-        }
-        TailscaleServeResult result = tailscaleService.disableHttps(httpsPort);
-        if (!result.configured()) {
-            throw new InstallationException(result.message());
-        }
-        return result;
     }
 
     private AccessModels.PrivateAccessReconciliationReport unavailableReport(String status, String headline, String summary, List<AppRuntimeView> apps, TailscaleStatus tailscale) {
@@ -156,10 +116,8 @@ public class PrivateAccessReconciliationService {
                 .map(app -> stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config).expectedHttpsPort())
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
-        Set<Integer> autarkOsPorts = knownAutarkOsPorts();
         return config.mappings().stream()
                 .filter(mapping -> mapping.servePort() != null)
-                .filter(mapping -> autarkOsPorts.contains(mapping.servePort()))
                 .filter(mapping -> !expectedPorts.contains(mapping.servePort()))
                 .map(mapping -> new AccessModels.PrivateAccessStaleMapping(
                         mapping.serviceName() == null || mapping.serviceName().isBlank()
@@ -170,34 +128,10 @@ public class PrivateAccessReconciliationService {
                         mapping.servePort(),
                         mapping.target(),
                         mapping.targetPort(),
-                        "Stale private link found",
-                        "Tailscale Serve still has an HTTPS link on port " + mapping.servePort() + ", but no installed app currently expects it.",
-                        "Remove stale link"))
+                        "Unassigned private link found",
+                        "No managed app currently expects this endpoint. Its ownership cannot be confirmed, so Autark-OS leaves it unchanged. Review it in Tailscale diagnostics.",
+                        null))
                 .toList();
-    }
-
-    private Set<Integer> knownAutarkOsPorts() {
-        List<AppRuntimeView> apps = runtimeApps();
-        Set<Integer> ports = apps.stream()
-                .map(app -> app.observedAccess() == null ? null : app.observedAccess().localPort())
-                .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-        apps.stream()
-                .map(this::storedPrivateUrl)
-                .map(AppPrivateAccessPorts::portFromUrl)
-                .filter(Objects::nonNull)
-                .forEach(ports::add);
-        catalogService.findAll().stream()
-                .map(manifest -> portFromUrl(manifest.accessUrl()))
-                .filter(Objects::nonNull)
-                .forEach(ports::add);
-        catalogService.findAll().forEach(manifest -> {
-            Integer localPort = portFromUrl(manifest.accessUrl());
-            if (localPort != null) {
-                ports.add(AppPrivateAccessPorts.defaultHttpsPort(manifest.id(), localPort));
-            }
-        });
-        return ports;
     }
 
     private List<AppRuntimeView> runtimeApps() {

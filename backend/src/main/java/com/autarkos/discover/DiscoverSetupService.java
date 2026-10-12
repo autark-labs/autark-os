@@ -1,5 +1,6 @@
 package com.autarkos.discover;
 
+import com.autarkos.marketplace.install.InstallCustomizationResolver;
 import com.autarkos.system.ProjectSettings;
 import com.autarkos.system.ProjectSettingsService;
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ public class DiscoverSetupService {
                 "choice",
                 "recommended",
                 true,
-                manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired() ? "private_only" : manifest.access().privateAccessRecommended() ? "private_lan" : "lan_only",
+                defaultAccessChoice(manifest),
                 "Choose where the app can be opened from. Private access means trusted Tailscale devices can open the app away from home.",
                 accessOptions(manifest),
                 Map.of()));
@@ -166,10 +167,26 @@ public class DiscoverSetupService {
                     option("private_only", "Private devices", "Open the dashboard through Tailscale or on this server.", true, false),
                     option("local_only", "This server only", "Open the dashboard only on this server.", false, false));
         }
-        return List.of(
-                option("private_lan", "Private + home network", "Available on your home network and to trusted Tailscale devices.", true, false),
-                option("lan_only", "Home network only", "Available only to devices on your home network.", false, false),
-                option("local_only", "This server only", "Useful for internal tools that should not be exposed.", false, false));
+        String recommended = defaultAccessChoice(manifest);
+        List<DiscoverSetupModels.DiscoverSetupOption> choices = new ArrayList<>();
+        if (!manifest.runtime().network().equalsIgnoreCase("host")) {
+            choices.add(option("private_only", "Private devices", "Open the dashboard through Tailscale or on this server. The home network dashboard port stays closed.", recommended.equals("private_only"), false));
+        }
+        choices.add(option("private_lan", "Private + home network", "Available on your home network and to trusted Tailscale devices.", recommended.equals("private_lan"), false));
+        choices.add(option("lan_only", "Home network only", "Available only to devices on your home network.", recommended.equals("lan_only"), false));
+        if (!manifest.runtime().network().equalsIgnoreCase("host")) {
+            choices.add(option("local_only", "This server only", "Useful for internal tools that should not be exposed.", recommended.equals("local_only"), false));
+        }
+        return List.copyOf(choices);
+    }
+
+    private String defaultAccessChoice(ApplicationManifest manifest) {
+        return switch (InstallCustomizationResolver.accessMode(manifest, null)) {
+            case "private" -> "private_only";
+            case "local-and-private" -> "private_lan";
+            case "network" -> "lan_only";
+            default -> "local_only";
+        };
     }
 
     private List<DiscoverSetupModels.DiscoverSetupOption> storageOptions() {

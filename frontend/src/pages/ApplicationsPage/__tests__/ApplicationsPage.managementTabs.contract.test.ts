@@ -50,9 +50,7 @@ test('applications page splits settings and links management tabs into focused c
   assert.match(telemetry, /item\.runtime\.health/);
   assert.match(telemetry, /memoryPercent/);
   assert.match(telemetry, /networkIo/);
-  assert.match(page, /InstalledAppsAPIClient\.updateSettings\(appId, nextSettings\)/);
-  assert.match(page, /InstalledAppsAPIClient\.enablePrivateAccess\(appId\)/);
-  assert.match(page, /InstalledAppsAPIClient\.disablePrivateAccess\(appId\)/);
+  assert.match(page, /InstalledAppsAPIClient\.updateSettings\(appId, nextSettings, planId\)/);
   assert.match(liveModel, /links: appLinks\(app\)/);
   assert.match(liveModel, /settings: appSettings\(app\)/);
   assert.match(liveModel, /runtime: appRuntimeDetails\(app, health, telemetry\)/);
@@ -69,17 +67,14 @@ test('applications page settings tab uses a guarded batch form for app settings'
   assert.match(settings, /formState:\s*\{\s*isDirty/);
   assert.match(settings, /Save changes/);
   assert.match(settings, /Reset/);
-  assert.match(settings, /Restart required|Safe to save/);
   assert.match(settings, /beforeunload/);
   assert.match(settings, /onDirtyChange\(item\.id, isDirty\)/);
-  assert.match(settings, /onSaveSettings\(item\.id, pendingValues\)/);
+  assert.match(settings, /onSaveSettings\(item\.id, pendingValues, pendingImpact!\.planId\)/);
   assert.doesNotMatch(settings, /onAutoRepairChange\(item\.id, checked\)/);
   assert.doesNotMatch(settings, /onPrivateAccessChange\(item\.id, checked\)/);
-  assert.match(settings, /onSetPrivateNetworkAccess/);
-  assert.match(settings, /actions\.onSetPrivateNetworkAccess\(item\.id, checked\)/);
-  assert.match(page, /saveApplicationSettings\(appId: string, values: ApplicationSettingsFormValues\)/);
+  assert.match(page, /saveApplicationSettings\(appId: string, values: ApplicationSettingsFormValues, planId: string\)/);
   assert.match(page, /InstalledAppsAPIClient\.settingsChangePlan\(appId, nextSettings\)/);
-  assert.match(page, /InstalledAppsAPIClient\.updateSettings\(appId, nextSettings\)/);
+  assert.match(page, /InstalledAppsAPIClient\.updateSettings\(appId, nextSettings, planId\)/);
   assert.doesNotMatch(page, /values\.tailscaleEnabled !== app\.settings\?\.tailscaleEnabled/);
   assert.doesNotMatch(page, /appWithOptimisticPrivateAccess/);
   assert.doesNotMatch(settings, /name="tailscaleEnabled"/);
@@ -89,7 +84,7 @@ test('applications page settings tab uses a guarded batch form for app settings'
 test('applications page settings tab uses real controls and confirm-before-save planning', () => {
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
-  assert.match(settings, /AlertDialog/);
+  assert.match(settings, /SettingsChangeReview/);
   assert.match(settings, /Tooltip/);
   assert.match(settings, /Input/);
   assert.match(settings, /Select/);
@@ -109,7 +104,7 @@ test('settings feedback does not claim that a paused app was restarted', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   assert.match(page, /showActionNotification\(updatedApp\)/);
   assert.doesNotMatch(page, /Settings saved and restart requested/);
-  assert.match(page, /void invalidateApplicationState\(queryClient\);\s*showActionErrorNotification\(err, 'Settings update failed'\)/);
+  assert.match(page, /void invalidateApplicationState\(queryClient\);[\s\S]*showActionErrorNotification\(err, 'Settings update failed'\)/);
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache/);
 });
 

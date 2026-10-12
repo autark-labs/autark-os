@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage, type FixtureScenario } from './support/mockApi';
 
-test('private-access feedback saves descriptive text while retaining the working app link', async ({ page }) => {
+test('reviewed private-access job feedback keeps private URLs out of notifications while retaining the app link', async ({ page }) => {
   await installMockApi(page, 'ready');
   await page.goto('/access');
   const state = await page.evaluate(async () => (await fetch('/api/application-state')).json());
@@ -21,25 +21,27 @@ test('private-access feedback saves descriptive text while retaining the working
     saved = route.request().postDataJSON();
     return route.fulfill({ json: { id: 991, ...saved } });
   });
-  await page.route('**/api/apps/vaultwarden/private-access/enable', route => {
-    app.settings.desiredAccessMode = 'local-and-private';
+  await page.route('**/api/jobs', route => route.fulfill({ json: [] }));
+  await page.route('**/api/apps/vaultwarden/settings-plan', route => route.fulfill({ json: { planId: 'access-review', headline: 'Review access', summary: 'LAN to private only; restart required.', saveAllowed: true, changes: [], warnings: [], blockedReasons: [] } }));
+  await page.route('**/api/apps/vaultwarden/settings', route => {
+    app.settings.desiredAccessMode = 'private';
     app.settings.tailscaleEnabled = true;
     app.accessRoute.privateLinkStatus = 'verified';
     app.accessRoute.privateUrl = privateUrl;
     app.accessRoute.primaryOpenUrl = privateUrl;
     application.availableActions.find((action: { id: string }) => action.id === 'open').href = privateUrl;
-    return route.fulfill({ json: { appId: 'vaultwarden', action: 'private-access', status: 'completed',
-      message: 'Vaultwarden is available through its private HTTPS link. Use Open app to connect.', app, output: [], checkedAt: '2026-10-10T12:00:00Z' } });
+    return route.fulfill({ json: { jobId: 'private-review', type: 'save_app_settings', subjectId: 'vaultwarden', status: 'succeeded', currentStep: 'verified', steps: [{ id: 'verified', status: 'succeeded', label: 'Private link verified', message: 'Vaultwarden is available through its private HTTPS link. Use Open app to connect.' }], createdAt: '2026-10-10T12:00:00Z', updatedAt: '2026-10-10T12:00:00Z' } });
   });
   await page.reload();
   const service = page.getByRole('button', { name: /^Review Vaultwarden/ });
   await service.click();
   await service.locator('xpath=ancestor::*[@id][1]').getByRole('button', { name: 'Details and actions', exact: true }).click();
   await page.getByRole('group', { name: /^Security posture for Vaultwarden/ }).getByRole('radio', { name: 'Private', exact: true }).click();
+  await page.getByRole('button', { name: 'Save settings', exact: true }).click();
   await expect(page.locator('[data-sonner-toast]')).toContainText('Vaultwarden is available through its private HTTPS link');
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('fixture-private-host');
-  await expect.poll(() => saved?.message).toBe('Vaultwarden is available through its private HTTPS link. Use Open app to connect.');
-  expect(JSON.stringify(saved)).not.toContain('fixture-private-host');
+  // Durable jobs own history; do not duplicate their results in browser notification records.
+  expect(saved).toBeUndefined();
   await page.goto('/apps?focus=managed%3Avaultwarden&panel=manage');
   await expect(page.getByRole('link', { name: 'Open app', exact: true }).last()).toHaveAttribute('href', privateUrl);
 });
@@ -303,7 +305,7 @@ test('Tailscale header follows Access refresh and shares status requests', async
   await expect(page.getByRole('button', { name: 'Tailscale: Not signed in', exact: true })).toBeVisible();
   expect(initialRequests).toEqual([1, 1]);
   await page.getByRole('button', { name: 'Tailscale: Not signed in', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveAttribute('href', 'https://login.tailscale.com/start');
+  await expect(page.getByRole('link', { name: 'Connect this host', exact: true })).toHaveAttribute('href', '/access?tab=advanced');
   await page.getByRole('button', { name: 'sudo tailscale up', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('sudo tailscale up');
   connected = true;
@@ -357,37 +359,16 @@ test('Tailscale status failure stays unknown until a successful retry', async ({
   await expect(page).toHaveURL(/\/access/);
 });
 
-test('Tailscale stale-link removal refreshes shared counts once after confirmation', async ({ page }) => {
+test('Ambiguous Tailscale mappings stay untouched with an ownership explanation', async ({ page }) => {
   await installMockApi(page, 'idle');
+  await page.route('**/api/network/private-access/reconciliation', route => route.fulfill({ json: { apps: [], staleMappings: [{ id: 'unknown-12443', servePort: 12443, endpoint: 'https://fixture.ts.net:12443', target: 'http://127.0.0.1:8080', detail: 'Ownership could not be confirmed. This mapping is left unchanged.' }] } }));
+  const mutations: string[] = [];
+  page.on('request', request => { if (request.method() === 'DELETE') mutations.push(request.url()); });
   await page.goto('/access');
-  const report = await page.evaluate(async () => (await fetch('/api/network/private-access/reconciliation')).json());
-  report.staleMappings = [{ id: 'stale-12443', servePort: 12443, endpoint: 'https://fixture.ts.net:12443', target: 'http://127.0.0.1:8080' }];
-  let reconciliationRequests = 0;
-  let removed = false;
-  await page.route('**/api/network/private-access/reconciliation', route => {
-    reconciliationRequests++;
-    return route.fulfill({ json: report });
-  });
-  await page.route('**/api/network/private-access/stale/12443', route => {
-    expect(route.request().method()).toBe('DELETE');
-    removed = true;
-    report.staleMappings = [];
-    // A concurrently reconciled app becomes ready in the same refreshed report.
-    report.apps.push({ ...report.apps[0], appId: 'syncthing', appName: 'Syncthing' });
-    return route.fulfill({ json: { configured: true, message: 'Link removed' } });
-  });
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await page.getByRole('button', { name: '1 unused link', exact: true }).click();
-  await page.getByRole('button', { name: 'Remove stale link', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('No app data will be deleted.');
-  expect(removed).toBe(false);
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Remove stale link', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('No unused private links were found.');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Access / Unused private links' })).toHaveCount(0);
-  await page.getByRole('button', { name: /^Tailscale:/ }).click();
-  await expect(page.getByRole('dialog')).toContainText('Private links: 2 ready');
-  expect(reconciliationRequests).toBe(2);
+  await expect(page.getByRole('dialog')).toContainText('Ownership could not be confirmed');
+  await expect(page.getByRole('button', { name: 'Remove stale link', exact: true })).toHaveCount(0);
+  expect(mutations).toEqual([]);
 });
 
 async function openReadyRoute(page: Parameters<typeof installMockApi>[0], path: string, viewport: { width: number; height: number }, scenario: FixtureScenario = 'ready') {

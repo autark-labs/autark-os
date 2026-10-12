@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.install.PortAllocator;
+import com.autarkos.network.HostAddress;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
@@ -39,7 +40,7 @@ class PortAllocatorTests {
         RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
         assertThat(configuration.ports()).containsExactly(port + ":80");
-        assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + port);
+        assertThat(configuration.accessUrl()).isEqualTo("http://" + HostAddress.lanAddress() + ":" + port);
     }
 
     @Test
@@ -51,7 +52,7 @@ class PortAllocatorTests {
             RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
             assertThat(configuration.ports()).containsExactly((port + 1) + ":80");
-            assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + (port + 1));
+            assertThat(configuration.accessUrl()).isEqualTo("http://" + HostAddress.lanAddress() + ":" + (port + 1));
         }
     }
 
@@ -72,7 +73,7 @@ class PortAllocatorTests {
 
         RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
-        assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + webPort);
+        assertThat(configuration.accessUrl()).isEqualTo("http://" + HostAddress.lanAddress() + ":" + webPort);
     }
 
     @Test

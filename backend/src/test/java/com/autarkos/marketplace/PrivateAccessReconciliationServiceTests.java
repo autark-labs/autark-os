@@ -92,7 +92,7 @@ class PrivateAccessReconciliationServiceTests {
                         .toList(),
                 Instant.now()));
         reconciliationService = new PrivateAccessReconciliationService(
-                applicationStateService, catalogService, tailscaleService, repository);
+                applicationStateService, tailscaleService, repository);
 
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
@@ -112,9 +112,17 @@ class PrivateAccessReconciliationServiceTests {
     }
 
     @Test
+    void discoversAmbiguousMappingWithNoPrivateAppsWithoutClaimingOwnership() {
+        tailscaleService.config = serveConfig(new TailscaleServeMapping(null, "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:9999", 9999));
+        var report = reconciliationService.report();
+        assertThat(report.staleMappings()).hasSize(1);
+        assertThat(report.staleMappings().getFirst().actionLabel()).isNull();
+    }
+
+    @Test
     void verifiesDirectHttpsPortMatch() {
         repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:8090", 8090));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping(null, "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:8090", 8090));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
@@ -129,7 +137,7 @@ class PrivateAccessReconciliationServiceTests {
     @Test
     void verifiesDefaultHttpsPort443WhenEndpointHostMatches() {
         repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "https://autark-os.tail123.ts.net/", null, "http://127.0.0.1:8090", 8090));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping(null, "https://autark-os.tail123.ts.net/", null, "http://127.0.0.1:8090", 8090));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
@@ -149,7 +157,7 @@ class PrivateAccessReconciliationServiceTests {
                 "Up 2 minutes (healthy)",
                 "0.0.0.0:19090->80/tcp"));
         repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:12890", 12890, "http://127.0.0.1:19090", 19090));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping(null, "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:19090", 19090));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
@@ -184,13 +192,16 @@ class PrivateAccessReconciliationServiceTests {
     }
 
     @Test
-    void refusesToRemoveHttpsEndpointStillExpectedByInstalledApp() {
+    void observedMappingDoesNotVerifyUnknownOrUnsupportedHttps() {
         repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:12890", 12890, "http://127.0.0.1:8090", 8090));
-
-        assertThatThrownBy(() -> reconciliationService.removeStaleMapping(12890))
-                .isInstanceOf(InstallationException.class)
-                .hasMessageContaining("still belongs to an installed app");
+        tailscaleService.config = serveConfig(new TailscaleServeMapping(null, "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:8090", 8090));
+        for (Boolean readiness : java.util.Arrays.asList(false, null)) {
+            tailscaleService.httpsReady = readiness;
+            var item = onlyItem();
+            assertThat(item.status()).isEqualTo("waiting");
+            assertThat(item.actualPrivateUrl()).isNull();
+            assertThat(item.actionLabel()).isEqualTo("Check Tailscale");
+        }
     }
 
     private AccessModels.PrivateAccessReconciliationItem onlyItem() {
@@ -208,11 +219,12 @@ class PrivateAccessReconciliationServiceTests {
     }
 
     private static class FakeTailscaleService extends TailscaleService {
+        Boolean httpsReady = true;
         TailscaleServeConfig config = TailscaleServeConfig.unavailable("unavailable", "No fake config set.", List.of());
 
         @Override
         public TailscaleStatus status() {
-            return new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tail123.ts.net.", List.of("100.64.0.2"), "tail123.ts.net", "user@example.com");
+            return new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tail123.ts.net.", List.of("100.64.0.2"), "tail123.ts.net", "user@example.com", true, httpsReady, true);
         }
 
         @Override

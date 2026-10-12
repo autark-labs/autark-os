@@ -9,7 +9,6 @@ import java.util.regex.Pattern;
 
 import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.install.models.InstallModels;
-import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 class AppSettingsPolicy {
@@ -44,6 +43,10 @@ class AppSettingsPolicy {
         Integer requestedPort = requested.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(requested.accessUrl()) : requested.expectedLocalPort();
         boolean wantsLan = "network".equals(requested.desiredAccessMode()) || "local-and-private".equals(requested.desiredAccessMode());
         boolean hasLan = !com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl());
+        String currentMode = observedAccessMode(current, current.accessUrl());
+        if (!currentMode.equals(requested.desiredAccessMode())) {
+            changes.add("Access: " + accessModeLabel(currentMode) + " → " + accessModeLabel(requested.desiredAccessMode()) + ".");
+        }
         if (wantsLan != hasLan) {
             changes.add(wantsLan ? "The dashboard will become available on your home network." : "The dashboard will be limited to this server and any enabled private link.");
             redeployRequired = true;
@@ -63,8 +66,8 @@ class AppSettingsPolicy {
             blocked.add("The local protocol is configured by the app and cannot be changed here. Use Tailscale private access for an HTTPS link.");
         }
         if (current.tailscaleEnabled() != requested.tailscaleEnabled()) {
-            changes.add(requested.tailscaleEnabled() ? "Private access preference will be enabled." : "Private access preference will be disabled.");
-            warnings.add("Private access is safest to manage from Network, where Autark-OS can repair and verify Tailscale links.");
+            changes.add(requested.tailscaleEnabled() ? "A verified private HTTPS link will be enabled." : "The app’s owned private HTTPS link will be removed.");
+            warnings.add("Autark-OS verifies the private link before saving. If the change fails it restores the previous configuration where possible; unresolved recovery remains visible in My Apps.");
         }
         if (!same(current.backup().frequency(), requested.backup().frequency())) {
             blocked.add("Routine backup frequency is shared by all apps. Change it in Settings > Backups.");
@@ -130,17 +133,25 @@ class AppSettingsPolicy {
             throw new InstallationException("Settings are required.");
         }
         String accessUrl = cleanAccessUrl(settings.accessUrl(), app.accessUrl());
-        String privateAccessUrl = cleanOptionalAccessUrl(settings.privateAccessUrl());
+        String privateAccessUrl = repository.settingsFor(app.appId()).map(InstallModels.InstallSettings::privateAccessUrl).orElse(null);
         InstallModels.BackupPolicy backup = sanitizeBackup(settings.backup());
         Map<String, String> storage = sanitizeStorage(settings.storageSubfolders());
-        String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
-        String privateAccessRequirement = sanitizePrivateAccessRequirement(settings.privateAccessRequirement(), false);
+        String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), observedAccessMode(settings, accessUrl));
+        String privateAccessRequirement = repository.settingsFor(app.appId())
+                .map(InstallModels.InstallSettings::privateAccessRequirement).orElse("optional");
         Integer expectedLocalPort = settings.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
+        if (accessUrl != null && !java.net.URI.create(accessUrl).getScheme().equals(expectedProtocol)) {
+            expectedProtocol = java.net.URI.create(accessUrl).getScheme();
+        }
+        if (expectedLocalPort != null) {
+            accessUrl = expectedProtocol + "://" + ((desiredMode.equals("network") || desiredMode.equals("local-and-private"))
+                    ? com.autarkos.network.HostAddress.lanAddress() : "localhost") + ":" + expectedLocalPort;
+        }
         return new InstallModels.InstallSettings(
                 accessUrl,
                 privateAccessUrl,
-                settings.tailscaleEnabled(),
+                desiredMode.equals("private") || desiredMode.equals("local-and-private"),
                 storage,
                 backup,
                 desiredMode,
@@ -157,8 +168,7 @@ class AppSettingsPolicy {
     InstallModels.InstallSettings normalizeSettings(InstallModels.InstallSettings settings, InstalledApp app, ApplicationManifest manifest, String accessUrl) {
         // Runtime probes must not overwrite preferences while an edit can still roll back.
         if (repository.settingsRecoveryFor(app.appId()).isPresent()) return settings;
-        AccessManifest accessManifest = manifest == null ? AccessManifest.defaults() : manifest.access();
-        String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : accessManifest.defaultMode());
+        String desiredMode = observedAccessMode(settings, accessUrl);
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         Integer expectedPort = settings.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
@@ -286,7 +296,7 @@ class AppSettingsPolicy {
     private String accessModeLabel(String mode) {
         return switch (mode) {
             case "private" -> "Your private devices";
-            case "local-and-private" -> "This device and your private devices";
+            case "local-and-private" -> "Home network and private devices";
             case "network" -> "Your home network";
             case "public" -> "Wider internet";
             case "none" -> "No browser link";
@@ -305,15 +315,9 @@ class AppSettingsPolicy {
         return value;
     }
 
-    private String cleanOptionalAccessUrl(String accessUrl) {
-        if (accessUrl == null || accessUrl.isBlank()) {
-            return null;
-        }
-        String value = accessUrl.trim();
-        if (!value.startsWith("https://")) {
-            throw new InstallationException("Private access URL must start with https://.");
-        }
-        return value;
+    private String observedAccessMode(InstallModels.InstallSettings settings, String url) {
+        boolean local = com.autarkos.network.HostAddress.isLoopbackUrl(url);
+        return settings.tailscaleEnabled() ? local ? "private" : "local-and-private" : local ? "local" : "network";
     }
 
     private InstallModels.BackupPolicy sanitizeBackup(InstallModels.BackupPolicy backup) {

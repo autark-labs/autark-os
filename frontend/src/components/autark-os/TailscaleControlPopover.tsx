@@ -40,8 +40,8 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
     : reconciliationQuery.error ? (reconciliation ? 'Private-link checks could not refresh. Showing the last confirmed links.' : 'Private-link checks are unavailable. Check again to retry.') : null;
   const label = statusQuery.isLoading ? 'Checking' : statusQuery.error ? (status ? 'Status stale' : 'Unavailable')
     : reconciliationQuery.error ? (reconciliation ? 'Links stale' : 'Links unavailable') : view.label;
-  const viewTone = statusQuery.isLoading || error ? 'amber' : view.tone as 'amber' | 'green' | 'red';
-  const StatusIcon = statusQuery.isLoading ? RefreshCw : viewTone === 'green' ? CheckCircle2 : CircleAlert;
+  const viewTone = statusQuery.isLoading || error ? 'amber' : view.tone as 'amber' | 'green' | 'red' | 'neutral';
+  const StatusIcon = statusQuery.isLoading ? RefreshCw : viewTone === 'green' ? CheckCircle2 : viewTone === 'neutral' ? Network : CircleAlert;
 
   async function copyHostname() {
     const hostname = status?.dnsName || status?.deviceName || '';
@@ -75,7 +75,7 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
           size="sm"
           type="button"
         >
-          <span className={cn('size-2 rounded-full shadow-md', viewTone === 'green' && 'bg-emerald-400 shadow-emerald-400/30', viewTone === 'amber' && 'bg-orange-400 shadow-orange-400/30', viewTone === 'red' && 'bg-red-400 shadow-red-400/30')} />
+          <span className={cn('size-2 rounded-full shadow-md', viewTone === 'green' && 'bg-emerald-400 shadow-emerald-400/30', viewTone === 'amber' && 'bg-orange-400 shadow-orange-400/30', viewTone === 'red' && 'bg-red-400 shadow-red-400/30', viewTone === 'neutral' && 'bg-muted-foreground')} />
           <Network data-icon="inline-start" />
           {triggerLabel === 'full' && <span className="hidden font-semibold sm:inline">Tailscale</span>}
           <span className="font-semibold">{label}</span>
@@ -94,10 +94,10 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
 
         <div className="grid gap-2 rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-xs">
           {status && <>
-            <StatusRow ready={view.connected} label={view.mock ? 'Development mock' : 'Signed in'} />
-            <StatusRow ready={view.magicDnsReady} label="MagicDNS ready" />
-            <StatusRow ready={view.httpsReady} label="HTTPS ready" />
-            <StatusRow ready={view.serveReady} label={reconciliation ? 'Serve ready' : reconciliationQuery.isLoading ? 'Checking Serve readiness' : 'Serve readiness unavailable'} />
+            <StatusRow ready={!statusQuery.error && view.connected} label={view.mock ? 'Development mock' : statusQuery.error ? 'Sign-in status stale' : view.connected ? 'Signed in' : 'Not signed in'} />
+            <StatusRow ready={!statusQuery.error && view.magicDnsReady} label={statusQuery.error || status.magicDnsReady == null ? 'MagicDNS unavailable' : view.magicDnsReady ? 'MagicDNS ready' : 'MagicDNS not ready'} />
+            <StatusRow ready={!statusQuery.error && view.httpsReady} label={statusQuery.error || status.httpsReady == null ? 'HTTPS certificate support unavailable' : view.httpsReady ? 'HTTPS certificates supported' : 'HTTPS certificates not supported'} />
+            <StatusRow ready={!error && view.serveReady} label={error || status.serveReady == null ? 'Serve readiness unavailable' : view.serveReady ? 'Serve ready' : 'Serve not ready'} />
           </>}
           {status?.loginName && <p className="m-0 pt-1 text-sky-100/55">Account: <span className="text-sky-100/80">{status.loginName}</span></p>}
           {status?.deviceName && <p className="m-0 text-sky-100/55">Device: <span className="text-sky-100/80">{status.deviceName}</span></p>}
@@ -170,7 +170,8 @@ function StatusRow({ label, ready }: { label: string; ready: boolean }) {
   );
 }
 
-function toneClass(tone: 'amber' | 'green' | 'red') {
+function toneClass(tone: 'amber' | 'green' | 'red' | 'neutral') {
+  if (tone === 'neutral') return 'border-border bg-muted text-muted-foreground hover:bg-accent';
   if (tone === 'green') {
     return 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15';
   }

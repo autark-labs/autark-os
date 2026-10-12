@@ -158,6 +158,7 @@ function AppContent() {
 function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: ApplicationBootstrap; onRebootstrap: () => void }) {
   const [authenticated, setAuthenticated] = useState(bootstrap.authenticated);
   const [onboardingComplete, setOnboardingComplete] = useState(bootstrap.onboardingComplete);
+  const [postSetupDestination, setPostSetupDestination] = useState<string>(appRoutes.home);
   const [sessionEndedReason, setSessionEndedReason] = useState<AdminSessionEndReason | null>(null);
 
   useEffect(() => {
@@ -218,7 +219,7 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
   if (!onboardingComplete) {
     return (
       <ProjectSettingsProvider>
-        <IncompleteOnboardingRoutes onComplete={() => setOnboardingComplete(true)} />
+        <IncompleteOnboardingRoutes onComplete={destination => { setPostSetupDestination(destination); setOnboardingComplete(true); }} />
       </ProjectSettingsProvider>
     );
   }
@@ -234,7 +235,7 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
               <Route element={<LegacyRouteRedirect to={to} />} key={from} path={from} />
             ))}
             <Route path={appRoutes.home} element={<LazyRoute pageName="Home"><OverviewPage /></LazyRoute>} />
-            <Route path={specialRoutes.setup} element={<Navigate replace to={appRoutes.home} />} />
+            <Route path={specialRoutes.setup} element={<Navigate replace to={postSetupDestination} />} />
             <Route path={appRoutes.apps} element={<LazyRoute pageName="My Apps"><ApplicationsPage /></LazyRoute>} />
             <Route path={appRoutes.discover} element={<LazyRoute pageName="Discover"><MarketplacePage /></LazyRoute>} />
             <Route path={appRoutes.access} element={<LazyRoute pageName="Access"><NetworkPage /></LazyRoute>} />
@@ -253,7 +254,7 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
   );
 }
 
-function IncompleteOnboardingRoutes({ onComplete }: { onComplete: () => void }) {
+function IncompleteOnboardingRoutes({ onComplete }: { onComplete: (destination: string) => void }) {
   return (
     <Routes>
       <Route path={specialRoutes.setup} element={<LazyRoute fullScreen pageName="Setup"><SetupRoute onComplete={onComplete} /></LazyRoute>} />
@@ -272,15 +273,13 @@ function RedirectToSetup() {
   return <Navigate replace to={setupRedirectTarget(location.pathname, location.search, location.hash)} />;
 }
 
-function SetupRoute({ onComplete }: { onComplete: () => void }) {
-  const navigate = useNavigate();
+function SetupRoute({ onComplete }: { onComplete: (destination: string) => void }) {
   const [searchParams] = useSearchParams();
   const returnTo = safePostSetupPath(searchParams.get('returnTo'));
   return (
     <OnboardingWizard
-      onComplete={() => {
-        onComplete();
-        navigate(returnTo, { replace: true });
+      onComplete={(connectTailscale) => {
+        onComplete(connectTailscale ? '/access?tab=advanced' : returnTo);
       }}
     />
   );

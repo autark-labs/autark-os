@@ -49,13 +49,13 @@ for (const width of [320, 390, 640, 768, 1024, 1280, 1440]) {
 }
 
 for (const width of [320, 390, 1024, 1440]) {
-  test(`${width}px unused-link disclosure leaves the matrix stable and requires confirmation`, async ({ page }) => {
+  test(`${width}px ambiguous-link disclosure leaves the matrix stable and never deletes`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 });
     await installMockApi(page, 'idle');
     let deleted = false;
     await page.route('**/api/network/private-access/reconciliation', route => route.fulfill({ json: {
       status: 'needs_attention', apps: [], checkedAt: '2025-01-15T12:00:00Z',
-      staleMappings: deleted ? [] : [{ id: 'stale-12078', servePort: 12078, endpoint: 'https://fixture.ts.net:12078', target: 'http://127.0.0.1:3003', detail: 'No app expects this link.' }],
+      staleMappings: deleted ? [] : [{ id: 'stale-12078', servePort: 12078, endpoint: 'https://fixture.ts.net:12078', target: 'http://127.0.0.1:3003', detail: 'Ownership is unknown. This mapping remains unchanged.' }],
     } }));
     await page.route('**/api/network/private-access/stale/12078', route => {
       expect(route.request().method()).toBe('DELETE');
@@ -83,22 +83,15 @@ for (const width of [320, 390, 1024, 1440]) {
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     expect(await matrix.boundingBox()).toEqual(before);
-    await popover.getByRole('button', { name: 'Remove stale link', exact: true }).click();
-    const confirmation = page.getByRole('alertdialog');
-    await expect(confirmation).toContainText('No app data will be deleted');
+    await expect(popover).toContainText('Ownership is unknown');
+    await expect(popover.getByRole('button', { name: 'Remove stale link' })).toHaveCount(0);
     expect(deleted).toBe(false);
-    await confirmation.getByRole('button', { name: 'Keep link' }).click();
-    expect(deleted).toBe(false);
-    await expect(popover.getByRole('button', { name: 'Remove stale link' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(chip).toBeFocused();
     await page.getByRole('tab', { name: 'Issues', exact: true }).click();
     await page.getByRole('button', { name: 'Review unused links', exact: true }).click();
     await expect(popover).toBeVisible();
-    await popover.getByRole('button', { name: 'Remove stale link' }).click();
-    await confirmation.getByRole('button', { name: 'Remove stale link' }).click();
-    await expect.poll(() => deleted).toBe(true);
-    await expect(page.getByRole('button', { name: 'Private links', exact: true })).toBeVisible();
+    expect(deleted).toBe(false);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -122,6 +115,8 @@ for (const width of [320, 390, 1024, 1440]) {
 test('failed Access action has one result, not a false page-load error or layout shift', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await installMockApi(page, 'idle');
+  await page.route('**/api/jobs', route => route.fulfill({ json: [] }));
+  await page.route('**/api/apps/vaultwarden/settings-plan', route => route.fulfill({ json: { planId: 'failed-review', headline: 'Review access', summary: 'Private to LAN.', saveAllowed: true, changes: [], warnings: [], blockedReasons: [] } }));
   await page.route('**/api/apps/vaultwarden/settings', route => route.fulfill({ status: 500, json: { message: 'Fixture access change failed.' } }));
   await page.goto('/access');
   const matrix = page.getByRole('heading', { name: 'Reachability matrix', exact: true });
@@ -131,7 +126,9 @@ test('failed Access action has one result, not a false page-load error or layout
   await service.click();
   await service.locator('xpath=ancestor::*[@id][1]').getByRole('button', { name: 'Details and actions', exact: true }).click();
   await page.getByRole('group', { name: /^Security posture for Vaultwarden/ }).getByRole('radio', { name: 'Home', exact: true }).click();
-  await expect(page.locator('[data-sonner-toast]')).toContainText('Reachability update failed');
+  await page.getByRole('button', { name: 'Save settings', exact: true }).click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('Access change could not be confirmed');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.getByText('Access status could not load', { exact: true })).toHaveCount(0);
   expect(await matrix.boundingBox()).toEqual(before);
 });

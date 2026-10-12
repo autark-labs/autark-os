@@ -34,7 +34,11 @@ public class ComposeRenderer {
     }
 
     public Path render(ApplicationManifest manifest, Path appRoot) {
-        return render(manifest, appRoot, new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()));
+        String mode = InstallCustomizationResolver.accessMode(manifest, null);
+        var configuration = new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), Map.of(),
+                manifest.accessUrl(), null, Map.of(), Map.of(), mode.contains("private"),
+                com.autarkos.marketplace.install.models.InstallModels.BackupPolicy.defaults(), mode);
+        return render(manifest, appRoot, configuration);
     }
 
     /** A port edit must not regenerate ownership, storage or other app settings. */

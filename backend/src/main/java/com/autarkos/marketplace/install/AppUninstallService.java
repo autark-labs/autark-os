@@ -105,7 +105,16 @@ class AppUninstallService {
         if (port == null) {
             return new TailscaleServeResult(true, settings.privateAccessUrl(), "No private HTTPS port was stored for this app.", List.of("No private HTTPS port was stored for this app."));
         }
-        TailscaleServeResult result = tailscaleService.disableHttps(port);
+        Integer localPort = settings.expectedLocalPort() != null ? settings.expectedLocalPort() : AppPrivateAccessPorts.portFromUrl(localUrl);
+        if (localPort == null) throw new InstallationException("Private link ownership could not be confirmed. No mapping was removed.");
+        tailscaleService.invalidateServeConfig();
+        var config = tailscaleService.serveConfig();
+        var mappings = config.mappings().stream().filter(mapping -> java.util.Objects.equals(mapping.servePort(), port)).toList();
+        if (!config.available() || (!mappings.isEmpty() && (mappings.size() != 1 || settings.privateAccessUrl() == null
+                || !mappings.getFirst().matchesNodeProxy(settings.privateAccessUrl(), localPort)))) {
+            throw new InstallationException("Private link ownership could not be confirmed. No mapping was removed. Review private links in Access.");
+        }
+        TailscaleServeResult result = tailscaleService.disableHttps(port, localPort);
         if (!result.configured()) {
             repository.recordEvent(app.appId(), "private_access_disable_failed", result.message());
             activityWarning("private_access_disable_failed", "Private link removal failed for " + app.appName(), result.message(), app.appId());

@@ -3,7 +3,7 @@ import type { ApplicationAction } from '@/types/applicationState';
 import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsageGuide, ApplicationRuntimeState, AutarkOsIssue } from '@/types/app';
 
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup';
-export type ApplicationSettingsAction = 'planning' | 'saving' | 'private_access';
+export type ApplicationSettingsAction = 'planning' | 'saving';
 export type AppOperationState =
   | { kind: 'idle' }
   | {
@@ -63,14 +63,14 @@ export type ApplicationActionHandlers = {
   onRepair: (id: string) => void;
   onRestart: (id: string) => void;
   onRunUninstall: (id: string) => Promise<void>;
-  onSaveSettings: (id: string, values: ApplicationSettingsFormValues) => Promise<void>;
+  onSaveSettings: (id: string, values: ApplicationSettingsFormValues, planId: string) => Promise<void>;
   onSettingsPlanRequest: (id: string, values: ApplicationSettingsFormValues) => Promise<ApplicationSettingsImpact | null>;
-  onSetPrivateNetworkAccess: (id: string, enabled: boolean) => Promise<void>;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
 };
 
 export type ApplicationSettingsFormValues = {
+  desiredAccessMode: string;
   autoRepairEnabled: boolean;
   backupEnabled: boolean;
   backupRetention: number;
@@ -78,6 +78,7 @@ export type ApplicationSettingsFormValues = {
 };
 
 export type ApplicationSettingsImpact = {
+  planId: string;
   blockedReasons: string[];
   changes: string[];
   headline: string;

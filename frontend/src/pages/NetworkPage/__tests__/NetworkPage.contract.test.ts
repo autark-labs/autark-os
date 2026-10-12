@@ -30,18 +30,10 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /InstalledAppsAPIClient\.updateSettings/);
   // The backend must preflight the entire edit before removing private access.
   assert.doesNotMatch(page, /InstalledAppsAPIClient\.disablePrivateAccess/);
-  assert.match(page, /pendingReachabilityByServiceId/);
-  assert.match(page, /applyPendingReachability\(reachabilityServices, pendingReachabilityByServiceId\)/);
-  assert.match(page, /pendingReachabilityTokenRef/);
-  assert.match(page, /setPendingReachabilityByServiceId\(\(current\) => \(\{ \.\.\.current, \[service\.id\]: \{ acknowledged: false, token: pendingToken, zone: targetZone \} \}\)\)/);
   assert.doesNotMatch(page, /appWithReachabilityZone/);
-  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, updated\)/);
-  assert.match(page, /removePendingReachabilityForToken\(current, service\.id, pendingToken\)/);
-  assert.match(page, /pending\.acknowledged && reachabilityServices\.find\(\(service\) => service\.id === serviceId\)\?\.zone === pending\.zone/);
-  assert.match(page, /removePendingReachabilityIds\(current, settledServiceIds\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.match(page, /void invalidateNetworkQueries\(queryClient\)/);
   assert.match(reachability, /export function filterReachabilityServices/);
-  assert.match(reachability, /export function applyPendingReachability/);
   assert.match(reachability, /export function settingsForReachabilityZone/);
   assert.match(deepLinks, /tab.*matrix/);
   assert.match(deepLinks, /focus/);
@@ -82,7 +74,7 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
 
   assert.match(issues, /onReviewPrivateLinks/);
   assert.match(issues, /Review services/);
-  assert.match(issues, /to="\/diagnostics"/);
+  assert.match(issues, /\/diagnostics/);
 
   assert.match(shell, /sticky top-0 z-40/);
   assert.match(header, /NotificationCenterPopover/);

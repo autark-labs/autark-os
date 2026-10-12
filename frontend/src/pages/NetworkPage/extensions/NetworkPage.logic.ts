@@ -8,7 +8,7 @@ import { privateAccessUrlForApp } from './NetworkPage.privateAccess';
 export function buildNetworkIssues(diagnostics: NetworkDiagnosticsReport | null, reconciliation?: PrivateAccessReconciliationReport | null): NetworkIssueView[] {
   const diagnosticIssues = diagnostics
     ? [...diagnostics.checks.map((item) => ({ item, source: 'network' as const })), ...diagnostics.appChecks.map((item) => ({ item, source: 'app' as const }))]
-    .filter(({ item }) => item.status === 'warning')
+    .filter(({ item, source }) => item.status === 'warning' && !(source === 'app' && reconciliation?.apps.some(app => item.id === `serve-${app.appId}`)) && !(reconciliation?.apps.length && item.id === 'private-apps'))
     .map(({ item, source }) => ({
       actionLabel: item.actionLabel,
       detail: item.detail,
@@ -23,17 +23,18 @@ export function buildNetworkIssues(diagnostics: NetworkDiagnosticsReport | null,
     actionLabel: mapping.actionLabel,
     detail: mapping.detail,
     id: `stale-${mapping.id}`,
-    label: `Stale link on port ${mapping.servePort ?? 'unknown'}`,
+    label: `Unassigned link on port ${mapping.servePort ?? 'unknown'}`,
     message: mapping.message,
     source: 'network' as const,
     status: 'warning' as const,
   }));
   const privateLinkIssues = (reconciliation?.apps || [])
-    .filter((app) => !['healthy', 'waiting'].includes(app.status))
+    .filter((app) => app.status !== 'healthy')
     .map((app) => ({
       actionLabel: app.actionLabel,
       detail: app.detail,
       id: `private-link-${app.appId}`,
+      appId: app.appId,
       label: `${app.appName} private link`,
       message: app.message,
       source: 'app' as const,
@@ -58,7 +59,7 @@ export function buildReachabilityServices({
     const localUrl = app.observedAccess?.localUrl || app.accessRoute?.localUrl || app.accessUrl || app.settings?.accessUrl || null;
     const zone = classifyAppExposure(app, tailscale);
     const issue = reachabilityIssue(app, reconciliationItem);
-    const status: NetworkNodeStatus = issue ? 'warning' : zone === 'tailnet' ? 'connected' : 'neutral';
+    const status: NetworkNodeStatus = issue ? 'warning' : zone === 'tailnet' && reconciliationItem?.status === 'healthy' ? 'connected' : 'neutral';
     return {
       app,
       detail: reachabilityDetail(zone, app),
@@ -88,7 +89,7 @@ function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAcces
   if (app.state === 'degraded' || app.state === 'missing' || app.state === 'unknown') {
     return app.remediation?.summary || app.healthSnapshot?.message || 'This app needs review.';
   }
-  if (reconciliationItem && !['healthy', 'waiting'].includes(reconciliationItem.status)) {
+  if (reconciliationItem && reconciliationItem.status !== 'healthy') {
     return reconciliationItem.message || 'Private link needs review.';
   }
   if (app.accessRoute?.privateLinkStatus === 'port_conflict') {
@@ -99,7 +100,7 @@ function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAcces
 
 function reachabilityDetail(zone: ReachabilityZoneId, app: AppRuntimeView) {
   if (zone === 'tailnet') {
-    return 'Available to trusted Tailscale devices.';
+    return app.settings?.desiredAccessMode === 'local-and-private' ? 'LAN + private: reachable on this home network and through Tailscale.' : 'Private only: LAN dashboard access is off.';
   }
   if (zone === 'lan') {
     return 'Available from this home network.';

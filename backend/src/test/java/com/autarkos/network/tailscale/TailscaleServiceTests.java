@@ -11,6 +11,63 @@ import org.junit.jupiter.api.Test;
 class TailscaleServiceTests {
 
     @Test
+    void staleDnsNameDoesNotMeanSignedIn() {
+        var service = new TailscaleService(command -> new TailscaleService.CommandResult(0,
+                List.of("{\"BackendState\":\"NeedsLogin\",\"Self\":{\"DNSName\":\"old.tailnet.ts.net\"}}"), false));
+        assertThat(service.status().connected()).isFalse();
+    }
+
+    @Test
+    void failedDeviceReadIsNotAHealthyEmptyList() {
+        var service = new TailscaleService(command -> new TailscaleService.CommandResult(1, List.of("read failed"), false));
+        org.assertj.core.api.Assertions.assertThatThrownBy(service::devices).hasMessageContaining("could not read");
+    }
+
+    @Test
+    void statusSeparatesDnsCertificateAndServeEvidence() {
+        var service = new TailscaleService(command -> {
+            if (String.join(" ", command).equals("tailscale status --json")) {
+                return new TailscaleService.CommandResult(0, List.of("""
+                        {"BackendState":"Running","Self":{"DNSName":"host.tailnet.ts.net."},
+                         "CurrentTailnet":{"MagicDNSEnabled":true},"CertDomains":[]}
+                        """), false);
+            }
+            return new TailscaleService.CommandResult(0, List.of("{}"), false);
+        });
+        var status = service.status();
+        assertThat(status.connected()).isTrue();
+        assertThat(status.magicDnsReady()).isTrue();
+        assertThat(status.httpsReady()).isFalse();
+        assertThat(status.serveReady()).isFalse();
+    }
+
+    @Test
+    void missingReadinessEvidenceStaysUnknownAndFailedStatusIsUnavailable() {
+        var service = new TailscaleService(command -> String.join(" ", command).equals("tailscale status --json")
+                ? new TailscaleService.CommandResult(0, List.of("{\"BackendState\":\"Running\",\"Self\":{\"DNSName\":\"host.tailnet.ts.net\"}}"), false)
+                : new TailscaleService.CommandResult(1, List.of("read failed"), false));
+        var status = service.status();
+        assertThat(status.magicDnsReady()).isNull();
+        assertThat(status.httpsReady()).isNull();
+        assertThat(status.serveReady()).isNull();
+        var failed = new TailscaleService(command -> new TailscaleService.CommandResult(1, List.of("read failed"), false));
+        org.assertj.core.api.Assertions.assertThatThrownBy(failed::status)
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class).hasMessageContaining("could not read");
+    }
+
+    @Test
+    void enrollmentUrlIsOnlyReturnedByTheGuideForThisHostsPendingLogin() throws Exception {
+        for (String url : List.of("https://login.tailscale.com/a/test-enrollment", "https://example.test/a/test-enrollment", "javascript:alert(1)")) {
+            var service = new TailscaleService(command -> new TailscaleService.CommandResult(0,
+                    List.of("{\"BackendState\":\"NeedsLogin\",\"AuthURL\":\"" + url + "\"}"), false));
+            var guide = service.connectGuide();
+            assertThat(guide.enrollmentUrl()).isEqualTo(url.startsWith("https://login.tailscale.com/") ? url : null);
+            assertThat(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(service.status()))
+                    .doesNotContain("test-enrollment");
+        }
+    }
+
+    @Test
     void parsesSelfAndPeersFromTailscaleStatusJson() {
         TailscaleService service = new TailscaleService(command -> new TailscaleService.CommandResult(0, List.of("""
                 {
@@ -73,6 +130,7 @@ class TailscaleServiceTests {
     void serveConfigParsesGetConfigEndpoints() {
         TailscaleService service = new TailscaleService(command -> {
             String joined = String.join(" ", command);
+            if (joined.equals("tailscale serve status --json")) return new TailscaleService.CommandResult(0, List.of("{}"), false);
             if (joined.equals("tailscale serve get-config --all")) {
                 return new TailscaleService.CommandResult(0, List.of("""
                         {
@@ -195,7 +253,9 @@ class TailscaleServiceTests {
         TailscaleService service = new TailscaleService(command ->
                 String.join(" ", command).equals("tailscale status --json")
                         ? new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false)
-                        : new TailscaleService.CommandResult(1, List.of(output), false));
+                        : (String.join(" ", command).contains("--json") || String.join(" ", command).contains("get-config"))
+                            ? new TailscaleService.CommandResult(0, List.of("{}"), false)
+                            : new TailscaleService.CommandResult(1, List.of(output), false));
         TailscaleServeResult result = service.serveHttps(8090, 14743);
         assertThat(result.configured()).isFalse();
         assertThat(result.message()).contains("could not create").doesNotContain("synthetic.tailnet", "synthetic-token");
@@ -225,7 +285,7 @@ class TailscaleServiceTests {
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
         });
 
-        TailscaleServeResult result = service.disableHttps(5984);
+        TailscaleServeResult result = service.disableHttps(5984, 5984);
 
         assertThat(result.configured()).isTrue();
         assertThat(result.message()).contains("removed");
@@ -248,17 +308,77 @@ class TailscaleServiceTests {
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
         });
 
-        TailscaleServeResult result = service.disableHttps(14743);
+        TailscaleServeResult result = service.disableHttps(14743, 8090);
 
         assertThat(result.configured()).isTrue();
         assertThat(result.message()).contains("already removed");
         assertThat(commands).doesNotContain("tailscale serve --https=14743 off");
     }
 
+    @Test
+    void successfulNullStatusMeansNoServeConfigurationOnACleanHost() {
+        var service = new TailscaleService(command -> new TailscaleService.CommandResult(0, List.of("null"), false));
+        assertThat(service.serveConfig().available()).isTrue();
+        assertThat(service.serveConfig().mappings()).isEmpty();
+    }
+
+    @Test
+    void incompleteNodeReadCannotProveAnEndpointIsFree() {
+        for (String nodeOutput : List.of("unavailable", "[]", "\"unexpected\"")) {
+            List<String> commands = new ArrayList<>();
+            var service = new TailscaleService(command -> {
+                String joined = String.join(" ", command);
+                commands.add(joined);
+                if (joined.equals("tailscale status --json")) return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
+                if (joined.equals("tailscale serve status --json")) return new TailscaleService.CommandResult(nodeOutput.equals("unavailable") ? 1 : 0, List.of(nodeOutput), false);
+                return new TailscaleService.CommandResult(0, List.of("{}"), false);
+            });
+            assertThat(service.serveHttps(8090, 14743).configured()).isFalse();
+            assertThat(service.disableHttps(14743, 8090).configured()).isFalse();
+            assertThat(commands).noneMatch(command -> command.contains("--https="));
+        }
+    }
+
+    @Test
+    void foreignProxyFileAndTcpMappingsAreNeverMutated() {
+        for (String config : List.of(
+                nodeServeStatusJson(14743, 9999),
+                nodeServeStatusJson(14743, 8090).replace("\"HTTPS\"", "\"HTTP\""),
+                nodeServeStatusJson(14743, 8090).replace("\"TCP\":", "\"AllowFunnel\":{\"autark-os.tail123.ts.net:14743\":true},\"TCP\":"),
+                "{\"Services\":{\"svc:foreign\":" + nodeServeStatusJson(14743, 8090) + "}}",
+                "{\"Foreground\":{\"session-foreign\":" + nodeServeStatusJson(14743, 8090) + "}}",
+                nodeServeStatusJson(14743, 8090).replace("http://127.0.0.1:8090", "http://192.0.2.1:8090"),
+                nodeServeStatusJson(14743, 8090).replace("\"/\"", "\"/other\""),
+                "{\"Web\":{\"autark-os.tail123.ts.net:14743\":{\"Handlers\":{\"/\":{\"Path\":\"/private\"}}}},\"TCP\":{\"14743\":{\"HTTPS\":true}}}",
+                "{\"TCP\":{\"14743\":{\"TCPForward\":\"localhost:8090\"}}}")) {
+            List<String> commands = new ArrayList<>();
+            var service = new TailscaleService(command -> {
+                String joined = String.join(" ", command);
+                commands.add(joined);
+                return new TailscaleService.CommandResult(0, List.of(joined.equals("tailscale status --json") ? connectedStatusJson()
+                        : joined.equals("tailscale serve status --json") ? config : "{}"), false);
+            });
+            assertThat(service.serveHttps(8090, 14743).configured()).isFalse();
+            assertThat(service.disableHttps(14743, 8090).configured()).isFalse();
+            assertThat(commands).noneMatch(command -> command.contains("--https="));
+        }
+    }
+
+    @Test
+    void unsupportedCertificatesCannotReportAConfiguredPrivateLink() {
+        var service = new TailscaleService(command -> new TailscaleService.CommandResult(0,
+                List.of(String.join(" ", command).equals("tailscale status --json")
+                        ? connectedStatusJson().replace("[\"autark-os.tail123.ts.net\"]", "[]")
+                        : nodeServeStatusJson(14743, 8090)), false));
+        assertThat(service.serveHttps(8090, 14743).configured()).isFalse();
+    }
+
     private String connectedStatusJson() {
         return """
                 {
                   "BackendState": "Running",
+                  "CurrentTailnet": {"MagicDNSEnabled": true},
+                  "CertDomains": ["autark-os.tail123.ts.net"],
                   "MagicDNSSuffix": "tail123.ts.net",
                   "Self": {
                     "ID": "self-id",

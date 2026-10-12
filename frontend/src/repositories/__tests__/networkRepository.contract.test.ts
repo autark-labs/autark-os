@@ -16,12 +16,12 @@ test('Access page data loading is owned by the network repository', () => {
   assert.doesNotMatch(networkPage, /setInterval|clearInterval|loadNetwork/);
   assert.doesNotMatch(networkPage, /NetworkAPIClient/);
   assert.match(networkPage, /useAccessNetworkRepository/);
-  assert.match(networkPage, /useRemoveStalePrivateAccessMutation/);
+  assert.doesNotMatch(networkPage, /useRemoveStalePrivateAccessMutation/);
 
   assert.match(networkRepository, /networkQueryKeys/);
   assert.match(networkRepository, /useAccessNetworkRepository/);
   assert.match(networkRepository, /invalidateNetworkQueries/);
-  assert.match(networkRepository, /useRemoveStalePrivateAccessMutation/);
+  assert.doesNotMatch(networkRepository, /useRemoveStalePrivateAccessMutation/);
   assert.match(networkRepository, /refetchInterval:\s*10_000/);
 });
 
@@ -36,8 +36,9 @@ test('Tailscale controls share repository queries instead of owning server state
 test('Access page private access mutations consume action results without local access projection', () => {
   const networkPage = source('src/pages/NetworkPage/NetworkPage.tsx');
 
-  assert.match(networkPage, /InstalledAppsAPIClient\.enablePrivateAccess\(app\.appId\)/);
-  assert.match(networkPage, /InstalledAppsAPIClient\.updateSettings\(app\.appId, settingsForReachabilityZone\(app, targetZone\)\)/);
+  assert.match(networkPage, /InstalledAppsAPIClient\.settingsChangePlan/);
+  assert.match(networkPage, /review\.plan\.planId/);
+  assert.doesNotMatch(networkPage, /20000|pendingReachability/);
   assert.doesNotMatch(networkPage, /InstalledAppsAPIClient\.disablePrivateAccess/);
   assert.match(networkPage, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.match(networkPage, /invalidateNetworkQueries\(queryClient\)/);

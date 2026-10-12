@@ -56,7 +56,7 @@ class AccessStatusServiceTests {
     @Test
     void missingPrivateMappingKeepsLocalAppUsableWithoutPublishingExpectedPrivateUrl() {
         AccessStatusService service = service(
-                new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tailnet.test", List.of("100.64.0.10"), "tailnet", "user@example.test"),
+                new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tailnet.test", List.of("100.64.0.10"), "tailnet", "user@example.test", true, true, true),
                 List.of(app("appinst_vaultwarden", "Vaultwarden", "private_needs_setup", "http://host:8090", "")));
 
         AccessStatus status = service.status();
@@ -92,7 +92,7 @@ class AccessStatusServiceTests {
     @Test
     void realPrivateAccessReadyRequiresSignedInTailscaleAndPrivateApp() {
         AccessStatusService service = service(
-                new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tailnet.test", List.of("100.64.0.10"), "tailnet", "user@example.test"),
+                new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tailnet.test", List.of("100.64.0.10"), "tailnet", "user@example.test", true, true, true),
                 List.of(app("appinst_vaultwarden", "Vaultwarden", "private_ready", "http://host:8090", "https://autark-os.tailnet.test")));
 
         AccessStatus status = service.status();
@@ -103,6 +103,29 @@ class AccessStatusServiceTests {
         assertThat(status.tailscale().httpsReady()).isTrue();
         assertThat(status.tailscale().serveReady()).isTrue();
         assertThat(status.issues()).isEmpty();
+    }
+
+    @Test
+    void dnsNameAloneDoesNotProveHttpsOrServeReadiness() {
+        var status = service(new TailscaleStatus(true, true, "connected", "Connected.", "host", "host.tailnet.test",
+                List.of(), "tailnet", "owner"), List.of()).status();
+        assertThat(status.tailscale().httpsReady()).isNotEqualTo(Boolean.TRUE);
+        assertThat(status.tailscale().serveReady()).isNotEqualTo(Boolean.TRUE);
+        assertThat(status.issues()).isEmpty();
+    }
+
+    @Test
+    void canonicalAppIssueIsNotRepeatedAsAHostIssue() {
+        var base = app("appinst_memos", "Memos", "private_waiting", "http://localhost:5230", "");
+        var issue = com.autarkos.api.AutarkOsIssueFactory.accessIssue("private-access-memos", "memos", "warning",
+                "private_access_waiting", "Memos needs private setup", "Sign in on this host.",
+                com.autarkos.api.AutarkOsAction.route("connect", "Connect this host", "/access?tab=advanced"));
+        var withIssue = new ApplicationView(
+                "memos", "Memos", "Notes", "", "", "", ApplicationRelationship.MANAGED, "installable",
+                "appinst_memos", AppOperationView.idle(), List.of(issue), "Installed", "Managed", "success", "success",
+                new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""), List.of(), base.runtime(), null);
+        assertThat(service(TailscaleStatus.notConnected("Waiting for sign in."), List.of(withIssue)).status().issues())
+                .containsExactly(issue);
     }
 
     private AccessStatusService service(TailscaleStatus tailscaleStatus, List<ApplicationView> apps) {

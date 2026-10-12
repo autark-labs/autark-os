@@ -31,8 +31,8 @@ test('offers sign-in and setup-later controls when Tailscale is disconnected', (
     deviceName: null,
   });
 
-  assert.deepEqual(actions.map((action) => action.id), ['signin', 'access', 'refresh']);
-  assert.equal(actions[0].href, 'https://login.tailscale.com/start');
+  assert.deepEqual(actions.map((action) => action.id), ['signin', 'refresh']);
+  assert.equal(actions[0].href, '/access?tab=advanced');
 });
 
 test('does not infer live Tailscale connection or Serve readiness without status', () => {
@@ -51,7 +51,7 @@ test('does not infer live Tailscale connection or Serve readiness without status
   assert.equal(view.connected, false);
   assert.equal(view.httpsReady, false);
   assert.equal(view.serveReady, false);
-  assert.equal(view.privateLinksReady, 0);
+  assert.equal(view.privateLinksReady, null);
   assert.equal(view.label, 'Unavailable');
 });
 
@@ -62,6 +62,7 @@ test('shows Serve ready only for live verified private-link reconciliation', () 
     state: 'connected',
     message: 'Autark-OS is connected.',
     dnsName: 'autark-os.tailnet.ts.net',
+    magicDnsReady: true, httpsReady: true, serveReady: true,
   };
   const desiredOnly = tailscaleControlView(status, {
     status: 'warning',
@@ -102,4 +103,16 @@ test('missing link checks are not a verified empty result and missing status doe
   assert.equal(tailscaleControlView({ connected: true }, null).privateLinksReady, null);
   assert.equal(tailscaleControlView({ connected: true }, { apps: [] }).privateLinksReady, 0);
   assert.deepEqual(tailscaleControlActions(null).map(action => action.id), ['access', 'refresh']);
+});
+
+test('DNS name alone does not establish HTTPS or Serve readiness', () => {
+  const view = tailscaleControlView({ connected: true, dnsName: 'host.ts.net' }, { apps: [{ status: 'healthy' }] });
+  assert.equal(view.magicDnsReady, false);
+  assert.equal(view.httpsReady, false);
+  assert.equal(view.serveReady, false);
+});
+
+test('optional disconnected Tailscale is neutral when no private apps are expected', () => {
+  assert.equal(tailscaleControlView({ connected: false, installed: true }, { apps: [] }).tone, 'neutral');
+  assert.equal(tailscaleControlView({ connected: false, installed: true }, { apps: [{ status: 'waiting' }] }).tone, 'amber');
 });

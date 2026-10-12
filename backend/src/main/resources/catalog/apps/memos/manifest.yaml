@@ -67,14 +67,14 @@ technical:
     - label: Backup
       value: Stops the app to copy its managed data folders
     - label: Access
-      value: Tailscale recommended
+      value: Private dashboard through Tailscale or on this server
 access:
   kind: web
   defaultMode: private
   privateAccessRecommended: true
   requiresFirstRunSetup: true
   notes:
-    - Private access is recommended because notes often contain sensitive personal information.
+    - The dashboard starts private because notes often contain sensitive personal information. Home network access requires an explicit choice.
     - First-run setup creates the first user and workspace preferences.
 usage:
   kind: web-app

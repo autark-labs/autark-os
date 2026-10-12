@@ -33,12 +33,12 @@ Twenty-two manifests are new; ten previously excluded apps are now eligible alon
 ### Setup boundaries
 
 - The installer uses managed folders, not arbitrary existing-folder imports. Media apps may need content copied into those folders and a library selected in the upstream app.
-- New dashboards are loopback-bound and optionally published through Tailscale; they do not open a LAN administration port. New Actual Budget and Vaultwarden installs use private HTTPS in this integration. Tailscale is therefore needed to use their remote browser interfaces, not for Core generally. Owners can still turn off private exposure afterward.
+- Twenty-seven catalog dashboards, including Memos and Syncthing, default to loopback binding with private Tailscale access requested. Eight apps explicitly default to home network plus private access: FreshRSS, Homepage, Gitea, Jellyfin, Uptime Kuma, Prowlarr, Radarr and Sonarr. Install review shows the selected scope before creation. Syncthing sync/discovery ports and other declared peer ports remain available on the home network even when the dashboard is private.
+- Actual Budget and Vaultwarden require private HTTPS in this integration; their access settings reject incompatible modes. Tailscale is needed for their remote browser interfaces, not for Core generally. Existing installations retain their saved exposure until the owner reviews an access change. Catalog defaults affect new installs only.
 - Some upstream apps ship a default login or no separate login. Their guides identify this; complete account setup before sharing access. Flatnotes deliberately uses upstream's no-login mode: anyone permitted to reach its private link can read, edit and delete notes. Tailnet access rules matter.
 - Gitea must use SQLite during its upstream setup. Wiki.js is configured with SQLite. No external database is provisioned.
 - Tautulli needs an existing Plex server/account. SABnzbd and NZBGet need a Usenet provider. Download tools and media managers have independent managed folders; Autark does not wire up a shared download/import pipeline or supply indexers, subscriptions or content.
 - No automatic app-image updating is introduced. New images are pinned to verified multi-architecture index digests; existing candidates retain their explicit version tags.
-- Known Access UI limitation: its generic Home/Server/Private selector still offers Home for private-dashboard apps. The backend rejects that move with a reason and does not open a LAN port. Disabling the incompatible option in the UI is a follow-up; this catalog change does not redesign access capabilities.
 
 ### Catalog validation — 2026-09-27
 

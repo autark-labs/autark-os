@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
 
@@ -26,6 +26,9 @@ export const privateAccessReconciliationQueryKey = networkQueryKeys.privateAcces
 
 export type AccessNetworkRepositoryView = {
   diagnostics: NetworkDiagnosticsReport | null;
+  diagnosticsError: unknown;
+  devicesError: unknown;
+  hasDeviceData: boolean;
   error: unknown;
   guide: TailscaleConnectGuide | null;
   isFetching: boolean;
@@ -75,6 +78,9 @@ export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
 
   return {
     diagnostics: diagnosticsQuery.data ?? null,
+    diagnosticsError: diagnosticsQuery.error,
+    devicesError: devicesQuery.error,
+    hasDeviceData: devicesQuery.data !== undefined,
     error: queries.find((query) => query.error)?.error ?? null,
     guide: guideQuery.data ?? null,
     isFetching: queries.some((query) => query.isFetching),
@@ -94,14 +100,6 @@ export function usePrivateAccessReconciliationQuery() {
     queryKey: privateAccessReconciliationQueryKey,
     queryFn: () => NetworkAPIClient.privateAccessReconciliation(),
     ...liveNetworkQueryOptions,
-  });
-}
-
-export function useRemoveStalePrivateAccessMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (port: number) => NetworkAPIClient.removeStalePrivateAccess(port),
-    onSuccess: () => invalidateNetworkQueries(queryClient),
   });
 }
 

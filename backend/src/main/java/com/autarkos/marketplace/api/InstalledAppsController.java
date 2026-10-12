@@ -189,27 +189,14 @@ public class InstalledAppsController {
         return created;
     }
 
-    @PostMapping("/{id}/private-access/enable")
-    public AppActionResult enablePrivateAccess(@PathVariable String id) {
-        return invalidateAfter(appLifecycleService.enablePrivateAccess(id));
-    }
-
-    @PostMapping("/{id}/private-access/repair")
-    public AppActionResult repairPrivateAccess(@PathVariable String id) {
-        return invalidateAfter(appLifecycleService.enablePrivateAccess(id));
-    }
-
-    @PostMapping("/{id}/private-access/disable")
-    public AppActionResult disablePrivateAccess(@PathVariable String id) {
-        return invalidateAfter(appLifecycleService.disablePrivateAccess(id));
-    }
-
     @PutMapping("/{id}/settings")
-    public AutarkOsJob updateSettings(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings) {
-        return jobService.startWithJob(AutarkOsStates.JobType.SAVE_APP_SETTINGS, id,
-                List.of(AutarkOsJobStep.pending("apply_settings", "Apply settings or recover the previous configuration")), settings, job -> {
+    public AutarkOsJob updateSettings(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Autark-Plan-Id", required = false) String planId) {
+        com.autarkos.marketplace.install.AppLifecycleService.requireSettingsReview(planId);
+        return jobService.startReviewedOnce("settings:" + id + ":" + planId, AutarkOsStates.JobType.SAVE_APP_SETTINGS, id,
+                List.of(AutarkOsJobStep.pending("apply_settings", "Apply settings or recover the previous configuration")), () -> {
                     try {
-                        appLifecycleService.updateSettings(id, settings);
+                        appLifecycleService.updateSettings(id, settings, planId);
                         return AutarkOsJobOutcome.succeeded("Settings saved. Paused apps use the new configuration on their next start.");
                     } finally {
                         applicationStateService.invalidate();

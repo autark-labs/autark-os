@@ -1135,9 +1135,9 @@ public final class NormalizedHostSnapshotAssembler {
             return "unknown";
         }
         if (access.tailscale().signedIn()
-                && access.tailscale().magicDnsReady()
-                && access.tailscale().httpsReady()) {
-            return access.tailscale().serveReady()
+                && Boolean.TRUE.equals(access.tailscale().magicDnsReady())
+                && Boolean.TRUE.equals(access.tailscale().httpsReady())) {
+            return Boolean.TRUE.equals(access.tailscale().serveReady())
                     ? "available"
                     : "degraded";
         }

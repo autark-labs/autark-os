@@ -127,28 +127,13 @@ test('applications page removes placeholder overflow controls until real actions
   assert.doesNotMatch(page, /onUninstall=\{handleUninstall\}/);
 });
 
-test('applications page changes private network access as a standalone settings action', () => {
+test('application access changes share the reviewed settings mutation', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
-  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
-
-  assert.match(types, /ApplicationSettingsAction = 'planning' \| 'saving' \| 'private_access'/);
-  assert.match(types, /onSetPrivateNetworkAccess: \(id: string, enabled: boolean\) => Promise<void>/);
-
-  assert.match(page, /runPrivateNetworkAccessChange\(appId: string, enabled: boolean\)/);
-  assert.match(page, /setSettingsLoading\(appId, 'private_access'\)/);
-  assert.match(page, /InstalledAppsAPIClient\.enablePrivateAccess\(appId\)/);
-  assert.match(page, /InstalledAppsAPIClient\.disablePrivateAccess\(appId\)/);
-  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /invalidateNetworkQueries\(queryClient\)/);
-  assert.doesNotMatch(page, /repairPrivateAccess\(appId\)/);
-
-  assert.match(panel, /<ApplicationSettingsTab actions=\{actions\}/);
-  assert.match(settings, /loadingAction === 'private_access'/);
-  assert.match(settings, /actions\.onSetPrivateNetworkAccess\(item\.id, checked\)/);
-  assert.match(settings, /Private network/);
-  assert.doesNotMatch(settings, /name: 'autoRepairEnabled' \| 'backupEnabled' \| 'tailscaleEnabled'/);
+  assert.doesNotMatch(page, /enablePrivateAccess|disablePrivateAccess|runPrivateNetworkAccessChange/);
+  assert.match(page, /updateSettings\(appId, nextSettings, planId\)/);
+  assert.match(settings, /name="desiredAccessMode"/);
+  assert.match(settings, /SettingsChangeReview/);
 });
 
 test('applications page surfaces backup-aware safety warnings around risky flows', () => {

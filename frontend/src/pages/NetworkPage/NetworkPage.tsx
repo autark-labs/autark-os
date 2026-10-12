@@ -1,29 +1,21 @@
+import axios from 'axios';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Network, Trash2 } from 'lucide-react';
+import { Network } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ContextChip } from '@/components/autark-os/ContextChip';
 import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import type { ReactNode } from 'react';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
-import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { SettingsChangeReview } from '@/components/autark-os/SettingsChangeReview';
+import type { AppSettingsChangePlan, InstallSettings } from '@/types/app';
+import { useAutarkOsJobsQuery, activeJobs } from '@/repositories/jobRepository';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
@@ -38,9 +30,9 @@ import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutat
 import {
   invalidateNetworkQueries,
   useAccessNetworkRepository,
-  useRemoveStalePrivateAccessMutation,
 } from '@/repositories/networkRepository';
 import type { PrivateAccessReconciliationReport } from '@/types/network';
+import { applicationDeepLinkForManagedApp } from '@/pages/ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
@@ -60,18 +52,7 @@ import {
   type AccessDeepLinkTab,
 } from './extensions/NetworkPage.deepLinks';
 import type { ReachabilityService, ReachabilityTypeFilter, ReachabilityZoneId } from './extensions/NetworkPage.types';
-import {
-  acknowledgePendingReachability,
-  applyPendingReachability,
-  filterReachabilityServices,
-  removePendingReachabilityForToken,
-  removePendingReachabilityIds,
-  removeServiceProcessingForToken,
-  removeServiceProcessingIds,
-  setServiceProcessingToken,
-  settingsForReachabilityZone,
-  type PendingReachability,
-} from './extensions/NetworkPage.reachability';
+import { filterReachabilityServices, settingsForReachabilityZone } from './extensions/NetworkPage.reachability';
 
 function NetworkPage() {
   const queryClient = useQueryClient();
@@ -79,18 +60,19 @@ function NetworkPage() {
   const navigate = useNavigate();
   const appState = useApplicationStateRepository();
   const network = useAccessNetworkRepository();
-  const removeStalePrivateAccess = useRemoveStalePrivateAccessMutation();
+  const jobsQuery = useAutarkOsJobsQuery();
+  const [review, setReview] = useState<{ appId: string; settings: InstallSettings; plan: AppSettingsChangePlan } | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [planningAppId, setPlanningAppId] = useState<string | null>(null);
+  const reviewRequestRef = useRef(0);
   const [copiedLinkKey, setCopiedLinkKey] = useState<string | null>(null);
-  const [processingServiceTokens, setProcessingServiceTokens] = useState<Record<string, number>>({});
-  const [pendingReachabilityByServiceId, setPendingReachabilityByServiceId] = useState<Record<string, PendingReachability>>({});
   const [privateLinksOpen, setPrivateLinksOpen] = useState(false);
-  const [staleActionLoadingId, setStaleActionLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [focusedServiceId, setFocusedServiceId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [typeFilters, setTypeFilters] = useState<ReachabilityTypeFilter[]>([]);
   const appliedDeepLinkKeyRef = useRef('');
-  const pendingReachabilityTokenRef = useRef(0);
   const deepLinkTarget = useMemo(() => parseAccessDeepLink(location.search), [location.search]);
 
   const apps = useMemo(() => appState.applications.flatMap((application) => (
@@ -106,28 +88,33 @@ function NetworkPage() {
     ]);
   }, [appState, network]);
 
+  const reviewRoutes = useMemo(() => new Map(appState.applications.map(application => {
+    const action = application.issues.find(issue => issue.id === `private-access-${application.id}`)?.primaryAction;
+    const route = action?.route || (action?.method === 'GET' ? action.href : null);
+    return [application.id, route || applicationDeepLinkForManagedApp(application.id, { panel: 'manage' })];
+  })), [appState.applications]);
+
   const devices = useMemo(() => buildDeviceViews(network.tailscale, network.tailnetDevices), [network.tailnetDevices, network.tailscale]);
   const issues = useMemo(() => buildNetworkIssues(network.diagnostics, network.reconciliation), [network.diagnostics, network.reconciliation]);
   const reachabilityServices = useMemo(() => buildReachabilityServices({
     apps,
     reconciliation: network.reconciliation,
     tailscale: network.tailscale,
-  }), [apps, network.reconciliation, network.tailscale]);
-  const displayedReachabilityServices = useMemo(
-    () => applyPendingReachability(reachabilityServices, pendingReachabilityByServiceId),
-    [pendingReachabilityByServiceId, reachabilityServices],
-  );
+  }).map(service => ({ ...service, reviewHref: reviewRoutes.get(service.id) })), [apps, network.reconciliation, network.tailscale, reviewRoutes]);
   const filteredReachabilityServices = useMemo(
-    () => filterReachabilityServices(displayedReachabilityServices, query, typeFilters),
-    [displayedReachabilityServices, query, typeFilters],
+    () => filterReachabilityServices(reachabilityServices, query, typeFilters),
+    [reachabilityServices, query, typeFilters],
   );
-  const loadingServiceIds = useMemo(
-    () => Object.fromEntries(Object.keys(processingServiceTokens).map((serviceId) => [serviceId, true])),
-    [processingServiceTokens],
-  );
+  const loadingServiceIds = useMemo(() => Object.fromEntries(appState.applications.map(application => [application.id,
+    planningAppId === application.id || reviewBusy && review?.appId === application.id
+    || !['idle', 'failed'].includes(application.operation.kind)
+    || activeJobs(jobsQuery.data ?? []).some(job => job.subjectId === application.id),
+  ])), [appState.applications, planningAppId, reviewBusy, review, jobsQuery.data]);
   const selectedTab = activeTab ?? deepLinkTarget.tab ?? 'matrix';
-  const focusedService = useMemo(() => displayedReachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [displayedReachabilityServices, focusedServiceId]);
-  const needsReviewCount = issues.length;
+  const focusedService = useMemo(() => reachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [reachabilityServices, focusedServiceId]);
+  const issuesStale = Boolean(network.diagnosticsError || network.reconciliationError);
+  const issuesUnavailable = Boolean(network.diagnosticsError && !network.diagnostics || network.reconciliationError && !network.reconciliation);
+  const needsReviewCount = issuesStale ? null : issues.length;
 
   const copyAccessLink = useCallback(async (appId: string, linkKind: string, url: string | null) => {
     if (!url) return;
@@ -147,58 +134,44 @@ function NetworkPage() {
     window.setTimeout(() => setCopiedLinkKey((current) => current === copiedKey ? null : current), 1600);
   }, []);
 
-  const moveReachabilityService = useCallback(async (service: ReachabilityService, targetZone: ReachabilityZoneId) => {
-    const app = service.app;
-    if (!app || service.zone === targetZone || targetZone === 'public') {
-      return;
-    }
-    let succeeded = false;
-    const pendingToken = pendingReachabilityTokenRef.current + 1;
-    pendingReachabilityTokenRef.current = pendingToken;
-    setProcessingServiceTokens((current) => setServiceProcessingToken(current, service.id, pendingToken));
-    setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { acknowledged: false, token: pendingToken, zone: targetZone } }));
-    setFocusedServiceId(service.id);
-    window.setTimeout(() => {
-      setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
-      setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
-    }, 20000);
+  const moveReachabilityService = useCallback(async (service: ReachabilityService, targetZone: ReachabilityZoneId | 'lan-and-private') => {
+    if (!service.app || targetZone === 'public' || loadingServiceIds[service.id]) return;
+    const settings = settingsForReachabilityZone(service.app, targetZone);
+    if (settings.desiredAccessMode === service.app.settings?.desiredAccessMode) return;
+    const requestId = ++reviewRequestRef.current;
+    setPlanningAppId(service.id);
+    setReviewError(null);
     try {
-      if (targetZone === 'tailnet') {
-        const result = await InstalledAppsAPIClient.enablePrivateAccess(app.appId);
-        syncCanonicalAppMutationResult(queryClient, result);
-        showActionNotification(result, 'Private Tailnet enabled');
-        succeeded = true;
-      } else {
-        const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(app, targetZone));
-        syncCanonicalAppMutationResult(queryClient, updated);
-        showActionNotification(updated);
-        succeeded = true;
-      }
-      setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));
-      void invalidateNetworkQueries(queryClient);
-    } catch (err) {
-      showActionErrorNotification(err, 'Reachability update failed');
-      void appState.refresh().catch(() => {});
+      const plan = await InstalledAppsAPIClient.settingsChangePlan(service.app.appId, settings);
+      if (requestId === reviewRequestRef.current) setReview({ appId: service.app.appId, settings, plan });
+    } catch (error) {
+      showActionErrorNotification(error, 'Access review unavailable');
     } finally {
-      if (!succeeded) {
-        setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
-        setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
-      }
+      if (requestId === reviewRequestRef.current) setPlanningAppId(null);
     }
-  }, [appState, queryClient]);
+  }, [loadingServiceIds]);
 
-  const removeStaleMapping = useCallback(async (port: number) => {
-    setStaleActionLoadingId(`stale-${port}`);
+  async function applyAccessReview() {
+    if (!review || reviewBusy) return;
+    setReviewBusy(true);
+    setReviewError(null);
     try {
-      await removeStalePrivateAccess.mutateAsync(port);
-      showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Autark-OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
+      const result = await InstalledAppsAPIClient.updateSettings(review.appId, review.settings, review.plan.planId);
+      syncCanonicalAppMutationResult(queryClient, result);
+      showActionNotification(result);
+      setReview(null);
+      void invalidateNetworkQueries(queryClient);
+    } catch (error) {
+      const message = axios.isAxiosError(error) && !error.response
+        ? 'The response was lost. The job may still be running. Check Activity; submitting this same review again retrieves the accepted job.'
+        : apiErrorMessage(error, 'The change could not be confirmed. Review the current settings before trying again.');
+      setReviewError(message);
+      showActionNotification({ ok: false, severity: 'error', title: 'Access change could not be confirmed', message });
       void appState.refresh().catch(() => {});
-    } catch (err) {
-      showActionErrorNotification(err, 'Stale private link removal failed');
     } finally {
-      setStaleActionLoadingId(null);
+      setReviewBusy(false);
     }
-  }, [appState, removeStalePrivateAccess]);
+  }
 
   const handleTabChange = useCallback((tab: string) => {
     const nextTab = tab as AccessDeepLinkTab;
@@ -222,10 +195,10 @@ function NetworkPage() {
       appliedDeepLinkKeyRef.current = deepLinkTarget.key;
       return;
     }
-    if (!displayedReachabilityServices.length) {
+    if (!reachabilityServices.length) {
       return;
     }
-    const targetService = findAccessDeepLinkTarget(displayedReachabilityServices, deepLinkTarget);
+    const targetService = findAccessDeepLinkTarget(reachabilityServices, deepLinkTarget);
     if (!targetService) {
       return;
     }
@@ -233,18 +206,7 @@ function NetworkPage() {
     setTypeFilters([]);
     setFocusedServiceId(targetService.id);
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
-  }, [deepLinkTarget, displayedReachabilityServices]);
-
-  useEffect(() => {
-    const settledServiceIds = Object.entries(pendingReachabilityByServiceId)
-    .filter(([serviceId, pending]) => pending.acknowledged && reachabilityServices.find((service) => service.id === serviceId)?.zone === pending.zone)
-    .map(([serviceId]) => serviceId);
-    if (!settledServiceIds.length) {
-      return;
-    }
-    setProcessingServiceTokens((current) => removeServiceProcessingIds(current, settledServiceIds));
-    setPendingReachabilityByServiceId((current) => removePendingReachabilityIds(current, settledServiceIds));
-  }, [pendingReachabilityByServiceId, reachabilityServices]);
+  }, [deepLinkTarget, reachabilityServices]);
 
   return (
     <PageShell
@@ -252,10 +214,11 @@ function NetworkPage() {
       contained
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
+      <SettingsChangeReview open={Boolean(review)} onOpenChange={open => { if (!open && !reviewBusy) setReview(null); }} plan={review?.plan ?? null} busy={reviewBusy} error={reviewError} onConfirm={() => void applyAccessReview()} />
       <ExtensionActionTarget actionId="review-access" routeId="access">
         <AccessPageHeader
           error={pageError}
-          context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} loadingId={staleActionLoadingId} onRemoveStaleMapping={removeStaleMapping} reconciliation={network.reconciliation} error={Boolean(network.reconciliationError)} />}
+          context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} reconciliation={network.reconciliation} error={Boolean(network.reconciliationError)} />}
           needsReviewCount={needsReviewCount}
           onRefresh={() => void refreshAll().catch(() => {})}
           refreshing={pageRefreshing}
@@ -307,10 +270,24 @@ function NetworkPage() {
               </ApplicationStateContent>
             </TabsContent>
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="issues">
-              <NetworkIssuesPanel onReviewServices={() => handleTabChange('matrix')} issues={issues} onReviewPrivateLinks={() => setPrivateLinksOpen(true)} />
+              {issuesUnavailable ? (
+                <PageLoadError model={{ title: 'Issue checks unavailable', message: 'Autark-OS could not check every source. Refresh to try again.' }} onRetry={() => void refreshAll()} />
+              ) : (
+                <NetworkIssuesPanel
+                  stale={issuesStale}
+                  issues={issues}
+                  onReviewPrivateLinks={() => setPrivateLinksOpen(true)}
+                  onReviewServices={appId => {
+                    if (appId) navigate(reviewRoutes.get(appId) || applicationDeepLinkForManagedApp(appId, { panel: 'manage' }));
+                    else handleTabChange('matrix');
+                  }}
+                />
+              )}
             </TabsContent>
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="devices">
-              <NetworkDevicesPanel devices={devices} />
+              {network.devicesError && !network.hasDeviceData ? (
+                <PageLoadError model={{ title: 'Device list unavailable', message: 'Tailscale devices could not be read. Refresh to try again.' }} onRetry={() => void refreshAll()} />
+              ) : <NetworkDevicesPanel devices={devices} />}
             </TabsContent>
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="advanced">
               <div className="grid gap-3">
@@ -336,7 +313,7 @@ function AccessPageHeader({
 }: {
   context: ReactNode;
   error: string | null;
-  needsReviewCount: number;
+  needsReviewCount: number | null;
   onRefresh: () => void;
   refreshing: boolean;
   serviceCount: number | null;
@@ -356,15 +333,11 @@ function AccessPageHeader({
 function StalePrivateLinksPanel({
   open,
   onOpenChange,
-  loadingId,
-  onRemoveStaleMapping,
   reconciliation,
   error,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  loadingId: string | null;
-  onRemoveStaleMapping: (port: number) => void;
   reconciliation: PrivateAccessReconciliationReport | null;
   error: boolean;
 }) {
@@ -372,7 +345,7 @@ function StalePrivateLinksPanel({
   return (
     <ContextChip open={open} onOpenChange={onOpenChange} className="w-40" label={error ? reconciliation ? 'Links stale' : 'Links unavailable' : mappings.length ? `${mappings.length} unused link${mappings.length === 1 ? '' : 's'}` : 'Private links'} title="Access / Unused private links" tone={error || mappings.length ? 'warning' : 'muted'}>
       {error && <p className="text-xs text-amber-200">Private-link checks could not refresh.{reconciliation ? ' Showing the last confirmed links.' : ' Use Refresh to try again.'}</p>}
-      <p className="text-xs text-muted-foreground">{!reconciliation ? 'Private links have not been checked yet.' : mappings.length ? 'These links no longer match an app’s private-access settings. Review each before removing it.' : 'No unused private links were found.'}</p>
+      <p className="text-xs text-muted-foreground">{!reconciliation ? 'Private links have not been checked yet.' : mappings.length ? 'These links no longer match an app’s private-access settings. Ownership must be confirmed before a mapping can be changed.' : 'No unused private links were found.'}</p>
       {mappings.map((mapping) => (
         <div className="grid gap-3 border-t border-border pt-3" key={mapping.id}>
           <div className="min-w-0">
@@ -384,30 +357,7 @@ function StalePrivateLinksPanel({
               <AccessLine label="Routes to" value={mapping.target || 'Unknown target'} />
             </div>
           </div>
-          <AlertDialog>
-            <DisabledAction disabled={!mapping.servePort || loadingId === `stale-${mapping.servePort}`} reason={!mapping.servePort ? 'Autark-OS needs the stale Tailscale port before cleanup.' : 'Autark-OS is already reviewing this stale private link.'}>
-              <AlertDialogTrigger asChild>
-                <ProjectWarningButton disabled={!mapping.servePort || loadingId === `stale-${mapping.servePort}`} type="button">
-                  <Trash2 className={cn('size-4', loadingId === `stale-${mapping.servePort}` && 'animate-pulse')} />
-                  Remove stale link
-                </ProjectWarningButton>
-              </AlertDialogTrigger>
-            </DisabledAction>
-            <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove this stale private link?</AlertDialogTitle>
-                <AlertDialogDescription className="text-slate-400">
-                  Autark-OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. This link will stop working. No app data will be deleted. Active service links should be changed from the matrix.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">Keep link</AlertDialogCancel>
-                <AlertDialogAction className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => mapping.servePort && onRemoveStaleMapping(mapping.servePort)}>
-                  Remove stale link
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <p className="text-xs text-muted-foreground">{mapping.detail || 'Ownership could not be confirmed. Autark-OS leaves this mapping unchanged; review it in Tailscale diagnostics.'}</p>
         </div>
       ))}
     </ContextChip>

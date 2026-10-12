@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useBlocker, useLocation, useNavigate } from 'react-router-dom';
@@ -256,7 +257,7 @@ export const ApplicationsPage = () => {
     }
   }
 
-  async function saveApplicationSettings(appId: string, values: ApplicationSettingsFormValues) {
+  async function saveApplicationSettings(appId: string, values: ApplicationSettingsFormValues, planId: string) {
     const app = managedAppById.get(appId);
     if (!app) {
       return;
@@ -267,11 +268,7 @@ export const ApplicationsPage = () => {
     setSettingsLoading(appId, 'saving');
 
     try {
-      const plan = await InstalledAppsAPIClient.settingsChangePlan(appId, nextSettings);
-      if (plan.saveAllowed === false) {
-        throw new Error(plan.blockedReasons[0] || 'Autark-OS cannot safely apply these settings yet.');
-      }
-      const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
+      const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings, planId);
       syncCanonicalAppMutationResult(queryClient, updatedApp);
       setTrackedAppJobIds((current) => current.includes(updatedApp.jobId) ? current : [...current, updatedApp.jobId]);
 
@@ -279,25 +276,11 @@ export const ApplicationsPage = () => {
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       void invalidateApplicationState(queryClient);
-      showActionErrorNotification(err, 'Settings update failed');
-      throw err;
-    } finally {
-      setSettingsLoading(appId, null);
-    }
-  }
-
-  async function runPrivateNetworkAccessChange(appId: string, enabled: boolean) {
-    setSettingsLoading(appId, 'private_access');
-
-    try {
-      const result = enabled
-        ? await InstalledAppsAPIClient.enablePrivateAccess(appId)
-        : await InstalledAppsAPIClient.disablePrivateAccess(appId);
-      syncCanonicalAppMutationResult(queryClient, result);
-      showActionNotification(result, enabled ? 'Private network ready' : 'Private network turned off');
-      void invalidateNetworkQueries(queryClient);
-    } catch (err) {
-      showActionErrorNotification(err, enabled ? 'Private network could not be enabled' : 'Private network could not be turned off');
+      if (axios.isAxiosError(err) && !err.response) {
+        showActionNotification({ ok: false, severity: 'error', title: 'Settings update could not be confirmed', message: 'The response was lost. Check Activity; retrying this same review retrieves the accepted job.' });
+      } else {
+        showActionErrorNotification(err, 'Settings update failed');
+      }
       throw err;
     } finally {
       setSettingsLoading(appId, null);
@@ -339,7 +322,6 @@ export const ApplicationsPage = () => {
     onRunUninstall: runUninstall,
     onSaveSettings: saveApplicationSettings,
     onSettingsPlanRequest: requestSettingsPlan,
-    onSetPrivateNetworkAccess: runPrivateNetworkAccessChange,
     onStart: handleStart,
     onStop: handleStop,
   };

@@ -26,7 +26,19 @@ public final class InstallModels {
             boolean dataMigrationRequired,
             List<String> changes,
             List<String> warnings,
-            List<String> blockedReasons) {
+            List<String> blockedReasons,
+            String planId) {
+        public AppSettingsChangePlan(String appId, String appName, String impact, String headline, String summary,
+                boolean saveAllowed, boolean redeployRequired, boolean restartRequired, boolean dataMigrationRequired,
+                List<String> changes, List<String> warnings, List<String> blockedReasons) {
+            this(appId, appName, impact, headline, summary, saveAllowed, redeployRequired, restartRequired,
+                    dataMigrationRequired, changes, warnings, blockedReasons, null);
+        }
+
+        public AppSettingsChangePlan withPlanId(String id) {
+            return new AppSettingsChangePlan(appId, appName, impact, headline, summary, saveAllowed, redeployRequired,
+                    restartRequired, dataMigrationRequired, changes, warnings, blockedReasons, id);
+        }
     }
 
     public record BackupPolicy(

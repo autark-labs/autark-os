@@ -355,6 +355,12 @@ public class MarketplaceInstallService {
             return new TailscaleServeResult(false, null, "This app does not expose a local HTTP port for Tailscale Serve.", List.of());
         }
         int privateHttpsPort = AppPrivateAccessPorts.selectHttpsPort(manifest.id(), hostPort, installedAppRepository);
+        tailscaleService.invalidateServeConfig();
+        var config = tailscaleService.serveConfig();
+        if (!config.available() || config.mappings().stream().anyMatch(mapping -> java.util.Objects.equals(mapping.servePort(), privateHttpsPort))) {
+            return new TailscaleServeResult(false, null,
+                    "This private endpoint could not be confirmed as available. Existing mappings were left unchanged; review private links in Access.", List.of());
+        }
         return tailscaleService.serveHttps(hostPort, privateHttpsPort);
     }
 

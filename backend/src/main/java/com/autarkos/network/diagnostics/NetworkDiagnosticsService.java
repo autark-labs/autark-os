@@ -36,9 +36,9 @@ public class NetworkDiagnosticsService {
         int privateAppCount = reconciliation.apps().size();
 
         List<NetworkDiagnosticItem> checks = new ArrayList<>();
-        checks.add(installedCheck(tailscale));
-        checks.add(connectedCheck(tailscale));
-        checks.add(dnsCheck(tailscale));
+        checks.add(installedCheck(tailscale, privateAppCount > 0));
+        checks.add(connectedCheck(tailscale, privateAppCount > 0));
+        checks.add(dnsCheck(tailscale, privateAppCount > 0));
         checks.add(devicesCheck(tailscale, devices));
         checks.add(connectionPathCheck(devices));
         checks.add(privateAppsCheck(tailscale, apps, privateAppCount, reconciliation));
@@ -50,35 +50,38 @@ public class NetworkDiagnosticsService {
         String status = overallStatus(checks, appChecks);
         return new NetworkDiagnosticsReport(
                 status,
-                headline(status),
+                privateAppCount == 0 && "healthy".equals(status) ? "Network status" : headline(status),
                 summary(status, privateAppCount, devices.size()),
                 checks,
                 appChecks,
                 Instant.now());
     }
 
-    private NetworkDiagnosticItem installedCheck(TailscaleStatus tailscale) {
+    private NetworkDiagnosticItem installedCheck(TailscaleStatus tailscale, boolean requested) {
         if (tailscale.installed()) {
             return ok("tailscale-installed", "Tailscale installed", "Private networking is available on this host.", "Autark-OS can inspect Tailscale locally.", null);
         }
+        if (!requested) return neutral("tailscale-installed", "Tailscale optional", "No apps request private links.", "Home network access does not require Tailscale.", null);
         return warn("tailscale-installed", "Tailscale install needed", "Install Tailscale on this host.", "Autark-OS cannot create private app links until Tailscale is installed.", "Install Tailscale");
     }
 
-    private NetworkDiagnosticItem connectedCheck(TailscaleStatus tailscale) {
+    private NetworkDiagnosticItem connectedCheck(TailscaleStatus tailscale, boolean requested) {
         if (tailscale.connected()) {
             return ok("tailscale-connected", "Autark-OS connected", "This device is joined to your tailnet.", tailscale.message(), null);
         }
+        if (!requested) return neutral("tailscale-connected", "Private access not in use", "No apps request private links.", "Connect this host when you choose private access for an app.", null);
         return warn("tailscale-connected", "Connect Autark-OS", "Sign in to Tailscale from this device.", tailscale.message(), "Connect this device");
     }
 
-    private NetworkDiagnosticItem dnsCheck(TailscaleStatus tailscale) {
+    private NetworkDiagnosticItem dnsCheck(TailscaleStatus tailscale, boolean requested) {
         if (!tailscale.connected()) {
             return neutral("tailscale-dns", "Private DNS", "Waiting for Tailscale connection.", "DNS names appear after the device joins your tailnet.", null);
         }
-        if (tailscale.dnsName() != null && !tailscale.dnsName().isBlank()) {
+        if (Boolean.TRUE.equals(tailscale.magicDnsReady())) {
             return ok("tailscale-dns", "Private DNS ready", "Private app links can use a friendly device name.", tailscale.dnsName(), null);
         }
-        return warn("tailscale-dns", "Private DNS missing", "Autark-OS will fall back to the Tailscale IP.", "Enable MagicDNS in Tailscale for friendlier private links.", "Check DNS");
+        if (!requested) return neutral("tailscale-dns", "Private DNS not in use", "No apps request private links.", "Enable MagicDNS when setting up private links.", null);
+        return warn("tailscale-dns", "Private DNS not verified", "Autark-OS has not confirmed MagicDNS for this host.", "Check MagicDNS in Tailscale before using private app links.", "Check DNS");
     }
 
     private NetworkDiagnosticItem devicesCheck(TailscaleStatus tailscale, List<TailscaleDevice> devices) {
@@ -112,7 +115,7 @@ public class NetworkDiagnosticsService {
 
     private NetworkDiagnosticItem privateAppsCheck(TailscaleStatus tailscale, List<AppRuntimeView> apps, int privateAppCount, AccessModels.PrivateAccessReconciliationReport reconciliation) {
         if (privateAppCount == 0) {
-            return warn("private-apps", "No private apps", "Choose apps to make available privately.", apps.size() + " installed app(s) can be reviewed.", "Make an app private");
+            return neutral("private-apps", "Private access optional", "No apps request private links.", apps.size() + " managed app(s) can be reviewed when you need private access.", null);
         }
         if (!tailscale.connected()) {
             return warn("private-apps", "Private apps waiting", privateAppCount + " app(s) are selected for private access.", "Connect Tailscale to activate their private links.", "Connect this device");
@@ -145,6 +148,7 @@ public class NetworkDiagnosticsService {
     }
 
     private String summary(String status, int privateAppCount, int deviceCount) {
+        if (privateAppCount == 0 && "healthy".equals(status)) return "No apps currently request private access.";
         if ("healthy".equals(status)) {
             return privateAppCount + " private app(s) and " + deviceCount + " tailnet device(s) are ready.";
         }
