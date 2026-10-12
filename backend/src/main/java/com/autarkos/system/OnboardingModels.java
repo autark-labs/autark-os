@@ -23,7 +23,9 @@ public final class OnboardingModels {
             List<String> recommendedApps,
             List<String> completedSteps,
             SystemDoctorStatus doctor,
-            Instant updatedAt) {
+            Instant updatedAt,
+            String backupPosture,
+            List<BetaScope.App> starterApps) {
     }
 
     public record OnboardingUpdateRequest(
@@ -34,6 +36,14 @@ public final class OnboardingModels {
             Boolean automaticBackupsEnabled,
             String privateAccessChoice,
             List<String> recommendedApps,
-            List<String> completedSteps) {
+            List<String> completedSteps,
+            String backupPosture,
+            Boolean acknowledgeOptionalWork) {
+        public OnboardingUpdateRequest(String status, Integer currentStep, String deviceName, String backupDestination,
+                Boolean automaticBackupsEnabled, String privateAccessChoice, List<String> recommendedApps, List<String> completedSteps) {
+            this(status, currentStep, deviceName, backupDestination, automaticBackupsEnabled, privateAccessChoice, recommendedApps, completedSteps, null, null);
+        }
     }
+
+    public record OnboardingCompletionRequest(boolean acknowledgeOptionalWork) { }
 }

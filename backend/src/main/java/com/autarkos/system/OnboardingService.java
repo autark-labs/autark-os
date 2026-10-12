@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.marketplace.install.InstallationException;
@@ -44,48 +45,73 @@ public class OnboardingService {
     }
 
     public OnboardingModels.OnboardingState state() {
-        Map<String, String> values = settingsRepository.readAll();
+        return state(settingsRepository.readAll(), tailscaleConnected(), doctorService.status());
+    }
+
+    boolean tailscaleConnected() { return tailscaleService.status().connected(); }
+
+    private OnboardingModels.OnboardingState state(Map<String, String> values, boolean connected, SystemSetupModels.SystemDoctorStatus doctor) {
         ProjectSettings settings = settingsService.current();
+        String destination = currentBackupDestination();
         return new OnboardingModels.OnboardingState(
                 SetupCompletionState.onboardingStatus(values),
                 intValue(values, "onboardingCurrentStep", 0),
                 settings.deviceName(),
                 runtimeLayout.runtimeRoot().toString(),
-                currentBackupDestination(),
-                tailscaleService.status().connected(),
-                value(values, "privateAccessChoice", tailscaleService.status().connected() ? "already-connected" : "local-only"),
+                destination,
+                connected,
+                value(values, "privateAccessChoice", connected ? "already-connected" : "local-only"),
                 settings.automaticBackupsEnabled(),
                 settings.backupFrequency(),
                 listValue(values, "onboardingRecommendedApps", DEFAULT_RECOMMENDED_APPS).stream().filter(DEFAULT_RECOMMENDED_APPS::contains).toList(),
-                listValue(values, "onboardingCompletedSteps", List.of()),
-                doctorService.status(),
-                instantValue(values, "onboardingUpdatedAt"));
+                listValue(values, "onboardingCompletedSteps", List.of()).stream()
+                        .filter(step -> !"tailscale".equals(step) || connected).toList(),
+                doctor,
+                instantValue(values, "onboardingUpdatedAt"),
+                value(values, "onboardingBackupPosture", !destination.equals(defaultBackupDestination().toString()) ? "external"
+                        : settings.automaticBackupsEnabled() ? "routine" : "later"),
+                BetaScope.CURRENT.apps().stream().filter(BetaScope.App::starter).toList());
     }
 
+    @Transactional
     public OnboardingModels.OnboardingState update(OnboardingModels.OnboardingUpdateRequest request) {
+        var savedValues = settingsRepository.readAll();
+        if (SetupCompletionState.isComplete(savedValues)) return state();
         Map<String, String> updates = new LinkedHashMap<>();
+        boolean finishRequested = "complete".equals(cleanStatus(request.status() == null ? "" : request.status()));
         if (request.status() != null && !request.status().isBlank()) {
-            String status = cleanStatus(request.status());
-            updates.put(SetupCompletionState.ONBOARDING_STATUS_KEY, status);
-            java.util.Set<String> progress = SetupCompletionState.steps(settingsRepository.readAll().get(SetupCompletionState.PROGRESS_COMPLETED_KEY));
-            if ("complete".equals(status)) {
-                progress.add("done");
-            } else {
-                progress.remove("done");
-            }
-            updates.put(SetupCompletionState.PROGRESS_COMPLETED_KEY, SetupCompletionState.encode(progress));
-            updates.put(SetupCompletionState.PROGRESS_UPDATED_KEY, Instant.now().toString());
+            updates.put(SetupCompletionState.ONBOARDING_STATUS_KEY, finishRequested ? "in_progress" : cleanStatus(request.status()));
         }
         if (request.currentStep() != null) {
             updates.put("onboardingCurrentStep", Integer.toString(Math.max(0, Math.min(request.currentStep(), 6))));
         }
-        if (request.backupDestination() != null) {
-            if (backupDestinationService != null) {
-                backupDestinationService.configure(request.backupDestination());
-            } else {
-                updates.put("backupDestination", cleanBackupDestination(request.backupDestination()));
+        String posture = request.backupPosture();
+        if (posture != null && !List.of("routine", "external", "later").contains(posture)) {
+            throw new InstallationException("Choose same-device backups, an external location, or configure later.");
+        }
+        String destination = request.backupDestination();
+        if ("routine".equals(posture) || "later".equals(posture)) destination = defaultBackupDestination().toString();
+        if ("external".equals(posture)) {
+            if (destination == null) destination = currentBackupDestination();
+            if (defaultBackupDestination().equals(Path.of(destination.trim()).toAbsolutePath().normalize())) {
+                throw new InstallationException("Choose an external backup location or same-device backups.");
             }
         }
+        if (destination != null) {
+            String configuredDestination;
+            if (backupDestinationService != null) configuredDestination = backupDestinationService.configure(destination).configuredPath();
+            else {
+                configuredDestination = cleanBackupDestination(destination);
+                updates.put("backupDestination", configuredDestination);
+            }
+            if (posture == null) {
+                boolean internal = defaultBackupDestination().toString().equals(configuredDestination);
+                boolean unchangedLater = internal && "later".equals(savedValues.get("onboardingBackupPosture"))
+                        && configuredDestination.equals(savedValues.getOrDefault("backupDestination", defaultBackupDestination().toString()));
+                posture = unchangedLater ? "later" : internal ? "routine" : "external";
+            }
+        }
+        if (posture != null) updates.put("onboardingBackupPosture", posture);
         if (request.privateAccessChoice() != null) {
             updates.put("privateAccessChoice", cleanPrivateAccessChoice(request.privateAccessChoice()));
         }
@@ -93,13 +119,11 @@ public class OnboardingService {
             updates.put("onboardingRecommendedApps", encodeList(request.recommendedApps().stream().filter(DEFAULT_RECOMMENDED_APPS::contains).toList()));
         }
         if (request.completedSteps() != null) {
-            updates.put("onboardingCompletedSteps", encodeList(request.completedSteps()));
+            updates.put("onboardingCompletedSteps", encodeList(request.completedSteps().stream()
+                    .filter(step -> !"tailscale".equals(step)).toList()));
         }
         updates.put("onboardingUpdatedAt", Instant.now().toString());
-        if (!updates.isEmpty()) {
-            settingsRepository.saveValues(updates);
-        }
-        if (request.deviceName() != null || request.automaticBackupsEnabled() != null) {
+        if (request.deviceName() != null || request.automaticBackupsEnabled() != null || "later".equals(posture)) {
             ProjectSettings current = settingsService.current();
             settingsService.update(new ProjectSettings(
                     request.deviceName() == null || request.deviceName().isBlank() ? current.deviceName() : request.deviceName().trim(),
@@ -112,17 +136,50 @@ public class OnboardingService {
                     current.telemetryEnabled(),
                     current.defaultInstallAccess(),
                     current.automaticRepairEnabled(),
-                    request.automaticBackupsEnabled() == null ? current.automaticBackupsEnabled() : request.automaticBackupsEnabled(),
+                    "later".equals(posture) ? false : request.automaticBackupsEnabled() == null ? current.automaticBackupsEnabled() : request.automaticBackupsEnabled(),
                     current.backupFrequency(),
                     current.backupRetentionDays(),
                     current.backupTime(),
                     Instant.now()));
         }
-        return state();
+        settingsRepository.saveValues(updates);
+        return finishRequested ? complete(Boolean.TRUE.equals(request.acknowledgeOptionalWork())) : state();
     }
 
-    public OnboardingModels.OnboardingState complete() {
-        return update(new OnboardingModels.OnboardingUpdateRequest("complete", 6, null, null, null, null, null, List.of("device", "doctor", "tailscale", "storage", "backups", "apps")));
+    @Transactional
+    public OnboardingModels.OnboardingState complete() { return complete(false); }
+
+    @Transactional
+    public OnboardingModels.OnboardingState complete(boolean acknowledgeOptionalWork) {
+        var values = settingsRepository.readAll();
+        if (SetupCompletionState.isComplete(values)) return state();
+        var doctor = doctorService.status();
+        var readiness = doctor.readiness();
+        if (!readiness.canCompleteOnboarding()) throw new InstallationException(readiness.summary());
+        if (readiness.finishAnywayRequiresAdvanced() && !acknowledgeOptionalWork) {
+            throw new InstallationException("Review and acknowledge the remaining optional setup work before finishing. " + readiness.summary());
+        }
+        boolean connected = tailscaleConnected();
+        var completed = SetupCompletionState.steps(values.get(SetupCompletionState.PROGRESS_COMPLETED_KEY));
+        var skipped = SetupCompletionState.steps(values.get("setupProgressSkippedSteps"));
+        completed.addAll(List.of("welcome", "host_check", "access_choice", "starter_apps", "done"));
+        if (doctor.checks().stream().anyMatch(check -> SystemCapabilityCatalog.DOCKER.equals(check.id()) && SystemCapabilityCatalog.OK.equals(check.status()))) completed.add("docker_check");
+        else { completed.remove("docker_check"); skipped.add("docker_check"); }
+        completed.remove("tailscale_connect");
+        skipped.remove("tailscale_connect");
+        if (connected) completed.add("tailscale_connect");
+        else if ("local-only".equals(value(values, "privateAccessChoice", "local-only"))) skipped.add("tailscale_connect");
+        if (!completed.contains("first_backup")) skipped.add("first_backup");
+        skipped.removeAll(completed);
+        var timestamp = Instant.now().toString();
+        settingsRepository.saveValues(Map.of(
+                SetupCompletionState.ONBOARDING_STATUS_KEY, "complete",
+                SetupCompletionState.PROGRESS_COMPLETED_KEY, SetupCompletionState.encode(completed),
+                "setupProgressSkippedSteps", SetupCompletionState.encode(skipped),
+                SetupCompletionState.PROGRESS_UPDATED_KEY, timestamp,
+                "onboardingCurrentStep", "6", "onboardingUpdatedAt", timestamp,
+                "onboardingCompletedSteps", connected ? "device,doctor,tailscale,storage,backups,apps" : "device,doctor,storage,backups,apps"));
+        return state(settingsRepository.readAll(), connected, doctor);
     }
 
     private String cleanStatus(String value) {

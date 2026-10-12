@@ -34,13 +34,15 @@ public class SetupProgressService {
 
     private final ProjectSettingsRepository repository;
     private final Supplier<Instant> clock;
+    private final OnboardingService onboardingService;
 
     @Autowired
-    public SetupProgressService(ProjectSettingsRepository repository) {
-        this(repository, Instant::now);
+    public SetupProgressService(ProjectSettingsRepository repository, OnboardingService onboardingService) {
+        this(repository, onboardingService, Instant::now);
     }
 
-    SetupProgressService(ProjectSettingsRepository repository, Supplier<Instant> clock) {
+    SetupProgressService(ProjectSettingsRepository repository, OnboardingService onboardingService, Supplier<Instant> clock) {
+        this.onboardingService = onboardingService;
         this.repository = repository;
         this.clock = clock;
     }
@@ -66,6 +68,13 @@ public class SetupProgressService {
 
     public SetupProgressModels.SetupProgress completeStep(String step) {
         String normalized = cleanStep(step);
+        if ("done".equals(normalized)) {
+            onboardingService.complete();
+            return status();
+        }
+        if ("tailscale_connect".equals(normalized) && !onboardingService.tailscaleConnected()) {
+            throw new InstallationException("Connect this server to Tailscale before marking private access complete.");
+        }
         SetupProgressModels.SetupProgress current = status();
         List<String> completed = append(current.completedSteps(), normalized);
         List<String> skipped = without(current.skippedSteps(), normalized);
@@ -75,6 +84,7 @@ public class SetupProgressService {
 
     public SetupProgressModels.SetupProgress skipStep(String step) {
         String normalized = cleanStep(step);
+        if ("done".equals(normalized)) throw new InstallationException("Use Finish setup after reviewing readiness. Completion cannot be skipped or reopened here.");
         SetupProgressModels.SetupProgress current = status();
         List<String> skipped = append(current.skippedSteps(), normalized);
         List<String> completed = without(current.completedSteps(), normalized);
@@ -86,8 +96,7 @@ public class SetupProgressService {
         repository.saveValues(Map.of(
                 COMPLETED_KEY, encode(completed),
                 SKIPPED_KEY, encode(skipped),
-                UPDATED_KEY, clock.get().toString(),
-                SetupCompletionState.ONBOARDING_STATUS_KEY, completed.contains("done") ? "complete" : "in_progress"));
+                UPDATED_KEY, clock.get().toString()));
     }
 
     private String nextStep(List<String> completed, List<String> skipped) {

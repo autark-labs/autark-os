@@ -19,8 +19,9 @@ test('clamps persisted setup steps to the supported guided flow', () => {
 
 test('persists completed guided steps as a user advances', () => {
   assert.deepEqual(completedOnboardingSteps(0), []);
-  assert.deepEqual(completedOnboardingSteps(4), ['device', 'doctor', 'tailscale', 'storage', 'backups']);
-  assert.deepEqual(completedOnboardingSteps(5), ['device', 'doctor', 'tailscale', 'storage', 'backups', 'apps']);
+  assert.deepEqual(completedOnboardingSteps(3, true), ['device', 'doctor', 'tailscale']);
+  assert.deepEqual(completedOnboardingSteps(4), ['device', 'doctor', 'storage', 'backups']);
+  assert.deepEqual(completedOnboardingSteps(5), ['device', 'doctor', 'storage', 'backups', 'apps']);
 });
 
 test('requires a device name and a safe external backup path before advancing', () => {

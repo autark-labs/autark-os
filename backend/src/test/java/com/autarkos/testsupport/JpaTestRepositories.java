@@ -60,6 +60,10 @@ public final class JpaTestRepositories {
         return context(layout).getBean(ProjectSettingsRepository.class);
     }
 
+    public static PlatformTransactionManager transactionManager(RuntimeLayout layout) {
+        return context(layout).getBean(PlatformTransactionManager.class);
+    }
+
     public static DeviceTrustRepository deviceTrustRepository(RuntimeLayout layout) {
         return context(layout).getBean(DeviceTrustRepository.class);
     }

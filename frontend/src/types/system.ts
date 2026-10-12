@@ -193,6 +193,8 @@ export type OnboardingState = {
   deviceName: string;
   runtimePath: string;
   backupDestination: string;
+  backupPosture: 'routine' | 'external' | 'later';
+  starterApps: { id: string; label: string; detail: string; starter: boolean }[];
   tailscaleConnected: boolean;
   privateAccessChoice: 'setup-now' | 'local-only' | 'already-connected' | string;
   automaticBackupsEnabled: boolean;
@@ -204,6 +206,8 @@ export type OnboardingState = {
 };
 
 export type OnboardingUpdateRequest = {
+  backupPosture?: 'routine' | 'external' | 'later';
+  acknowledgeOptionalWork?: boolean;
   status?: string;
   currentStep?: number;
   deviceName?: string;

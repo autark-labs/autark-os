@@ -347,12 +347,11 @@ json_bool() {
 }
 
 json_array_strings() {
-  local key="$1"
-  local file="$2"
-  sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\\[([^]]*)\\].*/\\1/p" "${file}" \
-    | head -n 1 \
-    | tr ',' '\n' \
-    | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//; /^$/d'
+  python3 - "$1" "$2" <<'PYARRAY'
+import json, sys
+for value in json.load(open(sys.argv[2])).get(sys.argv[1], []):
+    print(value)
+PYARRAY
 }
 
 json_escape() {
@@ -432,7 +431,7 @@ confirm_default_no() {
 
 print_setup_next_step() {
   local base_url
-  base_url="$(resolve_base_url)"
+  base_url="${1:-$(resolve_base_url)}"
   log "Open Autark-OS: ${base_url}"
   log "First-time setup code: sudo autark-os admin setup-code"
   log "Run 'autark-os doctor' if the page is not reachable."
@@ -2814,154 +2813,171 @@ DOCTOR_USAGE
   log "Open Autark-OS: ${base_url}"
 }
 
+setup_value() {
+  python3 - "$1" "$2" <<'PYVALUE'
+import json, sys
+value = json.load(open(sys.argv[2]))
+for key in sys.argv[1].split('.'):
+    value = value.get(key) if isinstance(value, dict) else None
+print('' if value is None else str(value).lower() if isinstance(value, bool) else value)
+PYVALUE
+}
+
 setup() {
-  local non_interactive=0
-  local print_next_step=0
+  local non_interactive=0 print_next_step=0 acknowledge_optional=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --non-interactive)
-        non_interactive=1
-        ;;
-      --print-next-step)
-        print_next_step=1
-        ;;
+      --non-interactive) non_interactive=1 ;;
+      --acknowledge-optional-work) acknowledge_optional=true ;;
+      --print-next-step) print_next_step=1 ;;
       -h|--help)
         cat <<SETUP_USAGE
 Usage: autark-os setup [options]
 
 Options:
-  --non-interactive  Complete setup using current backend defaults.
-  --print-next-step  Print the browser URL and support command without changing setup state.
-  -h, --help         Show this help.
+  --non-interactive             Preserve saved choices and complete when ready.
+  --acknowledge-optional-work   Explicitly accept current optional setup work.
+  --print-next-step             Show the browser URL without changing setup state.
+  -h, --help                    Show this help.
+
+Hard readiness blockers cannot be bypassed. Optional work needs acknowledgement.
 SETUP_USAGE
-        return 0
-        ;;
-      *)
-        log "Unknown setup option: $1"
-        return 1
-        ;;
+        return 0 ;;
+      *) log "Unknown setup option: $1"; return 1 ;;
     esac
     shift
   done
+  if [[ "${print_next_step}" -eq 1 ]]; then print_setup_next_step; return 0; fi
+  has_command python3 || die "python3 is required to read the setup policy."
 
-  if [[ "${print_next_step}" -eq 1 ]]; then
-    print_setup_next_step
-    return 0
-  fi
-
-  local base_url
-  local onboarding_file
-  local doctor_file
+  local base_url browser_url onboarding_file doctor_file
   base_url="$(resolve_base_url)"
   onboarding_file="$(mktemp)"
   doctor_file="$(mktemp)"
-
-  if ! api_get /api/system/onboarding >"${onboarding_file}" 2>/dev/null; then
+  if ! api_get /api/system/onboarding >"${onboarding_file}"; then
     rm -f "${onboarding_file}" "${doctor_file}"
-    log "Backend is not reachable at ${base_url}."
-    if has_command systemctl; then
-      log "Service state: $(systemctl is-active "${SERVICE_NAME}.service" 2>/dev/null || true)"
-    fi
-    log "Try:"
-    log "  autark-os doctor"
-    log "  autark-os status"
-    log "  autark-os logs"
+    log "Setup state could not be read at ${base_url}. Run 'autark-os doctor' and retry."
     return 1
   fi
 
-  api_get /api/system/doctor >"${doctor_file}" 2>/dev/null || cp "${onboarding_file}" "${doctor_file}"
-
-  local status
-  local device_name
-  local runtime_path
-  local backup_destination
-  local tailscale_connected
-  local automatic_backups
-  local lan_url
-  status="$(json_value status "${onboarding_file}")"
-  device_name="$(json_value deviceName "${onboarding_file}")"
-  runtime_path="$(json_value runtimePath "${onboarding_file}")"
-  backup_destination="$(json_value backupDestination "${onboarding_file}")"
-  tailscale_connected="$(json_bool tailscaleConnected "${onboarding_file}")"
-  automatic_backups="$(json_bool automaticBackupsEnabled "${onboarding_file}")"
-  lan_url="$(json_value lanUrl "${doctor_file}")"
-  [[ -n "${lan_url}" ]] || lan_url="${base_url}"
-
+  browser_url="$(setup_value doctor.lanUrl "${onboarding_file}")"
+  [[ -n "${browser_url}" ]] || browser_url="${base_url}"
+  local status device_name runtime_path backup_destination backup_posture tailscale_connected automatic_backups private_choice
+  status="$(setup_value status "${onboarding_file}")"
+  if [[ "${status}" == "complete" ]]; then
+    rm -f "${onboarding_file}" "${doctor_file}"
+    log "Setup is already complete. Saved choices were preserved."
+    print_setup_next_step "${browser_url}"
+    return 0
+  fi
+  device_name="$(setup_value deviceName "${onboarding_file}")"
+  runtime_path="$(setup_value runtimePath "${onboarding_file}")"
+  backup_destination="$(setup_value backupDestination "${onboarding_file}")"
+  backup_posture="$(setup_value backupPosture "${onboarding_file}")"
+  tailscale_connected="$(setup_value tailscaleConnected "${onboarding_file}")"
+  automatic_backups="$(setup_value automaticBackupsEnabled "${onboarding_file}")"
+  private_choice="$(setup_value privateAccessChoice "${onboarding_file}")"
   log "Autark-OS first-boot setup"
-  log "Current status: ${status:-unknown}"
-  log "Browser URL: ${lan_url}"
-  log "Runtime data: ${runtime_path:-unknown}"
+  log "Browser URL: ${browser_url}"
+  log "Runtime data: ${runtime_path}"
 
-  if [[ "${status}" == "complete" && "${non_interactive}" -eq 0 ]]; then
-    if ! confirm_default_yes "Setup is already complete. Review and save it again?"; then
-      print_setup_next_step
-      rm -f "${onboarding_file}" "${doctor_file}"
-      return 0
-    fi
-  fi
-
+  local recommended=() saved_recommended=()
+  while IFS= read -r app_id; do saved_recommended+=("${app_id}"); done < <(json_array_strings recommendedApps "${onboarding_file}")
   if [[ "${non_interactive}" -eq 0 ]]; then
-    printf '\nDevice readiness:\n'
-    if grep -q '"status":"warning"' "${doctor_file}"; then
-      log "Some setup checks need review. Run 'autark-os doctor' for full details."
-    else
-      log "Core setup checks look ready."
-    fi
-    printf '\n'
-    device_name="$(read_default "Device name" "${device_name:-Autark-OS}")"
+    device_name="$(read_default "Device name" "${device_name}")"
     if [[ "${tailscale_connected}" == "true" ]]; then
-      log "Tailscale is connected. Private app links can be created."
+      log "This host is connected to Tailscale. Private app links still require their own verification."
     else
-      log "Tailscale is not connected yet. Private links can be finished later from Network."
-      log "If you want private access now, run: sudo tailscale up"
+      log "Private access is optional. Use the host guide at ${browser_url}/access?tab=advanced to connect this server."
     fi
-    log "Runtime storage is currently: ${runtime_path:-unknown}"
-    backup_destination="$(read_default "Backup destination" "${backup_destination:-${runtime_path}/backups}")"
-    log "Routine backups use the shared $(json_value backupFrequency "${onboarding_file}") schedule from Settings. Running participating apps temporarily stop while data is copied, then resume. Manual backups remain available when routines are off."
-    if confirm_default_yes "Turn on routine backups?"; then
-      automatic_backups=true
-    else
-      automatic_backups=false
-    fi
-  fi
-
-  local recommended=()
-  if [[ "${non_interactive}" -eq 1 ]]; then
-    while IFS= read -r app_id; do
-      recommended+=("${app_id}")
-    done < <(json_array_strings recommendedApps "${onboarding_file}")
-    [[ "${#recommended[@]}" -gt 0 ]] || recommended=(vaultwarden jellyfin homepage)
-  else
-    printf '\nRecommended starter apps:\n'
-    local app_id
-    for app_id in vaultwarden jellyfin homepage; do
-      if confirm_default_yes "Recommend ${app_id}?"; then
-        recommended+=("${app_id}")
+    local location_choice
+    location_choice="$(read_default "Backup location: this-device, external, or later" "${backup_posture/routine/this-device}")"
+    case "${location_choice}" in
+      this-device) backup_posture=routine; backup_destination="${runtime_path}/backups" ;;
+      external) backup_posture=external; backup_destination="$(read_default "External backup destination" "${backup_destination}")" ;;
+      later) backup_posture=later; automatic_backups=false; log "Routine backups stay off. Manual backups use this device until you choose another destination." ;;
+      *) rm -f "${onboarding_file}" "${doctor_file}"; log "Choose this-device, external, or later. No choices were saved."; return 1 ;;
+    esac
+    if [[ "${backup_posture}" != "later" ]]; then
+      log "Routine backups temporarily stop participating apps; manual backups remain available with routines off."
+      if [[ "${automatic_backups}" == "true" ]]; then
+        if confirm_default_yes "Turn on routine backups?"; then automatic_backups=true; else automatic_backups=false; fi
+      else
+        if confirm_default_no "Turn on routine backups?"; then automatic_backups=true; else automatic_backups=false; fi
       fi
-    done
+    fi
+    printf '\nRecommended starter apps:\n'
+    local app_id app_label app_detail
+    while IFS=$'\t' read -r app_id app_label app_detail <&3; do
+      [[ -n "${app_id}" ]] || continue
+      log "${app_label}: ${app_detail}"
+      if [[ " ${saved_recommended[*]} " == *" ${app_id} "* ]]; then
+        if confirm_default_yes "Recommend ${app_label}?"; then recommended+=("${app_id}"); fi
+      else
+        if confirm_default_no "Recommend ${app_label}?"; then recommended+=("${app_id}"); fi
+      fi
+    done 3< <(python3 - "${onboarding_file}" <<'PYSTARTERS'
+import json, sys
+for app in json.load(open(sys.argv[1])).get('starterApps', []):
+    if app.get('starter'):
+        print('\t'.join(str(app[key]).replace('\t', ' ').replace('\n', ' ') for key in ('id', 'label', 'detail')))
+PYSTARTERS
+)
+  else
+    recommended=("${saved_recommended[@]}")
   fi
 
   local body
-  body="$(printf '{"status":"in_progress","currentStep":5,"deviceName":"%s","backupDestination":"%s","automaticBackupsEnabled":%s,"recommendedApps":%s,"completedSteps":["device","doctor","tailscale","storage","backups","apps"]}' \
-    "$(json_escape "${device_name:-Autark-OS}")" \
-    "$(json_escape "${backup_destination:-}")" \
-    "${automatic_backups:-true}" \
-    "$(json_list "${recommended[@]}")")"
-
+  body="$(python3 - "${device_name}" "${backup_destination}" "${backup_posture}" "${automatic_backups}" "${recommended[@]}" <<'PYBODY'
+import json, sys
+name, destination, posture, automatic = sys.argv[1:5]
+body = {'currentStep': 5, 'deviceName': name, 'backupPosture': posture,
+        'automaticBackupsEnabled': automatic == 'true', 'recommendedApps': sys.argv[5:]}
+if posture != 'later':
+    body['backupDestination'] = destination
+print(json.dumps(body))
+PYBODY
+)"
   if ! api_put /api/system/onboarding "${body}" >/dev/null; then
     rm -f "${onboarding_file}" "${doctor_file}"
-    log "Could not save setup choices."
+    log "Could not save setup choices. Setup has not been marked complete."
     return 1
   fi
-  if ! api_post /api/system/onboarding/complete '{}' >/dev/null; then
+  if ! api_get /api/system/doctor >"${doctor_file}"; then
     rm -f "${onboarding_file}" "${doctor_file}"
-    log "Could not mark setup complete."
+    log "Choices were saved, but current readiness could not be checked. Retry setup."
     return 1
   fi
-
+  if [[ "$(setup_value readiness.canCompleteOnboarding "${doctor_file}")" != "true" ]]; then
+    log "$(setup_value summary "${doctor_file}")"
+    rm -f "${onboarding_file}" "${doctor_file}"
+    log "Choices were saved. Resolve the current readiness blocker before finishing."
+    return 1
+  fi
+  if [[ "$(setup_value readiness.finishAnywayRequiresAdvanced "${doctor_file}")" == "true" && "${acknowledge_optional}" != "true" ]]; then
+    log "$(setup_value summary "${doctor_file}")"
+    if [[ "${non_interactive}" -eq 0 ]] && confirm_default_no "Finish setup while leaving this optional work for later?"; then
+      acknowledge_optional=true
+    else
+      rm -f "${onboarding_file}" "${doctor_file}"
+      log "Choices were saved. Review optional work, then rerun with --acknowledge-optional-work or finish in the browser."
+      return 1
+    fi
+  fi
+  if ! api_post /api/system/onboarding/complete "{\"acknowledgeOptionalWork\":${acknowledge_optional}}" >"${onboarding_file}" 2>/dev/null \
+      || [[ "$(setup_value status "${onboarding_file}")" != "complete" ]]; then
+    if ! api_get /api/system/onboarding >"${onboarding_file}" || [[ "$(setup_value status "${onboarding_file}")" != "complete" ]]; then
+      rm -f "${onboarding_file}" "${doctor_file}"
+      log "Completion could not be confirmed. Choices remain saved; retry setup to recheck current readiness."
+      return 1
+    fi
+  fi
   rm -f "${onboarding_file}" "${doctor_file}"
   log "Setup complete."
-  print_setup_next_step
+  if [[ "${private_choice}" == "setup-now" && "${tailscale_connected}" != "true" ]]; then
+    log "Connect this host using ${browser_url}/access?tab=advanced. Private access is not complete until the host is connected."
+  fi
+  print_setup_next_step "${browser_url}"
 }
 
 case "${1:-help}" in

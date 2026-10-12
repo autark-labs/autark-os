@@ -121,7 +121,7 @@ export function starterAppsForMarketplace(
   storage: StorageReport | null | undefined,
 ) {
   const eligibleRecommendations = recommendedApps.filter((appId) => betaStarterAppIds.includes(appId));
-  const selectedIds = (eligibleRecommendations.length ? eligibleRecommendations : betaStarterAppIds).slice(0, 5);
+  const selectedIds = eligibleRecommendations.slice(0, 5);
   const appInstallsBlocked = doctor?.readiness.groups.find((group) => group.id === 'app-installs')?.status === 'warning';
   const privateAccessBlocked = doctor?.readiness.groups.find((group) => group.id === 'private-access')?.status === 'warning';
   const limitedStorage = storage?.status === 'warning' || storage?.status === 'critical' || (storage?.runtimeDisk.usedPercent ?? 0) >= 75;

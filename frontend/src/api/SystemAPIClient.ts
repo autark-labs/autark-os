@@ -23,16 +23,6 @@ export const SystemAPIClient = {
     return response.data;
   },
 
-  async completeSetupStep(step: string) {
-    const response = await httpClient.post<SetupProgress>('/api/setup/progress/complete', { step });
-    return response.data;
-  },
-
-  async skipSetupStep(step: string) {
-    const response = await httpClient.post<SetupProgress>('/api/setup/progress/skip', { step });
-    return response.data;
-  },
-
   async setupStatus() {
     const response = await httpClient.get<SystemSetupStatus>('/api/system/setup-status');
     return response.data;
@@ -58,8 +48,8 @@ export const SystemAPIClient = {
     return response.data;
   },
 
-  async completeOnboarding() {
-    const response = await httpClient.post<OnboardingState>('/api/system/onboarding/complete');
+  async completeOnboarding(acknowledgeOptionalWork = false) {
+    const response = await httpClient.post<OnboardingState>('/api/system/onboarding/complete', { acknowledgeOptionalWork });
     return response.data;
   },
 

@@ -25,6 +25,7 @@ type MarketplaceAppListProps = {
   selectedAppId: string;
   starterGuidance?: {
     appName: string;
+    detail: string;
     onDismiss: () => void;
     onReview: () => void;
   } | null;
@@ -126,7 +127,7 @@ export function MarketplaceAppList({ apps, installingAppId = null, onRestoreStar
   );
 }
 
-function StarterGuidance({ appName, onDismiss, onReview }: NonNullable<MarketplaceAppListProps['starterGuidance']>) {
+function StarterGuidance({ appName, detail, onDismiss, onReview }: NonNullable<MarketplaceAppListProps['starterGuidance']>) {
   return (
     <section aria-label="Starter app recommendation" className="mb-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-sky-300/15 bg-slate-800/60 px-3 py-2.5">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -135,7 +136,7 @@ function StarterGuidance({ appName, onDismiss, onReview }: NonNullable<Marketpla
         </span>
         <div className="min-w-0">
           <p className="text-xs font-semibold text-white">Start with {appName}</p>
-          <p className="mt-0.5 text-xs leading-4 text-sky-100/70">A private password manager and a gentle first app to try on your server.</p>
+          <p className="mt-0.5 text-xs leading-4 text-sky-100/70">{detail}</p>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">

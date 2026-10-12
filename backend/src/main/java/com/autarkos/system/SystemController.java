@@ -76,8 +76,8 @@ public class SystemController {
     }
 
     @PostMapping("/onboarding/complete")
-    public OnboardingModels.OnboardingState completeOnboarding() {
-        return onboardingService.complete();
+    public OnboardingModels.OnboardingState completeOnboarding(@RequestBody(required = false) OnboardingModels.OnboardingCompletionRequest request) {
+        return onboardingService.complete(request != null && request.acknowledgeOptionalWork());
     }
 
     @GetMapping("/metrics")

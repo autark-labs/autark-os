@@ -1,3 +1,4 @@
+import type { OnboardingState } from '@/types/system';
 export type BackupPosture = 'routine' | 'external' | 'later';
 export type PrivateAccessChoice = 'setup-now' | 'local-only' | 'already-connected';
 
@@ -29,11 +30,11 @@ export function clampOnboardingStep(step: number | null | undefined): number {
   return Math.max(0, Math.min(step ?? 0, onboardingSteps.length - 1));
 }
 
-export function completedOnboardingSteps(nextStep: number): string[] {
+export function completedOnboardingSteps(nextStep: number, tailscaleConnected = false): string[] {
   const completed = new Set<string>();
   if (nextStep >= 1) completed.add('device');
   if (nextStep >= 2) completed.add('doctor');
-  if (nextStep >= 3) completed.add('tailscale');
+  if (nextStep >= 3 && tailscaleConnected) completed.add('tailscale');
   if (nextStep >= 4) {
     completed.add('storage');
     completed.add('backups');
@@ -61,4 +62,17 @@ export function cleanPrivateAccessChoice(value: string, tailscaleConnected: bool
     return value;
   }
   return tailscaleConnected ? 'already-connected' : 'local-only';
+}
+
+export function draftFromState(state: OnboardingState): OnboardingDraft {
+  const defaultDestination = `${state.runtimePath}/backups`;
+  const backupDestination = state.backupDestination || defaultDestination;
+  return {
+    automaticBackups: state.automaticBackupsEnabled,
+    backupDestination,
+    backupPosture: state.backupPosture,
+    deviceName: state.deviceName || 'Autark-OS',
+    privateAccessChoice: cleanPrivateAccessChoice(state.privateAccessChoice, state.tailscaleConnected),
+    selectedApps: state.recommendedApps,
+  };
 }

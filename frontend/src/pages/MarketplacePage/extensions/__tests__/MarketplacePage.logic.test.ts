@@ -166,7 +166,7 @@ test('starterAppsForMarketplace marks blocked and storage-review recommendations
   assert.match(recommendations[1].notes.join(' '), /Storage is tight/);
 });
 
-test('starterAppsForMarketplace falls back to curated starter apps when onboarding did not pick apps', () => {
+test('starterAppsForMarketplace preserves an explicit empty onboarding selection', () => {
   const apps = [
     app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }),
     app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity' }),
@@ -177,7 +177,7 @@ test('starterAppsForMarketplace falls back to curated starter apps when onboardi
 
   const recommendations = starterAppsForMarketplace(apps, [], new Map(), null, null);
 
-  assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), betaStarterAppIds);
+  assert.deepEqual(recommendations, []);
 });
 
 test('starterAppsForMarketplace does not turn a non-starter app into an onboarding recommendation', () => {
@@ -190,7 +190,7 @@ test('starterAppsForMarketplace does not turn a non-starter app into an onboardi
 
   const recommendations = starterAppsForMarketplace(apps, ['vaultwarden'], new Map(), null, null);
 
-  assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), betaStarterAppIds);
+  assert.deepEqual(recommendations, []);
 });
 
 test('shouldShowStartHereSection hides dismissed or fully installed starter recommendations', () => {

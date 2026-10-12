@@ -12,6 +12,8 @@ test('only returns to safe same-app destinations after setup', () => {
   assert.equal(safePostSetupPath('//example.com'), '/home');
   assert.equal(safePostSetupPath('https://example.com'), '/home');
   assert.equal(safePostSetupPath(null), '/home');
+  assert.equal(safePostSetupPath('/missing-page'), '/home');
+  assert.equal(safePostSetupPath('/access?tab=advanced'), '/access?tab=advanced');
 });
 
 test('a setup return target cannot create a setup redirect loop', () => {

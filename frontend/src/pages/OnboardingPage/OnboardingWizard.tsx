@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import type { OnboardingState, SystemSetupStatus } from '@/types/system';
 import {
   clampOnboardingStep,
-  cleanPrivateAccessChoice,
+  draftFromState,
   completedOnboardingSteps,
   onboardingSteps,
   validateOnboardingStep,
@@ -84,18 +84,19 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const nextState = await SystemAPIClient.updateOnboarding({
       status: 'in_progress',
       currentStep: nextStep,
-      deviceName: draft.deviceName.trim(),
-      backupDestination: nextStep >= 4 ? destination : undefined,
-      automaticBackupsEnabled: nextStep >= 4 ? (draft.backupPosture === 'later' ? false : draft.automaticBackups) : undefined,
-      privateAccessChoice: nextStep >= 3 ? draft.privateAccessChoice : undefined,
-      recommendedApps: nextStep >= 5 ? draft.selectedApps : undefined,
-      completedSteps: completedOnboardingSteps(nextStep),
+      deviceName: step === 0 ? draft.deviceName.trim() : undefined,
+      backupDestination: step === 3 ? destination : undefined,
+      backupPosture: step === 3 ? draft.backupPosture : undefined,
+      automaticBackupsEnabled: step === 3 ? (draft.backupPosture === 'later' ? false : draft.automaticBackups) : undefined,
+      privateAccessChoice: step === 2 ? draft.privateAccessChoice : undefined,
+      recommendedApps: step === 4 ? draft.selectedApps : undefined,
+      completedSteps: completedOnboardingSteps(nextStep, state.tailscaleConnected),
     });
     setState(nextState);
     setDraft(draftFromState(nextState));
     setStep(clampOnboardingStep(nextStep));
     return nextState;
-  }, [defaultBackupDestination, draft, state]);
+  }, [defaultBackupDestination, draft, state, step]);
 
   const moveBack = useCallback(async () => {
     const previousStep = Math.max(0, step - 1);
@@ -103,19 +104,15 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setSaving(true);
     setError(null);
     try {
-      const nextState = await SystemAPIClient.updateOnboarding({
-        status: 'in_progress',
-        currentStep: previousStep,
-        completedSteps: completedOnboardingSteps(previousStep),
-      });
-      setState(nextState);
-      setStep(previousStep);
+      const validation = validateOnboardingStep(step, draft);
+      if (validation) { setError(validation); return; }
+      await persistDraft(previousStep);
     } catch (saveError) {
       setError(apiErrorMessage(saveError, 'Autark-OS could not save setup progress.'));
     } finally {
       setSaving(false);
     }
-  }, [state, step]);
+  }, [draft, persistDraft, state, step]);
 
   const moveNext = useCallback(async () => {
     const validation = validateOnboardingStep(step, draft);
@@ -152,16 +149,24 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setSaving(true);
     setError(null);
     try {
-      await persistDraft(6);
-      await persistSetupProgress(draft.privateAccessChoice);
-      await SystemAPIClient.completeOnboarding();
-      onComplete(draft.privateAccessChoice === 'setup-now' && !state.tailscaleConnected);
+      const completed = await SystemAPIClient.completeOnboarding(advancedFinish);
+      onComplete(completed.privateAccessChoice === 'setup-now' && !completed.tailscaleConnected);
     } catch (saveError) {
-      setError(apiErrorMessage(saveError, 'Setup could not be saved.'));
+      // Completion may have committed before its response was lost. This small
+      // durable read does not depend on the host checks that may currently fail.
+      const progress = await SystemAPIClient.setupProgress().catch(() => null);
+      if (progress?.setupComplete) {
+        onComplete(state.privateAccessChoice === 'setup-now' && !state.tailscaleConnected);
+        return;
+      }
+      const refreshed = await SystemAPIClient.onboarding().catch(() => null);
+      if (refreshed) setState(refreshed);
+      setAdvancedFinish(false);
+      setError(apiErrorMessage(saveError, 'Setup could not be confirmed. Your choices are retained; check readiness and try again.'));
     } finally {
       setSaving(false);
     }
-  }, [advancedFinish, draft, onComplete, persistDraft, readiness, state]);
+  }, [advancedFinish, draft, onComplete, readiness, state]);
 
   const updateDraft = useCallback((updates: Partial<OnboardingDraft>) => {
     setDraft((currentDraft) => ({ ...currentDraft, ...updates }));
@@ -209,7 +214,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         {error && <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-4 text-sm text-red-100" role="alert">{error}</div>}
 
         <WizardCard icon={iconForStep(current.id)} text={descriptionForStep(current.id)} title={current.label}>
-          {stepContent}
+          <fieldset className="min-w-0" disabled={saving}>{stepContent}</fieldset>
         </WizardCard>
 
         <footer className="flex flex-col-reverse gap-3 rounded-2xl border border-sky-400/25 bg-slate-900 p-4 shadow-xl shadow-slate-950/25 sm:flex-row sm:items-center sm:justify-between">
@@ -361,25 +366,6 @@ function emptyDraft(): OnboardingDraft {
   return { automaticBackups: true, backupDestination: '', backupPosture: 'routine', deviceName: 'Autark-OS', privateAccessChoice: 'local-only', selectedApps: starterApps.map((app) => app.id) };
 }
 
-function draftFromState(state: OnboardingState): OnboardingDraft {
-  const defaultDestination = `${state.runtimePath}/backups`;
-  const backupDestination = state.backupDestination || defaultDestination;
-  const backupPosture: BackupPosture = !state.automaticBackupsEnabled ? 'later' : backupDestination === defaultDestination ? 'routine' : 'external';
-  return { automaticBackups: state.automaticBackupsEnabled, backupDestination, backupPosture, deviceName: state.deviceName || 'Autark-OS', privateAccessChoice: cleanPrivateAccessChoice(state.privateAccessChoice, state.tailscaleConnected), selectedApps: state.recommendedApps.filter((id) => starterApps.some((app) => app.id === id)) };
-}
-
-async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {
-  await SystemAPIClient.completeSetupStep('welcome');
-  await SystemAPIClient.completeSetupStep('host_check');
-  await SystemAPIClient.completeSetupStep('docker_check');
-  await SystemAPIClient.completeSetupStep('access_choice');
-  if (privateAccessChoice === 'local-only') await SystemAPIClient.skipSetupStep('tailscale_connect');
-  else await SystemAPIClient.completeSetupStep('tailscale_connect');
-  await SystemAPIClient.completeSetupStep('starter_apps');
-  await SystemAPIClient.skipSetupStep('first_backup');
-  await SystemAPIClient.completeSetupStep('done');
-}
-
 function iconForStep(step: string): LucideIcon {
   if (step === 'device') return ServerCog;
   if (step === 'readiness') return ShieldCheck;
@@ -406,7 +392,7 @@ function privateAccessSummary(choice: PrivateAccessChoice, connected: boolean) {
 
 function backupSummary(posture: BackupPosture, automaticBackups: boolean) {
   if (posture === 'later') return 'Later';
-  if (!automaticBackups) return 'Manual only';
+  if (!automaticBackups) return posture === 'external' ? 'External folder · manual only' : 'Same device · manual only';
   if (posture === 'external') return 'External folder';
   return 'Same device';
 }

@@ -33,8 +33,10 @@ class SetupProgressControllerTests {
     private SetupProgressService service() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
+        var layout = new RuntimeLayout(properties);
+        var repository = JpaTestRepositories.projectSettingsRepository(layout);
         return new SetupProgressService(
-                JpaTestRepositories.projectSettingsRepository(new RuntimeLayout(properties)),
+                repository, OnboardingServiceTests.readyService(repository, layout),
                 () -> Instant.parse("2026-06-20T12:00:00Z"));
     }
 }

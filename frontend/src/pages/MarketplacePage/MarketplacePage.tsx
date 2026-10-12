@@ -1,3 +1,4 @@
+import betaScope from '@beta-scope';
 import { BackupReviewDialog } from '@/components/autark-os/BackupReviewDialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -388,6 +389,7 @@ function MarketplacePage() {
             selectedAppId={selectedView?.application.id ?? ''}
             starterGuidance={starterGuidanceVisible && starterRecommendation ? {
               appName: starterRecommendation.app.name,
+              detail: betaScope.apps.find((app) => app.id === starterRecommendation.app.id)?.detail ?? starterRecommendation.app.description,
               onDismiss: dismissStartHere,
               onReview: () => openAppDetails(starterRecommendation.app.id),
             } : null}
